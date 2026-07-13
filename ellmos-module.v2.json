@@ -3,7 +3,7 @@
   "id": "WORKFLOWHOOKER",
   "display_name": "WORKFLOWHOOKER",
   "category": "orchestration",
-  "kind": "library",
+  "kind": "workflow",
   "status": "planned",
   "visibility": "private",
   "provides": [
