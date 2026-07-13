@@ -63,6 +63,26 @@ class StateSource(Protocol):
 Geplante Adapter: `taskplan` (offene Aufgaben, Locks), `git` (Diff-Umfang, uncommittete Arbeit),
 `files`, `custom` per entry_point.
 
+## Verhältnis zu USMC: eigenständig, aber importierbar (Seam)
+
+Wie MemoryHooker bleibt dieses Modul **eigenständig** und wird von **USMC importiert**, wenn
+vorhanden. Fehlt USMC, greift ein einfacherer Fallback statt eines Fehlers — dasselbe Seam-Muster,
+mit dem Rinnsal schon TASKPLAN einbindet.
+
+```
+USMC vorhanden -> volle Fähigkeit: Checks kennen Sitzungshistorie, Lektionen, wiederkehrende Ticks
+USMC fehlt     -> Fallback: nur zustandslose Checks (git-Diff, offene Tasks, Lock-Status)
+```
+
+**Aber Vorsicht bei der Zuordnung:** MemoryHooker gehört fachlich klar zu USMC — er liefert
+**Wissen**. WorkflowHooker liefert **Steuerung**, und die ist kein Memory. Er *nutzt* USMC (für
+`times_shown`, Tick-Erkennung, Sitzungsverlauf), aber er *gehört* nicht hinein. Deshalb zwei Module
+und nicht eines: Sie hängen unterschiedlich stark an USMC.
+
+**Was er aus USMC/BACH zieht, wenn verfügbar:** `memory_lessons.trigger_words` /
+`trigger_events` (Lektionen, die bei Stichwörtern feuern), `times_shown` / `last_shown` (nicht
+dieselbe Lektion zweimal), `memory_consolidation` (was wird überhaupt je abgerufen).
+
 ## Modi — einstellbar, nicht fest verdrahtet
 
 ```toml
