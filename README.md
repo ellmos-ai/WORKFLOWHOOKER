@@ -63,12 +63,48 @@ class StateSource(Protocol):
 Geplante Adapter: `taskplan` (offene Aufgaben, Locks), `git` (Diff-Umfang, uncommittete Arbeit),
 `files`, `custom` per entry_point.
 
-## Verhältnis zu BACH
+## Modi — einstellbar, nicht fest verdrahtet
 
-BACHs Injektoren sind der Ideengeber. Was dort **Steuerung** ist (Zwischenchecks, Erinnerungen an
-Verfahren) gehört hierher; was dort **Wissen** ist, gehört in MemoryHooker. Die
-Orchestrierungs-Maschinerie wird **nicht** übernommen — sie bleibt in der Hook-Schicht, statt in ein
-Fachmodul zu wandern.
+```toml
+[mode]
+checks = ["closing_gate"]        # jeder Check einzeln zuschaltbar, keiner per Default an
+max_messages_per_session = 3     # danach schweigt das Modul — hart
+cooldown_minutes = 5             # Vorbild: BACHs Injektor-Cooldowns (1-3 min)
+
+[providers]
+order = ["claude", "codex", "git", "manual"]   # erster verfuegbarer gewinnt
+```
+
+**Provider-Fallback wie bei MemoryHooker:** Nicht jeder Agent hat dieselben Hooks. `git` ist der
+universelle Fallback — Git-Hooks funktionieren überall, unabhängig vom Agenten, und feuern an
+Arbeits**grenzen** (`pre-commit`, `pre-push`). Für ein Abschluss-Gate ist das sogar der *natürlichere*
+Ort als ein Agenten-Hook.
+
+## Verhältnis zu BACH — die konkrete Vorlage
+
+BACH hat **sieben Injektoren** (`python bach.py inject --help`). **Fünf davon sind Steuerung und
+gehören hierher:**
+
+| BACH-Injektor | Was er tut |
+|---|---|
+| **`StrategyInjector`** | Triggerwort → hilfreicher Gedanke. „Fehler" → *„Fehler sind wichtige Informationen"*; „komplex" → *„in kleine Schritte zerlegen"*; „blockiert" → *„überspringen und später zurückkommen"* |
+| **`ToolInjector`** | Erinnert an vorhandene Tools. Begründung im Docstring: *„Tools sind die Hände der LLMs — ohne Erinnerung werden sie vergessen und unnötig neu erstellt."* |
+| **`BetweenInjector`** | Between-Task-Erinnerung nach `done` — erkennt Session-Ende und schweigt dann |
+| **`MetaFeedbackInjector`** | Erkennt **wiederkehrende LLM-Ticks** und injiziert Korrektur-Feedback. **Auto-Deaktivierung, wenn das Muster nicht mehr auftritt** |
+| **`TimeInjector`** | Timebeat + ungelesene Nachrichten |
+
+(`ContextInjector` und Teile von `ReminderInjector` gehören dagegen zu **MemoryHooker** — sie liefern
+Wissen, keine Steuerung.)
+
+**Drei Mechanismen sind übernehmenswert, weil sie das Spam-Problem lösen:**
+
+1. **Cooldowns** (BACH: 1–3 min je Injektor) — verhindert Dauerfeuer.
+2. **Auto-Deaktivierung** (`MetaFeedbackInjector`) — ein Check, der nichts mehr findet, **schaltet
+   sich selbst ab**. Das ist die eleganteste Antwort auf „ab wann nervt es".
+3. **`usage_count`** — BACH zählt, welcher Trigger je gefeuert hat. Wer nie feuert, kann weg.
+
+**Nicht übernommen** wird die Orchestrierungs-Maschinerie *innerhalb* der Fachmodule — sie bleibt in
+der Hook-Schicht.
 
 ## Lizenz
 
