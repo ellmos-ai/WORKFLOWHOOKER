@@ -83,6 +83,50 @@ und nicht eines: Sie hängen unterschiedlich stark an USMC.
 `trigger_events` (Lektionen, die bei Stichwörtern feuern), `times_shown` / `last_shown` (nicht
 dieselbe Lektion zweimal), `memory_consolidation` (was wird überhaupt je abgerufen).
 
+## Die Fähigkeits-Kaskade: jede Schicht schaltet mehr frei, keine ist Pflicht
+
+```
+  USMC                 importiert die Hooker      -> Schalter: Hooker an/aus
+    └── Hooker         eigene Config              -> Feineinstellungen (Checks, Schwellen, Provider)
+          └── ControlCenter MCP  wird gesucht     -> schaltet ZUSATZINJEKTOREN frei
+```
+
+| Vorhanden | Fähigkeit |
+|---|---|
+| nur WorkflowHooker | zustandslose Checks (git-Diff, offene Tasks, Lock-Status) |
+| **+ USMC** | Sitzungsverlauf, `times_shown`, Erkennung wiederkehrender Ticks |
+| **+ ControlCenter MCP** | **Zusatzinjektoren**: passende Skills und Tools vorschlagen |
+
+**Nichts davon ist eine harte Abhängigkeit.** Fehlt eine Schicht, fallen ihre Fähigkeiten weg —
+nicht das Modul.
+
+### Was ControlCenter freischaltet — hier liegt der Hauptnutzen
+
+Der **ControlCenter-MCP-Server** kennt die installierten Skills, Tools, Profile und Bundles
+(`controlcenter_find_skill`, `controlcenter_list_tools`, `controlcenter_suggest_bundles`). Der Hook
+**erkennt ihn, liest ihn aus und liefert zurück** — und wird damit zum **Werkzeug-Ratgeber**:
+„Für diese Aufgabe gibt es den Skill X und das Tool Y."
+
+Das ist die Live-Fassung von BACHs `ToolInjector`. Dessen Begründung gilt hier wörtlich:
+
+> *„Tools sind die Hände der LLMs — ohne Erinnerung werden sie vergessen und unnötig neu erstellt."*
+
+**Der entscheidende Unterschied:** BACHs Version arbeitet gegen eine gepflegte Liste und veraltet
+mit jeder Installation. Die ControlCenter-Version fragt den **tatsächlichen Stand** ab — sie *kann*
+nicht veralten. Genau deshalb gehört dieser Injektor hierher und nicht in eine statische Tabelle.
+
+```toml
+[controlcenter]
+enabled = "auto"        # auto (nutzen wenn erreichbar) | on (Pflicht) | off
+suggest_skills = true
+suggest_tools  = true
+warn_before_new_tool = true   # BACHs ToolInjector: warnt, bevor ein Tool neu gebaut wird,
+                              # das es schon gibt
+```
+
+**Erkennung, nicht Annahme:** `auto` heißt, das Modul *prüft*, ob der Server antwortet — und
+schweigt still, wenn nicht. Ein fehlender MCP-Server darf nie ein Fehler sein.
+
 ## Modi — einstellbar, nicht fest verdrahtet
 
 ```toml
