@@ -1,6 +1,19 @@
 # WorkflowHooker
 
-**Status: Konzept — Gerüst angelegt, nicht implementiert.** (2026-07-13)
+**Status: 0.1.0 — v0.1 (Abschluss-Gate) implementiert, plus v0.2-Checks
+vorgezogen.** (2026-07-23)
+
+Umgesetzt: `StateSource`-Protokoll, Config-Schicht (`workflowhooker.toml`,
+`checks = []` per Default), Adapter `git` (read-only, `git status
+--porcelain`) + `files` (LOCK*.txt-Konvention) + `taskplan` als
+dokumentierter Stub, drei einzeln zuschaltbare Checks (`closing_gate`,
+`drift_warning`, `scope_guard`) mit generischer Auto-Deaktivierung nach dem
+MetaFeedbackInjector-Muster, Meldungsbudget + Cooldown (4-Augen-Hook-Regel),
+Provider `claude` (Hook-Snippet-Generator ohne `PreToolUse` im Default,
+optionale separate Blocker-Variante) + `manual` (CLI); `codex`/`git`-Provider
+als dokumentierte Stubs. 58 Tests, darunter echte Temp-Git-Repo-Fixtures.
+Siehe „Install" unten und CHANGELOG.md. Was bewusst fehlt: Abschnitt „Was
+noch nicht umgesetzt ist" am Ende dieser Datei.
 
 Hooks, die den **Arbeitsablauf** eines Agenten steuern — nicht sein Wissen.
 
@@ -169,6 +182,46 @@ Wissen, keine Steuerung.)
 
 **Nicht übernommen** wird die Orchestrierungs-Maschinerie *innerhalb* der Fachmodule — sie bleibt in
 der Hook-Schicht.
+
+## Install
+
+1. `pip install -e ".[dev]"` im Repo-Klon (zero-dependency zur Laufzeit;
+   `pytest` nur fuer die Testsuite).
+2. `workflowhooker.toml` anlegen und **explizit** die gewuenschten Checks
+   eintragen (`[mode] checks = ["closing_gate"]`) — ohne Datei bleibt das
+   Modul komplett stumm, das ist Absicht (README: "keiner ist per Default
+   an").
+3. Manuell testen: `python -m workflowhooker check` (liest Projektordner +
+   Git-Status des aktuellen Arbeitsverzeichnisses, sofern `--project-dir`
+   nicht gesetzt ist).
+4. Claude-Code-Hook einrichten (bleibt bewusst ein manueller Schritt):
+   `python -m workflowhooker install-snippet --out snippet.json` erzeugt den
+   `Stop`/`PreCompact`/`UserPromptSubmit`-Block, der von Hand in
+   `~/.claude/settings.json` unter `"hooks"` eingemischt wird. Enthaelt
+   niemals `PreToolUse` — die optionale Blocker-Variante
+   (`ClaudeProvider.pretooluse_blocker_snippet()`) ist bewusst eine
+   getrennte, nicht automatisch eingebundene Methode.
+
+## Was noch nicht umgesetzt ist
+
+- **`taskplan`-StateSource**: nur dokumentierter Stub (`available() ==
+  False`) — Anbindung an TASKPLAN/rinnsal fuer offene Aufgaben ist ARCHITECTURE.md
+  V4, noch nicht gebaut.
+- **`git`-Provider**: keine echte Git-Hook-Installation (`pre-commit`,
+  `pre-push`); bleibt Stub bis ROADMAP v0.2+.
+- **`codex`-Provider**: Hook-Ereignisse/-Format fuer Codex CLI nicht
+  verifiziert — bewusst kein geratener Code.
+- **`drift_warning`**: reine Proxy-Heuristik (Streuung ueber Top-Level-
+  Ordner) — versteht die eigentliche Aufgabe nicht und kann das laut README
+  auch nicht (Ermessensfrage).
+- **`scope_guard`**: warnt nur bei Dateizahl-Schwelle, NICHT bei fehlendem
+  Testlauf — ob Tests liefen, ist ohne CI-Anbindung nicht zuverlaessig
+  feststellbar (Faktentreue: kein geratener Fakt im Meldungstext).
+- **Verifikations-Erinnerung** und **Regelerinnerung zum passenden
+  Zeitpunkt** (ROADMAP v0.2): noch nicht gebaute Checks.
+- **Custom-Adapter per entry_point** (ROADMAP v0.3): noch nicht gebaut.
+- **Automatisches Eintragen des `claude`-Hook-Snippets** in eine echte
+  `settings.json` (bleibt bewusst manuell).
 
 ## Lizenz
 

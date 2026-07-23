@@ -1,6 +1,15 @@
 # -*- coding: utf-8 -*-
-"""WORKFLOWHOOKER — Gerüst. Siehe README.md und ROADMAP.md.
+"""WorkflowHooker -- Hooks, die den Arbeitsablauf eines Agenten steuern.
 
-Status: Konzept. Bewusst noch nicht implementiert.
+Siehe README.md und ROADMAP.md.
+
+Status: v0.1.0 -- Abschluss-Gate + Drift-/Umfangswaechter implementiert
+(keiner per Default aktiv).
 """
-__version__ = "0.0.0"
+
+from .config import Config, load_config
+from .protocol import ProjectState, StateSource
+
+__version__ = "0.1.0"
+
+__all__ = ["ProjectState", "StateSource", "Config", "load_config", "__version__"]

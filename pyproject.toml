@@ -4,13 +4,19 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "workflowhooker"
-version = "0.0.0"
+version = "0.1.0"
 description = "Hooks zur Steuerung des Arbeitsablaufs: Zwischenchecks, Abschluss-Gates, Drift-Warnungen."
 readme = "README.md"
 requires-python = ">=3.10"
 license = { text = "MIT" }
 authors = [{ name = "Lukas Geiger" }]
 dependencies = []
+
+[project.optional-dependencies]
+dev = ["pytest>=7"]
+
+[project.scripts]
+workflowhooker = "workflowhooker.cli:main"
 
 [tool.setuptools.packages.find]
 include = ["workflowhooker*"]

@@ -4,7 +4,8 @@
   "display_name": "WORKFLOWHOOKER",
   "category": "orchestration",
   "kind": "workflow",
-  "status": "planned",
+  "status": "development",
+  "version": "0.1.0",
   "visibility": "private",
   "provides": [
     "workflow.hook",
