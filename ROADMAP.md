@@ -22,9 +22,24 @@ Das sind Fragen mit einer objektiv prüfbaren Antwort — kein Ermessen, keine F
 Jeder Check ist ein eigener Schalter. Keiner ist per Default an, bis er sich bewährt hat.
 
 - [ ] Verifikations-Erinnerung („fertig" ohne Ausführung)
-- [ ] Drift-Warnung (Arbeit entfernt sich von der Aufgabe)
-- [ ] Umfangswächter (Lauf wächst über sein Budget)
+- [x] Drift-Warnung (Arbeit entfernt sich von der Aufgabe) — 0.1.0 als Proxy-Heuristik
+- [x] Umfangswächter (Lauf wächst über sein Budget) — 0.1.0 als `scope_guard`
 - [ ] Regelerinnerung zum passenden Zeitpunkt
+- [ ] **`goal_injector` / Aufgaben-Injektor [U 2026-07-23]:** erinnert an das ZIEL der
+  Sitzung — die positive Hälfte der Drift-Warnung („das Ziel war X" statt „du
+  streust"). Ziel-Quellen über StateSources: `taskplan` (aktive Task), Goal-Datei
+  (`AUFGABEN.txt`/`GOAL.md`), oder erster User-Prompt der Sitzung (bei SessionStart
+  gecacht). Wichtigstes Ereignis: **PreCompact** — das Ziel unmittelbar vor der
+  Kontext-Kompaktierung re-injizieren, genau gegen Zielverlust durch Kompaktierung.
+  Frequenz-Budget wie immer. **BACH-Erbe: ReminderInjector-Kern.**
+- [ ] **`loop_injector` [U 2026-07-23]:** weckt das Modell periodisch wieder auf.
+  Saubere Arbeitsteilung, weil Hooks keine Uhr haben: Der **Taktgeber** ist
+  provider-spezifisch (Claude Code: /loop / ScheduleWakeup / Cron; generisch:
+  Scheduled Task/cron — als `install-snippet`-Analogon generierbar); der Hooker
+  liefert das **Weck-Briefing** aus den StateSources (Ziel, offene Tasks, Locks,
+  uncommittete Arbeit → „hier stehst du, so geht es weiter"). **BACH-Erbe:
+  TimeInjector (Timebeat).** Zusammen mit goal_injector decken beide die letzten
+  zwei der sieben BACH-Injektoren funktional ab.
 
 ## v0.3 — Nutzerneutralität
 
