@@ -40,6 +40,12 @@ Jeder Check ist ein eigener Schalter. Keiner ist per Default an, bis er sich bew
   uncommittete Arbeit → „hier stehst du, so geht es weiter"). **BACH-Erbe:
   TimeInjector (Timebeat).** Zusammen mit goal_injector decken beide die letzten
   zwei der sieben BACH-Injektoren funktional ab.
+  **Zielnutzer-Klärung [U 2026-07-23]:** Claude Code braucht den loop_injector
+  NICHT (hat /loop, ScheduleWakeup, Cron). Zielnutzer sind **lokale Modelle**
+  (Ollama) über die ellmos-chat-Runtime — dort sitzen Uhr, aktivierbare
+  Timestamp-Injection (jeder Prompt gestempelt) und die Runner-Flags
+  `--goal`/`--loop` (siehe ellmos-chat TODO). Der Hooker bleibt zuständig für
+  das Briefing, nie für den Takt.
 
 ## v0.3 — Nutzerneutralität
 
