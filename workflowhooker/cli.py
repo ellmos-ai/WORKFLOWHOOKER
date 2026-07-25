@@ -70,10 +70,21 @@ def _state_path(args) -> Path:
 
 
 def _build_state_source(config: Config, project_dir: Path) -> CompositeStateSource:
+    """Baut die Quellen aus ``[sources].order`` (Default: alle).
+
+    Frueher waren alle drei hart verdrahtet -- ``order`` in der Config war
+    wirkungslos und suggerierte eine Kontrolle, die es nicht gab.
+    """
     files_dir = Path(config.sources.project_dir) if config.sources.project_dir else project_dir
     git_dir = Path(config.sources.git_dir) if config.sources.git_dir else project_dir
+
+    builders = {
+        "files": lambda: FilesStateSource(files_dir),
+        "git": lambda: GitStateSource(git_dir),
+        "taskplan": lambda: TaskplanStateSource(),
+    }
     return CompositeStateSource(
-        [FilesStateSource(files_dir), GitStateSource(git_dir), TaskplanStateSource()]
+        [builders[name]() for name in config.sources.order if name in builders]
     )
 
 

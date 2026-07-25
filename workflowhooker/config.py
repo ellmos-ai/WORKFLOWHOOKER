@@ -50,10 +50,28 @@ class ProvidersConfig:
     )
 
 
+VALID_SOURCES = ("files", "git", "taskplan")
+
+
 @dataclass
 class SourcesConfig:
+    """Welche Zustandsquellen den Projekt-Snapshot bilden.
+
+    ``order`` waehlt die Quellen aus (Default: alle). Wer nur einen Teil will,
+    listet ihn auf::
+
+        [sources]
+        order = ["git", "files"]
+
+    Die Reihenfolge bestimmt, wer bei ``meta``-Kollisionen gewinnt (spaetere
+    ueberschreiben fruehere); boolesche Felder werden ODER-verknuepft, die
+    Zaehler per Maximum. Eine nicht verfuegbare Quelle wird uebersprungen --
+    eine fehlende Quelle ist nie ein Fehler.
+    """
+
     project_dir: str | None = None  # fuer files-StateSource (LOCK*.txt)
     git_dir: str | None = None  # fuer git-StateSource (Default: project_dir/cwd)
+    order: list[str] = field(default_factory=lambda: list(VALID_SOURCES))
 
 
 @dataclass
@@ -73,6 +91,12 @@ class Config:
             raise ValueError("[mode].max_messages_per_session darf nicht negativ sein")
         if self.mode.cooldown_minutes < 0:
             raise ValueError("[mode].cooldown_minutes darf nicht negativ sein")
+        unknown_sources = [s for s in self.sources.order if s not in VALID_SOURCES]
+        if unknown_sources:
+            raise ValueError(
+                f"[sources].order enthaelt unbekannte Quellen {unknown_sources}; "
+                f"gueltig sind {VALID_SOURCES}"
+            )
 
 
 def default_config() -> Config:
@@ -135,6 +159,7 @@ def _config_from_dict(data: dict) -> Config:
     sources = SourcesConfig(
         project_dir=sources_data.get("project_dir") or None,
         git_dir=sources_data.get("git_dir") or None,
+        order=[str(name) for name in sources_data.get("order", VALID_SOURCES) if str(name)],
     )
 
     return Config(mode=mode, checks=checks, providers=providers, sources=sources)

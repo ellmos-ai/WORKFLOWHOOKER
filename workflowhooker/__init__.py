@@ -10,6 +10,6 @@ Status: v0.1.0 -- Abschluss-Gate + Drift-/Umfangswaechter implementiert
 from .config import Config, load_config
 from .protocol import ProjectState, StateSource
 
-__version__ = "0.1.0"
+__version__ = "0.2.0"
 
 __all__ = ["ProjectState", "StateSource", "Config", "load_config", "__version__"]

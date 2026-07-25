@@ -11,10 +11,10 @@ Kandidat mit dem klarsten Nutzen: **Abschluss-Gate** (`Stop`-Ereignis).
 Prüft vor dem Beenden: Lock entfernt? Steuerdateien nachgezogen? Eigene Änderungen committet?
 Das sind Fragen mit einer objektiv prüfbaren Antwort — kein Ermessen, keine Fehlalarme.
 
-- [ ] `StateSource`-Protokoll (`snapshot() -> State`)
-- [ ] Adapter: `git` (uncommittete Arbeit, Diff-Umfang)
-- [ ] Adapter: `taskplan` (offene Aufgaben, aktive Locks)
-- [ ] Hook `Stop`: Abschluss-Gate
+- [x] `StateSource`-Protokoll (`snapshot()` + `available()`) — gebaut
+- [x] Adapter: `git` (uncommittete Arbeit, Diff-Umfang) — gebaut
+- [x] Adapter: `taskplan` (offene Aufgaben, aktive Locks) — gebaut; seit 0.2.0 ueber `[sources].order` zuschaltbar
+- [x] Hook `Stop`: Abschluss-Gate — gebaut und in `~/.claude/settings.json` registriert
 - [ ] **Messen:** Wie oft greift er? Wie oft zu Recht?
 
 ## v0.2 — Weitere Checks, einzeln zugeschaltet

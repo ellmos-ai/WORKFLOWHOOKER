@@ -26,14 +26,29 @@ class CompositeStateSource:
         self.sources = sources
 
     def available(self) -> bool:
-        return any(source.available() for source in self.sources)
+        return any(self._safe_available(source) for source in self.sources)
+
+    @staticmethod
+    def _safe_available(source: StateSource) -> bool:
+        """Eine Quelle, die schon beim Verfuegbarkeitscheck scheitert, gilt als
+        abwesend -- nicht als Fehler des ganzen Snapshots."""
+        try:
+            return bool(source.available())
+        except Exception:
+            return False
 
     def snapshot(self) -> ProjectState:
         merged = ProjectState()
         for source in self.sources:
-            if not source.available():
+            if not self._safe_available(source):
                 continue
-            snap = source.snapshot()
+            try:
+                snap = source.snapshot()
+            except Exception:
+                # Eine kaputte Quelle darf die uebrigen nicht mitreissen: der
+                # Gate-Check soll lieber mit unvollstaendigem Zustand laufen
+                # als gar nicht.
+                continue
             merged = replace(
                 merged,
                 has_lock=merged.has_lock or snap.has_lock,

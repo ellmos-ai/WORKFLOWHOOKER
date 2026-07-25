@@ -2,6 +2,28 @@
 
 Alle nennenswerten Aenderungen an WorkflowHooker.
 
+## [0.2.0] - 2026-07-25
+
+### Behoben
+
+- **`[sources].order` war wirkungslos.** `_build_state_source` verdrahtete alle
+  drei Quellen hart; die Konfiguration wurde zwar geparst, aber nie
+  ausgewertet. Eine Live-Config mit `order = ["git", "files"]` suggerierte
+  damit eine Kontrolle, die es nicht gab -- `taskplan` lief immer mit, auch
+  wenn es nicht dastand. `order` waehlt die Quellen jetzt wirklich aus und
+  bestimmt ihre Reihenfolge; ohne Angabe bleibt es bei allen dreien.
+- **Fehlertoleranz der Komposition.** Scheiterte eine Quelle in `available()`
+  oder `snapshot()`, riss sie den gesamten Snapshot mit. Jetzt wird sie
+  uebersprungen -- der Gate-Check laeuft lieber mit unvollstaendigem Zustand
+  als gar nicht (dasselbe Prinzip wie bei den Memory-Backends).
+
+### Hinzugefuegt
+
+- `SourcesConfig.order` + `VALID_SOURCES`; `validate()` weist unbekannte
+  Quellen mit Namen zurueck.
+- 10 Tests: Auswahl und Reihenfolge, weggelassene Quelle wird nicht gebaut,
+  Default baut weiterhin alle drei, Fehlertoleranz bei kaputten Quellen.
+
 ## [0.1.0] - 2026-07-23
 
 Erste lauffaehige Fassung: v0.1 (Abschluss-Gate) aus der README/ROADMAP
