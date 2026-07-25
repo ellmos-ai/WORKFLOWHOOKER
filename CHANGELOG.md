@@ -4,6 +4,17 @@ Alle nennenswerten Aenderungen an WorkflowHooker.
 
 ## [0.2.0] - 2026-07-25
 
+### Hinzugefuegt
+
+- Standard-Dokumentationsindex `llms.txt` für KI-Agenten-Discovery angelegt (`Last-checked: 2026-07-25`).
+- GitHub Actions CI-Workflow (`.github/workflows/ci.yml`) für automatisierte Pytest-Testläufe hinzugefügt.
+- Modulmanifest- & Metadata-Tests (`tests/test_workflowhooker.py`) in der Testsuite verankert.
+- Shields.io Status-Badges und KI/LLM-Integrationshinweis in `README.md` eingebunden.
+- `SourcesConfig.order` + `VALID_SOURCES`; `validate()` weist unbekannte
+  Quellen mit Namen zurueck.
+- 10 Tests: Auswahl und Reihenfolge, weggelassene Quelle wird nicht gebaut,
+  Default baut weiterhin alle drei, Fehlertoleranz bei kaputten Quellen.
+
 ### Behoben
 
 - **`[sources].order` war wirkungslos.** `_build_state_source` verdrahtete alle
@@ -16,13 +27,6 @@ Alle nennenswerten Aenderungen an WorkflowHooker.
   oder `snapshot()`, riss sie den gesamten Snapshot mit. Jetzt wird sie
   uebersprungen -- der Gate-Check laeuft lieber mit unvollstaendigem Zustand
   als gar nicht (dasselbe Prinzip wie bei den Memory-Backends).
-
-### Hinzugefuegt
-
-- `SourcesConfig.order` + `VALID_SOURCES`; `validate()` weist unbekannte
-  Quellen mit Namen zurueck.
-- 10 Tests: Auswahl und Reihenfolge, weggelassene Quelle wird nicht gebaut,
-  Default baut weiterhin alle drei, Fehlertoleranz bei kaputten Quellen.
 
 ## [0.1.0] - 2026-07-23
 
