@@ -1,6 +1,6 @@
 # workflowhooker
 
-> Last-checked: 2026-07-25
+> Last-checked: 2026-07-26
 
 WorkflowHooker (`ellmos-ai/workflowhooker`) ist ein Modul im `ellmos-ai`-Ökosystem für agentische Arbeitsablaufsteuerung, Pre-Tool-Checks, Drift-Warnungen und Abschluss-Gates.
 

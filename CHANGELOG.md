@@ -4,6 +4,11 @@ Alle nennenswerten Aenderungen an WorkflowHooker.
 
 ## [0.2.0] - 2026-07-25
 
+### Gewartet (2026-07-26)
+
+- PEP 621 `[tool.pytest.ini_options]` Konfiguration in `pyproject.toml` ergänzt (`pythonpath = ["."]`), sodass `pytest` ohne explizites PYTHONPATH-Setzen direkt ausführbar ist.
+- `llms.txt` Header Last-checked Datum auf `2026-07-26` aktualisiert und 70/70 grüne Tests in der Testsuite verifiziert.
+
 ### Hinzugefuegt
 
 - Standard-Dokumentationsindex `llms.txt` für KI-Agenten-Discovery angelegt (`Last-checked: 2026-07-25`).

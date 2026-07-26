@@ -20,3 +20,7 @@ workflowhooker = "workflowhooker.cli:main"
 
 [tool.setuptools.packages.find]
 include = ["workflowhooker*"]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]
