@@ -158,3 +158,75 @@ def test_scope_guard_fires_when_many_files_changed(tmp_path, capsys, monkeypatch
     assert exit_code == 0
     out = capsys.readouterr().out
     assert "Umfangswaechter" in out
+
+
+def _hook_run(config_path, state_dir, project_dir, payload, monkeypatch, event="Stop"):
+    import io
+
+    monkeypatch.setattr("sys.stdin", io.StringIO(json.dumps(payload)))
+    return main([
+        "--config", str(config_path), "--state-dir", str(state_dir),
+        "--project-dir", str(project_dir), "hook-run", event,
+    ])
+
+
+def test_hook_run_trennt_state_nach_session_id_aus_stdin(tmp_path, capsys, monkeypatch):
+    """Regression: Sitzungskennung kommt NUR aus dem stdin-JSON.
+
+    Vor dem Fix (2026-07-27) wurde der State-Pfad aus ``args.session_id``
+    gebildet, bevor stdin gelesen war -- alle Sitzungen teilten sich
+    ``session-default.json``. Damit wurde aus ``max_messages_per_session`` ein
+    Budget "ueberhaupt": Nach N Meldungen schwieg das Modul dauerhaft statt nur
+    bis zur naechsten Sitzung. ``--session-id`` konnte das nicht heilen, weil
+    Claude Code in Hook-Kommandos keine Variablen ersetzt.
+    """
+    (tmp_path / "LOCK.txt").write_text("owner: test\n", encoding="utf-8")
+    config_path = _write_config(tmp_path, checks=["closing_gate"], max_messages=1, cooldown_minutes=0)
+    state_dir = tmp_path / "state"
+
+    assert _hook_run(config_path, state_dir, tmp_path, {"session_id": "A"}, monkeypatch) == 0
+    assert capsys.readouterr().out.strip(), "erste Meldung der Sitzung A"
+
+    # Budget von 1 ist in Sitzung A aufgebraucht.
+    assert _hook_run(config_path, state_dir, tmp_path, {"session_id": "A"}, monkeypatch) == 0
+    assert capsys.readouterr().out == "", "Budget gilt innerhalb der Sitzung"
+
+    # Neue Sitzung: eigenes Budget.
+    assert _hook_run(config_path, state_dir, tmp_path, {"session_id": "B"}, monkeypatch) == 0
+    assert capsys.readouterr().out.strip(), "neue Sitzung startet mit frischem Budget"
+
+    namen = sorted(p.name for p in state_dir.iterdir())
+    assert namen == ["session-A.json", "session-B.json"], namen
+
+
+def test_session_id_aus_stdin_wird_dateinamentauglich_entschaerft(tmp_path, monkeypatch):
+    """Die Kennung wandert in einen Dateinamen und kommt von aussen."""
+    (tmp_path / "LOCK.txt").write_text("owner: test\n", encoding="utf-8")
+    config_path = _write_config(tmp_path, checks=["closing_gate"])
+    state_dir = tmp_path / "state"
+
+    assert _hook_run(
+        config_path, state_dir, tmp_path, {"session_id": "../../boese/x"}, monkeypatch
+    ) == 0
+
+    geschrieben = list(state_dir.iterdir())
+    assert len(geschrieben) == 1
+    assert geschrieben[0].parent == state_dir, "darf den State-Ordner nicht verlassen"
+    assert geschrieben[0].name == "session-boesex.json", geschrieben[0].name
+
+
+def test_cli_session_id_schlaegt_stdin(tmp_path, monkeypatch):
+    """Manuelle Aufrufe und Tests muessen weiter steuern koennen."""
+    (tmp_path / "LOCK.txt").write_text("owner: test\n", encoding="utf-8")
+    config_path = _write_config(tmp_path, checks=["closing_gate"])
+    state_dir = tmp_path / "state"
+
+    import io
+
+    monkeypatch.setattr("sys.stdin", io.StringIO(json.dumps({"session_id": "aus-stdin"})))
+    assert main([
+        "--config", str(config_path), "--state-dir", str(state_dir),
+        "--project-dir", str(tmp_path), "--session-id", "explizit", "hook-run", "Stop",
+    ]) == 0
+
+    assert [p.name for p in state_dir.iterdir()] == ["session-explizit.json"]

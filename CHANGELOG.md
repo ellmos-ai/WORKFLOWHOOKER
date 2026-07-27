@@ -2,6 +2,31 @@
 
 Alle nennenswerten Aenderungen an WorkflowHooker.
 
+## [Unreleased]
+
+### Behoben
+
+- **Sitzungstrennung: `session_id` wird jetzt aus dem stdin-JSON gelesen.**
+  `_cmd_hook_run` bildete den State-Pfad aus `args.session_id`; das stdin-JSON
+  wurde zwar konsumiert, sein Inhalt aber verworfen. Da ein Hook-Kommando in
+  `settings.json` die CLI-Option nicht fuellen kann (Claude Code ersetzt dort
+  keine Variablen), teilten sich **alle** Sitzungen `session-default.json`.
+
+  Wirkung, gemessen auf WORKSTATION-LG beim Verdrahten der Hooks (2026-07-27):
+  Beide Budgets dieses Moduls verloren ihren Sinn. Aus
+  `max_messages_per_session = 3` wurde "drei Meldungen ueberhaupt" — danach
+  schwieg das Modul **dauerhaft** statt nur bis zur naechsten Sitzung. Genau die
+  4-Augen-Hook-Regel, die das Budget durchsetzen soll, wurde dadurch ins
+  Gegenteil verkehrt: nicht zu viele Meldungen, sondern gar keine mehr.
+
+  Die CLI-Option behaelt Vorrang, damit manuelle Aufrufe und Tests weiterhin
+  steuern koennen; die Kennung wird vor der Verwendung im Dateinamen entschaerft
+  (sie kommt von aussen).
+
+- 3 Regressionstests (`tests/test_cli.py`): getrenntes Budget je Sitzung,
+  Budget greift innerhalb einer Sitzung, Pfad-Entschaerfung, CLI-Vorrang.
+  **73 Tests gruen.**
+
 ## [0.2.0] - 2026-07-25
 
 ### Gewartet (2026-07-26)

@@ -130,12 +130,28 @@ def _cmd_check(args) -> int:
 
 def _cmd_hook_run(args) -> int:
     config = load_config(args.config)
-    state_path = _state_path(args)
+
+    # stdin MUSS vor dem State gelesen werden: Die Sitzungskennung steht nur dort.
+    # (Frueher wurde der Inhalt verworfen und nur konsumiert, damit kein Hook-
+    # Prozess an ungelesenem stdin haengt -- das Konsumieren bleibt, der Inhalt
+    # wird jetzt zusaetzlich ausgewertet.)
+    payload = _read_stdin_json()
+
+    # Ohne diese Zeile landen ALLE Sitzungen in session-default.json, und die
+    # beiden Budgets dieses Moduls verlieren ihren Sinn: Aus
+    # `max_messages_per_session = 3` wird "3 Meldungen ueberhaupt" -- danach
+    # schweigt das Modul dauerhaft statt nur bis zur naechsten Sitzung.
+    # Gemessen auf WORKSTATION-LG am 2026-07-27 beim Verdrahten der Hooks.
+    #
+    # `--session-id` allein reicht nicht: Ein Hook-Kommando in settings.json kann
+    # sie nicht fuellen, weil Claude Code dort keine Variablen ersetzt. Die
+    # Kennung kommt ausschliesslich im stdin-JSON. Die CLI-Option behaelt Vorrang,
+    # damit manuelle Aufrufe und Tests weiterhin steuern koennen.
+    state_path = state_path_for_session(
+        args.session_id or _extract_session_id(payload), args.state_dir
+    )
     state = SessionState.load(state_path)
     project_dir = args.project_dir or Path.cwd()
-
-    _read_stdin_json()  # aktuell ungenutzt, aber bewusst konsumiert (kein
-    # hangender Hook-Prozess durch ungelesenes stdin)
 
     message = _run_active_checks(config, project_dir, state)
     state.save(state_path)
@@ -149,6 +165,22 @@ def _cmd_hook_run(args) -> int:
         }
         print(json.dumps(output, ensure_ascii=False))
     return 0
+
+
+def _extract_session_id(payload: dict) -> str | None:
+    """Sitzungskennung aus dem Hook-stdin-JSON, dateinamentauglich gemacht.
+
+    Der Wert wandert in einen Dateinamen (``session-<id>.json``), deshalb bleiben
+    nur unbedenkliche Zeichen stehen. Claude Code liefert UUIDs, aber der Wert
+    kommt von aussen -- ein ``..`` oder ein Pfadtrenner darf nicht durchschlagen.
+    Bleibt nichts uebrig, wird ``None`` zurueckgegeben: dann greift wie bisher
+    ``session-default.json``, statt einen kaputten Namen zu bauen.
+    """
+    raw = payload.get("session_id")
+    if not isinstance(raw, str):
+        return None
+    sicher = "".join(z for z in raw if z.isalnum() or z in "-_")[:64]
+    return sicher or None
 
 
 def _read_stdin_json() -> dict:
