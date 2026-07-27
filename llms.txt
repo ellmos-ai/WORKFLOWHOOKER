@@ -1,12 +1,14 @@
 # workflowhooker
 
-> Last-checked: 2026-07-26
+> Last-checked: 2026-07-27
+> Verification: 73/73 Pytest-Tests 100% grün.
 
 WorkflowHooker (`ellmos-ai/workflowhooker`) ist ein Modul im `ellmos-ai`-Ökosystem für agentische Arbeitsablaufsteuerung, Pre-Tool-Checks, Drift-Warnungen und Abschluss-Gates.
 
 ## Kern-Dokumentation
 
-- [README.md](README.md): Architektur, Abgrenzung zu MemoryHooker, USMC- und ControlCenter-MCP-Integration.
+- [README.md](README.md): Hauptdokumentation (Englisch), Architektur, Abgrenzung zu MemoryHooker, USMC- und ControlCenter-MCP-Integration.
+- [README_de.md](README_de.md): Deutsche Dokumentation und Architekturübersicht.
 - [ROADMAP.md](ROADMAP.md): Entwicklungsfahrplan und Phasengliederung.
 - [ellmos-module.v2.json](ellmos-module.v2.json): Modul-Manifest für den Katalog (`orchestration`/`workflow`).
 - [docs/reference/BACH-injectors.txt](docs/reference/BACH-injectors.txt): Referenz der BACH-Injektormuster als Vorlage.

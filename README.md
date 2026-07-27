@@ -2,14 +2,16 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Python Version](https://img.shields.io/badge/python-3.10%2B-blue.svg)](pyproject.toml)
+[![Tests](https://img.shields.io/badge/tests-73%20passed-brightgreen.svg)](tests)
 [![ellmos-module](https://img.shields.io/badge/ellmos--module-orchestration%2Fworkflow-purple.svg)](ellmos-module.v2.json)
 [![LLM-Ready](https://img.shields.io/badge/LLM--Ready-llms.txt-brightgreen.svg)](llms.txt)
+[![Deutsch](https://img.shields.io/badge/Sprache-Deutsch-blue.svg)](README_de.md)
 
 > [!NOTE]
 > **KI/LLM-Integrationshinweis:** Dieses Repository ist nach dem `ellmos.module.v2`-Standard für autonome KI-Agenten strukturiert. Siehe [`llms.txt`](llms.txt) für maschinenlesbare Kontextdateien und [`ellmos-module.v2.json`](ellmos-module.v2.json) für das Modulmanifest.
+> Deutsche Dokumentation: [`README_de.md`](README_de.md).
 
-**Status: 0.1.0 — v0.1 (Abschluss-Gate) implementiert, plus v0.2-Checks
-vorgezogen.** (2026-07-23)
+**Status: 0.1.1 — Arbeitsablaufsteuerung & Injektormuster.** (Last-checked: 2026-07-27)
 
 Umgesetzt: `StateSource`-Protokoll, Config-Schicht (`workflowhooker.toml`,
 `checks = []` per Default), Adapter `git` (read-only, `git status
@@ -19,11 +21,59 @@ dokumentierter Stub, drei einzeln zuschaltbare Checks (`closing_gate`,
 MetaFeedbackInjector-Muster, Meldungsbudget + Cooldown (4-Augen-Hook-Regel),
 Provider `claude` (Hook-Snippet-Generator ohne `PreToolUse` im Default,
 optionale separate Blocker-Variante) + `manual` (CLI); `codex`/`git`-Provider
-als dokumentierte Stubs. 58 Tests, darunter echte Temp-Git-Repo-Fixtures.
-Siehe „Install" unten und CHANGELOG.md. Was bewusst fehlt: Abschnitt „Was
-noch nicht umgesetzt ist" am Ende dieser Datei.
+als dokumentierte Stubs. 73 Tests 100% grün, darunter echte Temp-Git-Repo-Fixtures.
 
 Hooks, die den **Arbeitsablauf** eines Agenten steuern — nicht sein Wissen.
+
+## Systemarchitektur
+
+```mermaid
+graph TD
+    subgraph StateSources ["State Sources (Zustands-Quellen)"]
+        GitSource["Git Adapter (git status, diff)"]
+        FilesSource["Files Adapter (LOCK*.txt)"]
+        TaskPlanSource["TaskPlan Adapter (Stub)"]
+    end
+
+    subgraph Core ["WorkflowHooker Core Engine"]
+        Config["Config (workflowhooker.toml)"]
+        CheckRunner["Check Runner"]
+        subgraph Checks ["Check-Module"]
+            ClosingGate["Closing Gate (Abschluss-Gate)"]
+            DriftWarning["Drift Warning (Umfangsdrift)"]
+            ScopeGuard["Scope Guard (Budget)"]
+        end
+        BudgetCooldown["Frequenz-Budget & Cooldown Engine"]
+    end
+
+    subgraph OptionalLayers ["Optionale Zusatzschichten"]
+        USMC["USMC (Session-Historie, Ticks)"]
+        ControlCenter["ControlCenter MCP (Skill/Tool Advisor)"]
+    end
+
+    subgraph HookProviders ["Hook Providers"]
+        ClaudeProvider["Claude Code Hooks (Stop / UserPromptSubmit)"]
+        CodexProvider["Codex CLI Provider"]
+        GitHookProvider["Git Hook Provider (pre-commit / pre-push)"]
+        CLIProvider["Manual CLI (python -m workflowhooker)"]
+    end
+
+    GitSource --> CheckRunner
+    FilesSource --> CheckRunner
+    TaskPlanSource --> CheckRunner
+
+    Config --> CheckRunner
+    CheckRunner --> Checks
+    Checks --> BudgetCooldown
+
+    USMC -.->|Enrichment| CheckRunner
+    ControlCenter -.->|Tool/Skill Suggestions| BudgetCooldown
+
+    BudgetCooldown --> ClaudeProvider
+    BudgetCooldown --> CodexProvider
+    BudgetCooldown --> GitHookProvider
+    BudgetCooldown --> CLIProvider
+```
 
 ## Abgrenzung zu MemoryHooker
 

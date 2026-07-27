@@ -4,6 +4,15 @@ Alle nennenswerten Aenderungen an WorkflowHooker.
 
 ## [Unreleased]
 
+## [0.1.1] - 2026-07-27
+
+### Hinzugefügt & Gewartet (Path B Sichtbarkeit & SEO)
+
+- **Mermaid Systemarchitektur & Ablauf-Diagramme:** In `README.md` und `README_de.md` wurde ein interaktives Mermaid-Systemdiagramm eingebunden, das das Zusammenspiel zwischen `StateSources`, `CheckRunner`, `BudgetCooldown`, `USMC`, `ControlCenter MCP` und Hook-Providern illustriert.
+- **Deutsche Dokumentation (`README_de.md`):** Vollständige deutsche Übersetzung und Architekturübersicht angelegt.
+- **Shields.io Badges & LLM-Navigations-Links:** Tests-Badge (`73 passed`), Deutsch-Badge und LLM-Integrationshinweise eingebunden.
+- **`llms.txt` Index-Update:** `Last-checked: 2026-07-27` und Verweise auf `README_de.md` aktualisiert (73/73 Tests 100% grün).
+
 ### Behoben
 
 - **Sitzungstrennung: `session_id` wird jetzt aus dem stdin-JSON gelesen.**
