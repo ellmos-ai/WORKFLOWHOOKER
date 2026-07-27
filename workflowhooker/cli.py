@@ -1,4 +1,4 @@
-"""CLI -- der ``manual``-Provider und die Wiring-Schicht fuer ``claude``.
+"""CLI -- manueller Aufruf und Wiring-Schicht für Hook-Provider.
 
 Befehle:
 
@@ -8,10 +8,8 @@ Befehle:
                                                     UserPromptSubmit), gibt
                                                     Claude-Code-Hook-Output aus
   python -m workflowhooker providers              Provider-Fallback-Kette
-  python -m workflowhooker install-snippet        claude-Hook-Snippet
-                                                    ausgeben (settings.json
-                                                    wird NIE automatisch
-                                                    beruehrt)
+  python -m workflowhooker install-snippet        Provider-Hook-Snippet
+                                                    ausgeben
 
 Kein Check ist per Default aktiv (``[mode] checks = []``) -- ohne Config
 bleibt das Modul vollstaendig stumm, wie im README gefordert.
@@ -58,7 +56,13 @@ def _build_parser() -> argparse.ArgumentParser:
     p_providers = sub.add_parser("providers", help="Provider-Fallback-Kette anzeigen")
     p_providers.set_defaults(func=_cmd_providers)
 
-    p_install = sub.add_parser("install-snippet", help="claude-Hook-Snippet ausgeben")
+    p_install = sub.add_parser("install-snippet", help="Provider-Hook-Snippet ausgeben")
+    p_install.add_argument(
+        "--provider",
+        default="claude",
+        choices=list(PROVIDER_REGISTRY.keys()),
+        help="Provider (claude, codex, ...)",
+    )
     p_install.add_argument("--out", type=Path, default=None)
     p_install.set_defaults(func=_cmd_install_snippet)
 
@@ -215,12 +219,12 @@ def _cmd_providers(args) -> int:
 
 
 def _cmd_install_snippet(args) -> int:
-    provider = ClaudeProvider()
+    provider = PROVIDER_REGISTRY.get(args.provider, ClaudeProvider())
     snippet = provider.hook_snippet()
     text = json.dumps(snippet, indent=2, ensure_ascii=False)
     if args.out:
         args.out.write_text(text, encoding="utf-8")
-        print(f"geschrieben nach {args.out} -- manuell in settings.json einmischen", file=sys.stderr)
+        print(f"geschrieben nach {args.out} -- manuell in die Hook-Config einmischen", file=sys.stderr)
     else:
         print(text)
     return 0

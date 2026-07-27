@@ -21,8 +21,18 @@ def test_pretooluse_blocker_variant_exists_separately_and_is_not_default():
     assert "PreToolUse" in blocker_snippet["hooks"]
 
 
-def test_codex_and_git_are_stubs():
-    assert CodexProvider().is_available() is False
+def test_codex_provider_emits_verified_codex_hook_shape():
+    provider = CodexProvider()
+    assert provider.is_available() is True
+    snippet = provider.hook_snippet()
+    assert set(snippet["hooks"]) == {"Stop", "PreCompact", "UserPromptSubmit"}
+    assert "PreToolUse" not in snippet["hooks"]
+    command = snippet["hooks"]["Stop"][0]["hooks"][0]
+    assert command["commandWindows"] == command["command"]
+    assert command["timeout"] == 10
+
+
+def test_git_remains_stub():
     assert GitProvider().is_available() is False
 
 
@@ -30,9 +40,9 @@ def test_manual_always_available():
     assert ManualProvider().is_available() is True
 
 
-def test_resolve_provider_falls_back_to_manual():
+def test_resolve_provider_picks_codex():
     config = ProvidersConfig(order=["codex", "git", "manual"])
-    assert resolve_provider(config).name == "manual"
+    assert resolve_provider(config).name == "codex"
 
 
 def test_resolve_provider_picks_claude_first():

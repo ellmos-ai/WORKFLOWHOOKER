@@ -106,6 +106,19 @@ def test_install_snippet_has_no_pretooluse(tmp_path, capsys):
     assert set(data["hooks"]) == {"Stop", "PreCompact", "UserPromptSubmit"}
 
 
+def test_install_snippet_supports_codex(tmp_path, capsys):
+    out_path = tmp_path / "snippet-codex.json"
+    exit_code = main([
+        "--state-dir", str(tmp_path),
+        "install-snippet", "--provider", "codex", "--out", str(out_path),
+    ])
+    assert exit_code == 0
+    data = json.loads(out_path.read_text(encoding="utf-8"))
+    command = data["hooks"]["Stop"][0]["hooks"][0]
+    assert command["commandWindows"] == command["command"]
+    assert command["statusMessage"] == "WorkflowHooker: Stop"
+
+
 @needs_git
 def test_hook_run_stop_reports_uncommitted_changes(tmp_path, capsys):
     _git(["init"], tmp_path)

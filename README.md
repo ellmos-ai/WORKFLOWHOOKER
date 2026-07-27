@@ -2,7 +2,7 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Python Version](https://img.shields.io/badge/python-3.10%2B-blue.svg)](pyproject.toml)
-[![Tests](https://img.shields.io/badge/tests-73%20passed-brightgreen.svg)](tests)
+[![Tests](https://img.shields.io/badge/tests-75%20passed-brightgreen.svg)](tests)
 [![ellmos-module](https://img.shields.io/badge/ellmos--module-orchestration%2Fworkflow-purple.svg)](ellmos-module.v2.json)
 [![LLM-Ready](https://img.shields.io/badge/LLM--Ready-llms.txt-brightgreen.svg)](llms.txt)
 [![Deutsch](https://img.shields.io/badge/Sprache-Deutsch-blue.svg)](README_de.md)
@@ -19,9 +19,10 @@ Umgesetzt: `StateSource`-Protokoll, Config-Schicht (`workflowhooker.toml`,
 dokumentierter Stub, drei einzeln zuschaltbare Checks (`closing_gate`,
 `drift_warning`, `scope_guard`) mit generischer Auto-Deaktivierung nach dem
 MetaFeedbackInjector-Muster, Meldungsbudget + Cooldown (4-Augen-Hook-Regel),
-Provider `claude` (Hook-Snippet-Generator ohne `PreToolUse` im Default,
-optionale separate Blocker-Variante) + `manual` (CLI); `codex`/`git`-Provider
-als dokumentierte Stubs. 73 Tests 100% grün, darunter echte Temp-Git-Repo-Fixtures.
+Provider `claude` und `codex` (Hook-Snippet-Generator ohne `PreToolUse` im
+Default, optionale separate Blocker-Variante) + `manual` (CLI); der
+`git`-Provider bleibt ein dokumentierter Stub. 75 Tests sind grün, darunter
+echte Temp-Git-Repo-Fixtures.
 
 Hooks, die den **Arbeitsablauf** eines Agenten steuern — nicht sein Wissen.
 
@@ -159,14 +160,14 @@ dieselbe Lektion zweimal), `memory_consolidation` (was wird überhaupt je abgeru
 ```
   USMC                 importiert die Hooker      -> Schalter: Hooker an/aus
     └── Hooker         eigene Config              -> Feineinstellungen (Checks, Schwellen, Provider)
-          └── ControlCenter MCP  wird gesucht     -> schaltet ZUSATZINJEKTOREN frei
+          └── ControlCenter MCP  (geplant)        -> künftige Zusatzinjektoren
 ```
 
 | Vorhanden | Fähigkeit |
 |---|---|
 | nur WorkflowHooker | zustandslose Checks (git-Diff, offene Tasks, Lock-Status) |
 | **+ USMC** | Sitzungsverlauf, `times_shown`, Erkennung wiederkehrender Ticks |
-| **+ ControlCenter MCP** | **Zusatzinjektoren**: passende Skills und Tools vorschlagen |
+| **+ ControlCenter MCP** | geplant: passende Skills und Tools vorschlagen |
 
 **Nichts davon ist eine harte Abhängigkeit.** Fehlt eine Schicht, fallen ihre Fähigkeiten weg —
 nicht das Modul.
@@ -174,17 +175,16 @@ nicht das Modul.
 ### Was ControlCenter freischaltet — hier liegt der Hauptnutzen
 
 Der **ControlCenter-MCP-Server** kennt die installierten Skills, Tools, Profile und Bundles
-(`controlcenter_find_skill`, `controlcenter_list_tools`, `controlcenter_suggest_bundles`). Der Hook
-**erkennt ihn, liest ihn aus und liefert zurück** — und wird damit zum **Werkzeug-Ratgeber**:
-„Für diese Aufgabe gibt es den Skill X und das Tool Y."
+(`controlcenter_find_skill`, `controlcenter_list_tools`, `controlcenter_suggest_bundles`). Eine
+spätere Anbindung soll daraus einen Werkzeug-Ratgeber machen. In v0.1.1 wird
+`[controlcenter]` nur geparst; WorkflowHooker fragt den Server noch nicht automatisch ab.
 
 Das ist die Live-Fassung von BACHs `ToolInjector`. Dessen Begründung gilt hier wörtlich:
 
 > *„Tools sind die Hände der LLMs — ohne Erinnerung werden sie vergessen und unnötig neu erstellt."*
 
-**Der entscheidende Unterschied:** BACHs Version arbeitet gegen eine gepflegte Liste und veraltet
-mit jeder Installation. Die ControlCenter-Version fragt den **tatsächlichen Stand** ab — sie *kann*
-nicht veralten. Genau deshalb gehört dieser Injektor hierher und nicht in eine statische Tabelle.
+**Zielbild:** BACHs Version arbeitet gegen eine gepflegte Liste. Eine spätere
+ControlCenter-Anbindung soll stattdessen den tatsächlichen Installationsstand abfragen.
 
 ```toml
 [controlcenter]
@@ -195,8 +195,9 @@ warn_before_new_tool = true   # BACHs ToolInjector: warnt, bevor ein Tool neu ge
                               # das es schon gibt
 ```
 
-**Erkennung, nicht Annahme:** `auto` heißt, das Modul *prüft*, ob der Server antwortet — und
-schweigt still, wenn nicht. Ein fehlender MCP-Server darf nie ein Fehler sein.
+**Geplantes Verhalten:** `auto` soll künftig prüfen, ob der Server antwortet, und bei
+Nichterreichbarkeit still schweigen. Bis zur Implementierung hat die Einstellung keine
+Laufzeitwirkung.
 
 ## Modi — einstellbar, nicht fest verdrahtet
 
@@ -259,6 +260,9 @@ der Hook-Schicht.
    niemals `PreToolUse` — die optionale Blocker-Variante
    (`ClaudeProvider.pretooluse_blocker_snippet()`) ist bewusst eine
    getrennte, nicht automatisch eingebundene Methode.
+5. Für Codex erzeugt `python -m workflowhooker install-snippet --provider codex --out
+   snippet.json` einen Block für `~/.codex/hooks.json`. Codex muss ihn anschließend
+   interaktiv über `/hooks` freigeben.
 
 ## Was noch nicht umgesetzt ist
 
@@ -267,8 +271,9 @@ der Hook-Schicht.
   V4, noch nicht gebaut.
 - **`git`-Provider**: keine echte Git-Hook-Installation (`pre-commit`,
   `pre-push`); bleibt Stub bis ROADMAP v0.2+.
-- **`codex`-Provider**: Hook-Ereignisse/-Format fuer Codex CLI nicht
-  verifiziert — bewusst kein geratener Code.
+- **Codex-Laufzeitfreigabe**: Provider und Snippet sind implementiert und direkt getestet; die
+  jeweilige Codex-Installation muss `~/.codex/hooks.json` dennoch interaktiv über `/hooks`
+  freigeben.
 - **`drift_warning`**: reine Proxy-Heuristik (Streuung ueber Top-Level-
   Ordner) — versteht die eigentliche Aufgabe nicht und kann das laut README
   auch nicht (Ermessensfrage).
