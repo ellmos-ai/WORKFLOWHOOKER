@@ -2,10 +2,10 @@
   "schema": "ellmos.module.v2",
   "id": "WORKFLOWHOOKER",
   "display_name": "WORKFLOWHOOKER",
-  "category": "orchestration",
+  "category": "control",
   "kind": "workflow",
-  "status": "development",
-  "version": "0.2.0",
+  "status": "released",
+  "version": "0.2.1",
   "visibility": "private",
   "provides": [
     "workflow.hook",
@@ -34,7 +34,7 @@
   "source_of_truth": {
     "type": "local-directory",
     "path": ".",
-    "repository": null
+    "repository": "https://github.com/ellmos-ai/workflowhooker.git"
   },
   "adapters": []
 }
