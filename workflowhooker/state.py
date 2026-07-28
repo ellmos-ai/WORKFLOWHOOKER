@@ -1,7 +1,7 @@
 """Session-Zustand: Meldungsbudget + Cooldown + Check-Laufzeitdaten.
 
-Wie beim Schwestermodul MemoryHooker eine direkte Umsetzung der
-4-Augen-Hook-Regel aus ``~/CLAUDE.md``: harte Obergrenze
+Wie beim Schwestermodul MemoryHooker eine direkte Umsetzung einer
+zurueckhaltenden Hook-Regel: harte Obergrenze
 (``max_messages_per_session``) + Cooldown, plus je Check ``usage_count`` und
 die Auto-Deaktivierung nach dem MetaFeedbackInjector-Muster aus README/
 ROADMAP ("ein Check, der nichts mehr findet, schaltet sich selbst ab").

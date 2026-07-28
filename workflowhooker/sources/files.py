@@ -1,6 +1,6 @@
 """``files``-StateSource: LOCK*.txt-Existenz nach lock-master-Konvention.
 
-Siehe ``~/OneDrive/_scripts/LOCK-SYSTEM.md``: ``LOCK.txt`` sperrt das ganze
+``LOCK.txt`` sperrt das ganze
 Projekt, ``LOCK.<scope>.txt`` eine Komponente. Dieser Adapter liest nur --
 er legt und loescht nie selbst eine LOCK-Datei.
 """

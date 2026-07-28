@@ -14,7 +14,7 @@ import workflowhooker
 def test_package_metadata():
     """Verify workflowhooker package version is defined."""
     assert hasattr(workflowhooker, "__version__")
-    assert workflowhooker.__version__ == "0.2.0"
+    assert workflowhooker.__version__ == "0.2.1"
 
 
 def test_manifest_validity():
@@ -27,6 +27,6 @@ def test_manifest_validity():
 
     assert data.get("schema") == "ellmos.module.v2"
     assert data.get("id") == "WORKFLOWHOOKER"
-    assert data.get("category") == "orchestration"
+    assert data.get("category") == "control"
     assert data.get("kind") == "workflow"
-    assert data.get("status") == "development"
+    assert data.get("status") == "released"
