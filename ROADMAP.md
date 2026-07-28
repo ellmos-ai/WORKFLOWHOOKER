@@ -13,9 +13,19 @@ Das sind Fragen mit einer objektiv prüfbaren Antwort — kein Ermessen, keine F
 
 - [x] `StateSource`-Protokoll (`snapshot()` + `available()`) — gebaut
 - [x] Adapter: `git` (uncommittete Arbeit, Diff-Umfang) — gebaut
-- [x] Adapter: `taskplan` (offene Aufgaben, aktive Locks) — gebaut; seit 0.2.0 ueber `[sources].order` zuschaltbar
+- [ ] Adapter: `taskplan` (offene Aufgaben, aktive Locks) — derzeit nur ein
+  konfigurierbarer Stub (`available() == False`); die echte Statusquelle ist
+  noch nicht implementiert
 - [x] Hook `Stop`: Abschluss-Gate — gebaut und in `~/.claude/settings.json` registriert
-- [ ] **Messen:** Wie oft greift er? Wie oft zu Recht?
+- [x] **Bestandsauswertung 2026-07-28:** 104 persistierte Gate-Meldungen,
+  davon 97 aus Transkripten rekonstruierbar. Nur vier waren sicher
+  `Stop`-Ereignisse; bei der handlungsrelevanten Own-Lock-Klassifikation
+  waren 1/4 Events korrekt. Details:
+  [`docs/stop-hook-measurement-2026-07-28.md`](docs/stop-hook-measurement-2026-07-28.md).
+- [ ] **Laufende Stop-Trefferquote:** Ereignis, Provider, Projekt,
+  strukturierte Ursache und Lock-Owner persistieren; der aktuelle State
+  vermischt `UserPromptSubmit`, `PreCompact` und `Stop`. TaskPlan kann erst
+  nach Implementierung des derzeitigen Stub-Adapters ausgewertet werden.
 
 ## v0.2 — Weitere Checks, einzeln zugeschaltet
 
