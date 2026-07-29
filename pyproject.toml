@@ -1,0 +1,28 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "workflowhooker"
+version = "0.2.1"
+description = "Local-first workflow checks for coding-agent lifecycle hooks."
+readme = "README.md"
+requires-python = ">=3.10"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [{ name = "ellmos-ai contributors" }]
+keywords = ["workflow", "llm-agent", "hook", "local-first"]
+dependencies = []
+
+[project.optional-dependencies]
+dev = ["pytest>=7"]
+
+[project.scripts]
+workflowhooker = "workflowhooker.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["workflowhooker*"]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]
