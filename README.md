@@ -1,3 +1,5 @@
+![WorkflowHooker](docs/assets/banner.svg)
+
 # WorkflowHooker
 
 WorkflowHooker runs small, configurable workflow checks at lifecycle events
