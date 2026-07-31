@@ -8,12 +8,14 @@ from .claude import ClaudeProvider
 from .codex import CodexProvider
 from .git import GitProvider
 from .manual import ManualProvider
+from .kimi import KimiProvider
 
 PROVIDER_REGISTRY: dict[str, Provider] = {
     "claude": ClaudeProvider(),
     "codex": CodexProvider(),
     "git": GitProvider(),
     "manual": ManualProvider(),
+    "kimi": KimiProvider(),
 }
 
 __all__ = [
@@ -23,6 +25,7 @@ __all__ = [
     "CodexProvider",
     "GitProvider",
     "ManualProvider",
+    "KimiProvider",
     "PROVIDER_REGISTRY",
     "resolve_provider",
 ]

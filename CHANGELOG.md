@@ -4,6 +4,21 @@ Alle nennenswerten Aenderungen an WorkflowHooker.
 
 ## [Unreleased]
 
+### Hinzugefuegt
+
+- **Kimi-Code-Provider (`providers/kimi.py`).** Events `Stop` +
+  `UserPromptSubmit`; `PreCompact` ist unter Kimi ein Beobachtungs-Event und
+  bleibt absichtlich unregistriert (stille Falle). Hook-Vertrag am 2026-07-28
+  gegen Kimi Code CLI 0.29.2 empirisch verifiziert (Capture-Probe).
+- **`hook-run --format plain`** (Klartext statt `hookSpecificOutput`-JSON, fuer
+  Kimis Kontext-Einspeisung bei `UserPromptSubmit`).
+- **`hook-run --block` (nur `Stop`).** Befund auf stderr + Exit 2: das
+  dokumentierte Kimi-Gate — blockiert das Turn-Ende und speist die Nachricht
+  als Weiterfuehrung ein. Live-Readback 2026-07-28: Modell fuhr nach `ERLEDIGT`
+  fort und raeumte den eigenen Lock auf. Loop-Bremse bleibt das Modul-Budget
+  (`max_messages_per_session`, `cooldown_minutes`); `--block` wird fuer andere
+  Events abgelehnt (Exit 1).
+
 ## [0.1.1] - 2026-07-27
 
 ### Hinzugefügt & Gewartet (Path B Sichtbarkeit & SEO)

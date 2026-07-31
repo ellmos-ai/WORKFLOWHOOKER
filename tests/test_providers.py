@@ -50,5 +50,38 @@ def test_resolve_provider_picks_claude_first():
     assert resolve_provider(config).name == "claude"
 
 
-def test_registry_has_all_four():
-    assert set(PROVIDER_REGISTRY) == {"claude", "codex", "git", "manual"}
+def test_registry_has_all_five():
+    assert set(PROVIDER_REGISTRY) == {"claude", "codex", "kimi", "git", "manual"}
+
+
+from pathlib import Path
+
+import pytest
+
+from workflowhooker.providers.kimi import KimiProvider
+
+
+def test_kimi_provider_emits_stop_and_userpromptsubmit_in_plain_format():
+    """Kimi-Vertrag (Probe 2026-07-28, CLI 0.29.2): Stop- und UserPromptSubmit-
+    stdout werden eingespeist; PreCompact ist Beobachtungs-Event und wird
+    absichtlich NICHT registriert (stille Falle)."""
+    snippet = KimiProvider().hook_snippet()
+    events = {h["event"] for h in snippet["hooks"]}
+    assert events == {"Stop", "UserPromptSubmit"}
+    assert "PreToolUse" not in events
+    assert "PreCompact" not in events
+    commands = {h["event"]: h["command"] for h in snippet["hooks"]}
+    assert "--format plain" in commands["UserPromptSubmit"]
+    assert "--block" in commands["Stop"]
+
+
+def test_kimi_provider_availability_mirrors_config_existence():
+    expected = (Path.home() / ".kimi-code" / "config.toml").exists()
+    assert KimiProvider().is_available() is expected
+
+
+def test_resolve_provider_picks_kimi_when_ordered_and_available():
+    if not KimiProvider().is_available():
+        pytest.skip("keine ~/.kimi-code/config.toml auf diesem Host")
+    config = ProvidersConfig(order=["kimi", "manual"])
+    assert resolve_provider(config).name == "kimi"

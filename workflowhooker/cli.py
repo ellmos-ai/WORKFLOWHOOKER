@@ -51,6 +51,18 @@ def _build_parser() -> argparse.ArgumentParser:
 
     p_hook = sub.add_parser("hook-run", help="stdin-JSON lesen, Claude-Code-Hook-Output schreiben")
     p_hook.add_argument("event", choices=["Stop", "PreCompact", "UserPromptSubmit"])
+    p_hook.add_argument(
+        "--format",
+        dest="output_format",
+        choices=["json", "plain"],
+        default="json",
+        help="Ausgabeformat: json (Claude/Codex, hookSpecificOutput) oder plain (Kimi: Klartext)",
+    )
+    p_hook.add_argument(
+        "--block",
+        action="store_true",
+        help="Nur fuer Stop: Befund auf stderr + Exit 2 (blockierendes Gate, z. B. Kimi-Weiterfuehrung).",
+    )
     p_hook.set_defaults(func=_cmd_hook_run)
 
     p_providers = sub.add_parser("providers", help="Provider-Fallback-Kette anzeigen")
@@ -133,6 +145,13 @@ def _cmd_check(args) -> int:
 
 
 def _cmd_hook_run(args) -> int:
+    if getattr(args, "block", False) and args.event != "Stop":
+        # Blockieren unterdrueckt bei UserPromptSubmit den Prompt und ist bei
+        # PreCompact wirkungslos (Beobachtungs-Event) -- nur Stop hat eine
+        # dokumentierte Weiterfuehr-Semantik.
+        print("--block ist nur fuer das Stop-Event sinnvoll.", file=sys.stderr)
+        return 1
+    config = load_config(args.config)
     config = load_config(args.config)
 
     # stdin MUSS vor dem State gelesen werden: Die Sitzungskennung steht nur dort.
@@ -167,7 +186,18 @@ def _cmd_hook_run(args) -> int:
                 "additionalContext": message,
             }
         }
-        print(json.dumps(output, ensure_ascii=False))
+        if getattr(args, "block", False):
+            # Kimi-Stop-Gate: Exit 2 + stderr blockiert das Turn-Ende und
+            # speist die Nachricht als Weiterfuehrung ein (Doku, 2026-07-28).
+            # Loop-Bremse: max_messages_per_session + cooldown des Moduls.
+            print(message, file=sys.stderr)
+            return 2
+        if args.output_format == "plain":
+            # Kimi Code speist Klartext auf stdout als Kontext ein; eine
+            # Auswertung von hookSpecificOutput-JSON ist dort nicht dokumentiert.
+            print(message)
+        else:
+            print(json.dumps(output, ensure_ascii=False))
     return 0
 
 

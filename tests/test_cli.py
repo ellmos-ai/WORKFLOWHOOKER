@@ -243,3 +243,84 @@ def test_cli_session_id_schlaegt_stdin(tmp_path, monkeypatch):
     ]) == 0
 
     assert [p.name for p in state_dir.iterdir()] == ["session-explizit.json"]
+
+
+def test_hook_run_plain_format_prints_bare_message(tmp_path, capsys, monkeypatch):
+    """--format plain (Kimi): kein JSON-Wrapper auf stdout; Klartext wird als
+    Weiterfuehr-Nachricht eingespeist."""
+    (tmp_path / "LOCK.txt").write_text("owner: test\n", encoding="utf-8")
+    config_path = _write_config(tmp_path, checks=["closing_gate"])
+    state_dir = tmp_path / "state"
+
+    import io
+
+    monkeypatch.setattr("sys.stdin", io.StringIO(json.dumps({"session_id": "kimi-probe"})))
+    exit_code = main(
+        [
+            "--config", str(config_path), "--state-dir", str(state_dir),
+            "--project-dir", str(tmp_path), "hook-run", "--format", "plain", "Stop",
+        ]
+    )
+    assert exit_code == 0
+    out = capsys.readouterr().out
+    assert "WorkflowHooker" in out
+    assert not out.strip().startswith("{")
+
+
+def test_hook_run_block_exits_2_with_message_on_stderr(tmp_path, capsys, monkeypatch):
+    """--block (Kimi-Stop-Gate): Befund geht auf stderr, Exit 2 blockiert das
+    Turn-Ende und speist die Nachricht als Weiterfuehrung ein."""
+    (tmp_path / "LOCK.txt").write_text("owner: test\n", encoding="utf-8")
+    config_path = _write_config(tmp_path, checks=["closing_gate"])
+    state_dir = tmp_path / "state"
+
+    import io
+
+    monkeypatch.setattr("sys.stdin", io.StringIO(json.dumps({"session_id": "kimi-block-probe"})))
+    exit_code = main(
+        [
+            "--config", str(config_path), "--state-dir", str(state_dir),
+            "--project-dir", str(tmp_path), "hook-run", "--block", "Stop",
+        ]
+    )
+    assert exit_code == 2
+    captured = capsys.readouterr()
+    assert "WorkflowHooker" in captured.err
+    assert captured.out == ""
+
+
+def test_hook_run_block_stays_silent_without_findings(tmp_path, capsys, monkeypatch):
+    """Ohne Befund darf --block niemals blockieren (Exit 0, keine Ausgabe)."""
+    config_path = _write_config(tmp_path, checks=["closing_gate"])
+    state_dir = tmp_path / "state"
+
+    import io
+
+    monkeypatch.setattr("sys.stdin", io.StringIO(json.dumps({"session_id": "kimi-block-clean"})))
+    exit_code = main(
+        [
+            "--config", str(config_path), "--state-dir", str(state_dir),
+            "--project-dir", str(tmp_path), "hook-run", "--block", "Stop",
+        ]
+    )
+    assert exit_code == 0
+    captured = capsys.readouterr()
+    assert captured.out == "" and captured.err == ""
+
+
+def test_hook_run_block_is_rejected_for_userpromptsubmit(tmp_path, capsys, monkeypatch):
+    """--block bei UserPromptSubmit wuerde den Prompt unterdruecken -- abgelehnt."""
+    config_path = _write_config(tmp_path, checks=["closing_gate"])
+    state_dir = tmp_path / "state"
+
+    import io
+
+    monkeypatch.setattr("sys.stdin", io.StringIO(json.dumps({})))
+    exit_code = main(
+        [
+            "--config", str(config_path), "--state-dir", str(state_dir),
+            "--project-dir", str(tmp_path), "hook-run", "--block", "UserPromptSubmit",
+        ]
+    )
+    assert exit_code == 1
+    assert "--block" in capsys.readouterr().err
