@@ -2,6 +2,9 @@
 
 # WorkflowHooker
 
+> **Contributing:** development happens in the private twin `workflowhooker-provenance`; this repository carries the curated result. See [CONTRIBUTING.md](CONTRIBUTING.md).
+
+
 WorkflowHooker runs small, configurable workflow checks at lifecycle events
 exposed by supported coding-agent hosts. It is local-first, has no runtime
 dependencies, performs no network requests, and is silent until checks are
