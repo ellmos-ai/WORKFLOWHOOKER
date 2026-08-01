@@ -1,3 +1,5 @@
+![WorkflowHooker](docs/assets/banner.svg)
+
 # WorkflowHooker
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
