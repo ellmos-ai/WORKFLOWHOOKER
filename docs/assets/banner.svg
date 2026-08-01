@@ -1,0 +1,264 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630" width="1200" height="630">
+  <defs>
+    <!-- Background Sky Gradient -->
+    <linearGradient id="skyGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#070A14"/>
+      <stop offset="40%" stop-color="#0F172A"/>
+      <stop offset="85%" stop-color="#1E1B4B"/>
+      <stop offset="100%" stop-color="#2E1065"/>
+    </linearGradient>
+
+    <!-- Mountain Gradient 1 (Far) -->
+    <linearGradient id="mountGradFar" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#1E293B"/>
+      <stop offset="100%" stop-color="#0F172A"/>
+    </linearGradient>
+
+    <!-- Mountain Gradient 2 (Mid) -->
+    <linearGradient id="mountGradMid" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#334155"/>
+      <stop offset="100%" stop-color="#1E1B4B"/>
+    </linearGradient>
+
+    <!-- Foreground Cliff Gradient -->
+    <linearGradient id="cliffGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#1E293B"/>
+      <stop offset="50%" stop-color="#0F172A"/>
+      <stop offset="100%" stop-color="#020617"/>
+    </linearGradient>
+
+    <!-- Ambient Glows -->
+    <radialGradient id="cyanGlow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#38BDF8" stop-opacity="0.4"/>
+      <stop offset="100%" stop-color="#38BDF8" stop-opacity="0"/>
+    </radialGradient>
+
+    <radialGradient id="amberGlow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#F59E0B" stop-opacity="0.3"/>
+      <stop offset="100%" stop-color="#F59E0B" stop-opacity="0"/>
+    </radialGradient>
+
+    <!-- Title Gradient -->
+    <linearGradient id="titleGradWorkflow" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#FFFFFF"/>
+      <stop offset="60%" stop-color="#38BDF8"/>
+      <stop offset="100%" stop-color="#0284C7"/>
+    </linearGradient>
+
+    <linearGradient id="jacketGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FB923C"/>
+      <stop offset="50%" stop-color="#F97316"/>
+      <stop offset="100%" stop-color="#EA580C"/>
+    </linearGradient>
+
+    <linearGradient id="mapPaperGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FFFBEB"/>
+      <stop offset="50%" stop-color="#FEF3C7"/>
+      <stop offset="100%" stop-color="#FDE68A"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Sky Background -->
+  <rect width="1200" height="630" fill="url(#skyGrad)"/>
+
+  <!-- Stars & Celestial elements -->
+  <g opacity="0.6">
+    <circle cx="150" cy="80" r="1.5" fill="#FFFFFF"/>
+    <circle cx="280" cy="140" r="1" fill="#38BDF8"/>
+    <circle cx="420" cy="60" r="2" fill="#F472B6"/>
+    <circle cx="550" cy="110" r="1.5" fill="#FFFFFF"/>
+    <circle cx="710" cy="70" r="1" fill="#38BDF8"/>
+    <circle cx="890" cy="130" r="2.5" fill="#FFFFFF"/>
+    <circle cx="1020" cy="90" r="1.5" fill="#F472B6"/>
+    <circle cx="1140" cy="50" r="1" fill="#FFFFFF"/>
+    <circle cx="90" cy="210" r="1" fill="#FFFFFF"/>
+    <circle cx="360" cy="230" r="1.5" fill="#38BDF8"/>
+    <circle cx="640" cy="190" r="1" fill="#FFFFFF"/>
+  </g>
+
+  <!-- Ambient Glow behind mountain summit -->
+  <circle cx="950" cy="220" r="260" fill="url(#cyanGlow)"/>
+  <circle cx="800" cy="260" r="120" fill="url(#amberGlow)"/>
+
+  <!-- Far Mountains (Layer 1) -->
+  <path d="M-50 480 L120 320 L250 410 L450 240 L620 380 L820 180 L1020 340 L1250 190 L1250 630 L-50 630 Z" fill="url(#mountGradFar)" opacity="0.7"/>
+  <!-- Far Mountain Snow Caps -->
+  <path d="M450 240 L410 290 L440 285 L450 295 L470 280 Z" fill="#38BDF8" opacity="0.5"/>
+  <path d="M820 180 L780 235 L810 230 L820 240 L850 225 Z" fill="#38BDF8" opacity="0.5"/>
+
+  <!-- Mid Mountains (Layer 2) -->
+  <path d="M-50 520 L180 340 L380 460 L580 290 L790 430 L980 260 L1250 440 L1250 630 L-50 630 Z" fill="url(#mountGradMid)" opacity="0.85"/>
+  <!-- Mid Mountain Snow/Light accents -->
+  <path d="M580 290 L540 345 L570 338 L585 350 L615 330 Z" fill="#94A3B8" opacity="0.6"/>
+  <path d="M980 260 L935 320 L970 310 L985 325 L1015 305 Z" fill="#CBD5E1" opacity="0.6"/>
+
+  <!-- Foreground Mountain Ridge / Cliff Edge -->
+  <path d="M-50 630 L-50 560 L180 500 L390 440 L580 410 L750 370 L920 310 L1080 250 L1250 190 L1250 630 Z" fill="url(#cliffGrad)"/>
+  <!-- Cliff Edge Top Highlight -->
+  <path d="M-50 560 L180 500 L390 440 L580 410 L750 370 L920 310 L1080 250 L1250 190" fill="none" stroke="#38BDF8" stroke-width="3" stroke-linecap="round" opacity="0.6"/>
+
+  <!-- Dotted Trail Line on Cliff -->
+  <path d="M250 525 Q 450 460, 650 415 T 900 330" fill="none" stroke="#38BDF8" stroke-width="3" stroke-dasharray="6 6" opacity="0.7"/>
+
+  <!-- ==================== CHARACTER: MOUNTAINEER (WORKFLOWHOOKER) ==================== -->
+  <g id="mountaineer" transform="translate(40, -10)">
+    
+    <!-- Shadow under feet -->
+    <ellipse cx="780" cy="385" rx="75" ry="14" fill="#020617" opacity="0.7"/>
+
+    <!-- Left Leg & Boot (Back Leg) -->
+    <g id="leftLeg">
+      <!-- Thigh & Calf (Pants) -->
+      <path d="M745 295 L725 345 L745 375 L765 370 L758 335 L765 295 Z" fill="#1E293B" stroke="#0F172A" stroke-width="2"/>
+      <!-- Boot -->
+      <path d="M735 365 L715 372 L710 384 L745 385 L750 370 Z" fill="#78350F" stroke="#451A03" stroke-width="2"/>
+      <!-- Crampons on Left Boot -->
+      <path d="M708 384 L747 385 M712 384 L710 391 M722 384 L720 392 M734 384 L733 392 M744 385 L744 391" stroke="#38BDF8" stroke-width="2.5" stroke-linecap="round"/>
+    </g>
+
+    <!-- Right Leg & Boot (Front Leg - Standing firmly on slope) -->
+    <g id="rightLeg">
+      <!-- Thigh & Calf (Pants) -->
+      <path d="M775 295 L800 335 L815 365 L835 360 L818 325 L795 295 Z" fill="#334155" stroke="#0F172A" stroke-width="2"/>
+      <!-- Knee Pad -->
+      <rect x="795" y="325" width="18" height="18" rx="4" fill="#475569" stroke="#1E293B" stroke-width="1.5"/>
+      <!-- Boot -->
+      <path d="M805 358 L828 355 L842 372 L800 376 Z" fill="#9A3412" stroke="#451A03" stroke-width="2"/>
+      <!-- Yellow Boot Laces -->
+      <path d="M815 358 L822 366 M820 357 L827 364" stroke="#F59E0B" stroke-width="2"/>
+      <!-- Crampons on Right Boot -->
+      <path d="M798 376 L844 372 M803 376 L802 383 M816 375 L815 383 M828 374 L828 382 M840 373 L841 380" stroke="#38BDF8" stroke-width="2.5" stroke-linecap="round"/>
+    </g>
+
+    <!-- Backpack Body (Behind Torso - NEATLY CLOSED / ROLL TOP) -->
+    <g id="backpack">
+      <!-- Backpack Main Bag -->
+      <rect x="700" y="185" width="55" height="105" rx="12" fill="#374151" stroke="#1F2937" stroke-width="3"/>
+      <!-- Closed Roll-top Cap -->
+      <path d="M698 185 L757 185 L752 173 L703 173 Z" fill="#4B5563" stroke="#1F2937" stroke-width="2"/>
+      <!-- Top Closure Strap & Buckle -->
+      <rect x="722" y="171" width="12" height="18" rx="2" fill="#F59E0B"/>
+      <!-- Side Pockets & Straps -->
+      <rect x="692" y="215" width="12" height="50" rx="4" fill="#4B5563"/>
+      <path d="M700 225 L755 225 M700 255 L755 255" stroke="#F59E0B" stroke-width="3.5" stroke-dasharray="12 4"/>
+      <!-- Coiled Climbing Rope attached to backpack -->
+      <path d="M690 250 C 675 255, 675 285, 690 290 C 705 295, 705 260, 690 265" fill="none" stroke="#F59E0B" stroke-width="6" stroke-linecap="round"/>
+      <path d="M692 252 C 677 257, 677 287, 692 292" fill="none" stroke="#FBBF24" stroke-width="2"/>
+    </g>
+
+    <!-- Torso (Jacket - Posture slightly leaning into studying map) -->
+    <g id="torso">
+      <path d="M740 215 L780 210 L790 295 L745 295 Z" fill="url(#jacketGrad)" stroke="#C2410C" stroke-width="2"/>
+      <path d="M765 212 L765 295" stroke="#06B6D4" stroke-width="2.5"/>
+      <path d="M750 213 L780 210 L785 225 L745 228 Z" fill="#0284C7"/>
+      <path d="M748 215 L755 280 M772 212 L778 280" stroke="#374151" stroke-width="4.5"/>
+      <path d="M748 215 L755 280 M772 212 L778 280" stroke="#F97316" stroke-width="1.5"/>
+    </g>
+
+    <!-- Head & Face (Head Tilted Downwards Studying Map) -->
+    <g id="head" transform="rotate(12, 765, 185)">
+      <rect x="756" y="198" width="16" height="16" fill="#FDBA74"/>
+      <path d="M750 172 C 750 160, 782 160, 782 176 C 782 192, 775 202, 758 200 Z" fill="#FDBA74" stroke="#EA580C" stroke-width="1.5"/>
+      <path d="M780 180 Q 787 182 780 187" fill="none" stroke="#EA580C" stroke-width="2" stroke-linecap="round"/>
+      <circle cx="754" cy="182" r="3.5" fill="#FDBA74" stroke="#EA580C" stroke-width="1"/>
+      
+      <!-- Eye (Looking DOWNWARDS at the map in hands) -->
+      <ellipse cx="774" cy="180" rx="3.5" ry="4" fill="#0F172A"/>
+      <circle cx="775" cy="181" r="1.2" fill="#FFFFFF"/>
+      <!-- Eyebrow (Studious / Focused expression) -->
+      <path d="M768 174 Q 774 171 779 174" fill="none" stroke="#451A03" stroke-width="2.2" stroke-linecap="round"/>
+      <!-- Focused / Concentrated Mouth -->
+      <path d="M771 192 L781 191" stroke="#9A3412" stroke-width="2" stroke-linecap="round"/>
+
+      <!-- Mountaineer Beanie / Cap -->
+      <path d="M746 174 C 744 152, 786 150, 786 172 Z" fill="#06B6D4" stroke="#0891B2" stroke-width="2"/>
+      <!-- Beanie Fold / Rim -->
+      <path d="M744 172 L788 170 L787 178 L744 180 Z" fill="#F8FAFC" stroke="#CBD5E1" stroke-width="1.5"/>
+      <!-- Pom-pom on Beanie -->
+      <circle cx="765" cy="148" r="7" fill="#F8FAFC" stroke="#06B6D4" stroke-width="1.5"/>
+    </g>
+
+    <!-- ==================== WORKFLOWHOOKER SPECIAL: HOLDING & STUDYING MAP ==================== -->
+    <g id="holdingMap">
+      <!-- Arms holding map in front of chest -->
+      <!-- Left Upper & Forearm -->
+      <path d="M742 225 L765 248 L785 242 L750 220 Z" fill="#EA580C" stroke="#9A3412" stroke-width="1.5"/>
+      <!-- Right Upper & Forearm -->
+      <path d="M778 220 L810 248 L828 240 L785 215 Z" fill="#F97316" stroke="#C2410C" stroke-width="1.5"/>
+
+      <!-- GLOWING MAP (PARCHMENT / WORKFLOW CHART) -->
+      <g transform="translate(760, 220) rotate(-6)">
+        <!-- Map Shadow -->
+        <rect x="5" y="5" width="110" height="75" rx="4" fill="#020617" opacity="0.5"/>
+        <!-- Map Paper Base -->
+        <rect x="0" y="0" width="110" height="75" rx="4" fill="url(#mapPaperGrad)" stroke="#F59E0B" stroke-width="2"/>
+
+        <!-- Map Grid Lines (Thin golden grid) -->
+        <path d="M0 25 L110 25 M0 50 L110 50 M35 0 L35 75 M70 0 L70 75" stroke="#FDE68A" stroke-width="1.2"/>
+
+        <!-- Top Title Bar on Map -->
+        <rect x="8" y="6" width="60" height="8" rx="2" fill="#D97706" opacity="0.7"/>
+
+        <!-- WORKFLOW ROUTE PATH (Dashed line connecting step nodes) -->
+        <path d="M15 55 Q 35 20, 60 45 T 95 20" fill="none" stroke="#EF4444" stroke-width="3" stroke-dasharray="5 3"/>
+
+        <!-- Workflow Step Nodes (Circles & X mark) -->
+        <circle cx="15" cy="55" r="4.5" fill="#10B981" stroke="#047857" stroke-width="1.5"/>
+        <circle cx="38" cy="30" r="4" fill="#3B82F6" stroke="#1D4ED8" stroke-width="1.5"/>
+        <circle cx="60" cy="45" r="4" fill="#3B82F6" stroke="#1D4ED8" stroke-width="1.5"/>
+        
+        <!-- Destination 'X' Mark -->
+        <path d="M90 15 L100 25 M100 15 L90 25" stroke="#DC2626" stroke-width="3" stroke-linecap="round"/>
+
+        <!-- Compass Rose in bottom right corner -->
+        <circle cx="92" cy="58" r="8" fill="none" stroke="#D97706" stroke-width="1"/>
+        <path d="M92 48 L94 58 L92 55 L90 58 Z" fill="#DC2626"/>
+
+        <!-- Subtle Glow Filter / Edge Highlight -->
+        <rect x="0" y="0" width="110" height="75" rx="4" fill="none" stroke="#FFFFFF" stroke-width="1" opacity="0.8"/>
+      </g>
+
+      <!-- Hands / Gloves gripping edges of map -->
+      <circle cx="762" cy="242" r="7" fill="#D97706" stroke="#78350F" stroke-width="1.5"/>
+      <circle cx="868" cy="230" r="7" fill="#D97706" stroke="#78350F" stroke-width="1.5"/>
+    </g>
+  </g>
+
+  <!-- ==================== BRANDING / TEXT SECTION (LEFT SIDE) ==================== -->
+  <g transform="translate(80, 0)">
+    <g transform="translate(0, 135)">
+      <rect width="265" height="34" rx="17" fill="#0F172A" stroke="#38BDF8" stroke-width="1.5" opacity="0.9"/>
+      <circle cx="20" cy="17" r="5" fill="#38BDF8"/>
+      <text x="34" y="22" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="12" font-weight="700" fill="#38BDF8" letter-spacing="1.5">ORCHESTRATION &amp; STATE</text>
+    </g>
+
+    <text x="0" y="245" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="64" font-weight="800" fill="url(#titleGradWorkflow)" letter-spacing="-1.5">WorkflowHooker</text>
+
+    <path d="M0 265 L380 265" stroke="#38BDF8" stroke-width="4" stroke-linecap="round" opacity="0.8"/>
+    <path d="M380 265 L460 265" stroke="#F59E0B" stroke-width="4" stroke-linecap="round" opacity="0.5"/>
+
+    <text x="0" y="315" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="24" font-weight="500" fill="#CBD5E1" letter-spacing="0.5">studies the map, keeps the route</text>
+
+    <text x="0" y="355" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="15" font-weight="400" fill="#94A3B8">
+      <tspan x="0" dy="0">Guides complex agent workflows, hook lifecycles &amp;</tspan>
+      <tspan x="0" dy="22">deterministic execution paths with precision.</tspan>
+    </text>
+
+    <g transform="translate(0, 425)">
+      <g transform="translate(0, 0)">
+        <rect width="160" height="36" rx="8" fill="#0F172A" stroke="#334155" stroke-width="1.5"/>
+        <text x="16" y="23" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="13" font-weight="600" fill="#38BDF8">Workflow Engine</text>
+      </g>
+      <g transform="translate(172, 0)">
+        <rect width="170" height="36" rx="8" fill="#0F172A" stroke="#334155" stroke-width="1.5"/>
+        <text x="16" y="23" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="13" font-weight="600" fill="#F59E0B">Hook Lifecycle</text>
+      </g>
+      <g transform="translate(0, 48)">
+        <rect width="185" height="36" rx="8" fill="#0F172A" stroke="#334155" stroke-width="1.5"/>
+        <text x="16" y="23" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="13" font-weight="600" fill="#10B981">Deterministic Paths</text>
+      </g>
+    </g>
+  </g>
+
+  <rect x="0" y="624" width="1200" height="6" fill="#38BDF8" opacity="0.8"/>
+</svg>
