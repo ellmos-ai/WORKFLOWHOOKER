@@ -171,7 +171,16 @@ def _cmd_hook_run(args) -> int:
         args.session_id or _extract_session_id(payload), args.state_dir
     )
     state = SessionState.load(state_path)
-    project_dir = args.project_dir or Path.cwd()
+
+    # Dieselbe Lektion wie eine Zeile hoeher, zweites Feld: Der Arbeitsordner
+    # steht ebenfalls nur im stdin-JSON. Das Prozess-cwd eines Hooks ist der
+    # Ordner, in dem die SITZUNG gestartet wurde -- nicht der, in dem gerade
+    # gearbeitet wird. Startet der Nutzer in seinem Home (kein Repository),
+    # meldet die git-Quelle "nicht verfuegbar", der Projektzustand bleibt leer
+    # und KEIN Check kann je zutreffen: Das Modul laeuft, ohne je zu wirken.
+    # Gemessen auf ASUS-GEI am 2026-08-01: 17 Auswertungen, 0 Ausloesungen,
+    # bei gleichzeitig gesetzten Locks und uncommitteten Aenderungen.
+    project_dir = args.project_dir or _extract_cwd(payload) or Path.cwd()
 
     message = _run_active_checks(config, project_dir, state)
     state.save(state_path)
@@ -212,6 +221,22 @@ def _extract_session_id(payload: dict) -> str | None:
         return None
     sicher = "".join(z for z in raw if z.isalnum() or z in "-_")[:64]
     return sicher or None
+
+
+def _extract_cwd(payload: dict) -> Path | None:
+    """Arbeitsordner aus dem Hook-stdin-JSON.
+
+    Anders als die Sitzungskennung wandert dieser Wert in keinen Dateinamen,
+    sondern wird nur gelesen (``git status``, Lock-Suche) -- deshalb keine
+    Zeichenfilterung, aber die Pruefung, dass der Ordner wirklich existiert.
+    Ein nicht existierender Pfad faellt auf ``Path.cwd()`` zurueck, statt eine
+    Quelle auf ein Nichts zeigen zu lassen.
+    """
+    raw = payload.get("cwd")
+    if not isinstance(raw, str) or not raw.strip():
+        return None
+    candidate = Path(raw)
+    return candidate if candidate.is_dir() else None
 
 
 def _read_stdin_json() -> dict:

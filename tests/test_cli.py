@@ -324,3 +324,68 @@ def test_hook_run_block_is_rejected_for_userpromptsubmit(tmp_path, capsys, monke
     )
     assert exit_code == 1
     assert "--block" in capsys.readouterr().err
+
+
+def _hook_run_ohne_project_dir(config_path, state_dir, payload, monkeypatch, event="Stop"):
+    """Wie ``_hook_run``, aber OHNE ``--project-dir`` -- so laeuft der Hook real."""
+    import io
+
+    monkeypatch.setattr("sys.stdin", io.StringIO(json.dumps(payload)))
+    return main([
+        "--config", str(config_path), "--state-dir", str(state_dir),
+        "hook-run", event,
+    ])
+
+
+def test_hook_run_nimmt_arbeitsordner_aus_stdin(tmp_path, capsys, monkeypatch):
+    """Regression: Der Arbeitsordner kommt aus dem stdin-JSON, nicht aus dem cwd.
+
+    Dieselbe Fehlerklasse wie bei der Sitzungskennung, zweites Feld. Das
+    Prozess-cwd eines Hooks ist der Ordner, in dem die SITZUNG gestartet
+    wurde. Startet der Nutzer im Home (kein Repository), meldet die
+    git-Quelle "nicht verfuegbar", der Projektzustand bleibt leer und KEIN
+    Check kann je zutreffen -- das Modul laeuft, ohne je zu wirken.
+    Gemessen auf ASUS-GEI am 2026-08-01: 17 Auswertungen, 0 Ausloesungen,
+    bei gleichzeitig gesetzten Locks und uncommitteten Aenderungen.
+    """
+    projekt = tmp_path / "projekt"
+    projekt.mkdir()
+    (projekt / "LOCK.txt").write_text("owner: test\n", encoding="utf-8")
+    woanders = tmp_path / "woanders"
+    woanders.mkdir()
+    config_path = _write_config(tmp_path, checks=["closing_gate"])
+    state_dir = tmp_path / "state"
+
+    monkeypatch.chdir(woanders)  # cwd zeigt bewusst NICHT auf das Projekt
+    assert _hook_run_ohne_project_dir(
+        config_path, state_dir, {"session_id": "S", "cwd": str(projekt)}, monkeypatch
+    ) == 0
+    assert "LOCK.txt" in capsys.readouterr().out
+
+
+def test_hook_run_faellt_auf_cwd_zurueck_wenn_stdin_ordner_fehlt(tmp_path, capsys, monkeypatch):
+    """Ein unbrauchbarer Ordner im Payload darf keine Quelle ins Leere zeigen
+    lassen: fehlend, leer oder nicht existent -> zurueck auf das cwd."""
+    projekt = tmp_path / "projekt"
+    projekt.mkdir()
+    (projekt / "LOCK.txt").write_text("owner: test\n", encoding="utf-8")
+    config_path = _write_config(tmp_path, checks=["closing_gate"])
+
+    monkeypatch.chdir(projekt)  # cwd IST diesmal das Projekt
+    for i, payload in enumerate([
+        {"session_id": "F"},                                      # Feld fehlt
+        {"session_id": "G", "cwd": "   "},                        # leer
+        {"session_id": "H", "cwd": str(tmp_path / "gibtsnicht")},   # existiert nicht
+    ]):
+        assert _hook_run_ohne_project_dir(
+            config_path, tmp_path / f"state{i}", payload, monkeypatch
+        ) == 0
+        assert "LOCK.txt" in capsys.readouterr().out, payload
+
+    # Und --project-dir behaelt Vorrang vor dem stdin-Wert.
+    monkeypatch.chdir(tmp_path)
+    assert _hook_run(
+        config_path, tmp_path / "state_x", projekt,
+        {"session_id": "X", "cwd": str(tmp_path)}, monkeypatch
+    ) == 0
+    assert "LOCK.txt" in capsys.readouterr().out
