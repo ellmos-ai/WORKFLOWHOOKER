@@ -1,13 +1,9 @@
 # -*- coding: utf-8 -*-
 """Tests for workflowhooker package version and module manifest integrity."""
 
-json_import = True
-try:
-    import json
-except ImportError:
-    json_import = False
-
+import json
 from pathlib import Path
+
 import workflowhooker
 
 

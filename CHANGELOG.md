@@ -4,6 +4,11 @@ Alle nennenswerten Aenderungen an WorkflowHooker.
 
 ## [Unreleased]
 
+### Gewartet (2026-08-03)
+
+- **Technische Hygiene & Doku-Wartung (Pfad A):** `llms.txt` Last-checked Datum auf `2026-08-03` und 82/82 verifizierte Pytest-Tests aktualisiert. Badges und Status-Timestamps in `README.md` & `README_de.md` auf 82 passed Tests und Datum `2026-08-03` synchronisiert, Kimi Code Provider in der deutschen Dokumentation ergänzt.
+- **PEP 8 Import-Sanierung in Testsuite:** 5 Import-Fehler (E402) in `tests/test_providers.py` und `tests/test_workflowhooker.py` gehärtet (`ruff check` & `pytest` 100% grün).
+
 ### Hinzugefuegt
 
 - **Kimi-Code-Provider (`providers/kimi.py`).** Events `Stop` +

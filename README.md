@@ -4,7 +4,7 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Python Version](https://img.shields.io/badge/python-3.10%2B-blue.svg)](pyproject.toml)
-[![Tests](https://img.shields.io/badge/tests-75%20passed-brightgreen.svg)](tests)
+[![Tests](https://img.shields.io/badge/tests-82%20passed-brightgreen.svg)](tests)
 [![ellmos-module](https://img.shields.io/badge/ellmos--module-orchestration%2Fworkflow-purple.svg)](ellmos-module.v2.json)
 [![LLM-Ready](https://img.shields.io/badge/LLM--Ready-llms.txt-brightgreen.svg)](llms.txt)
 [![Deutsch](https://img.shields.io/badge/Sprache-Deutsch-blue.svg)](README_de.md)
@@ -13,7 +13,7 @@
 > **KI/LLM-Integrationshinweis:** Dieses Repository ist nach dem `ellmos.module.v2`-Standard für autonome KI-Agenten strukturiert. Siehe [`llms.txt`](llms.txt) für maschinenlesbare Kontextdateien und [`ellmos-module.v2.json`](ellmos-module.v2.json) für das Modulmanifest.
 > Deutsche Dokumentation: [`README_de.md`](README_de.md).
 
-**Status: 0.2.1 — Arbeitsablaufsteuerung & Injektormuster.** (Last-checked: 2026-07-27)
+**Status: 0.2.1 — Arbeitsablaufsteuerung & Injektormuster.** (Last-checked: 2026-08-03)
 
 Umgesetzt: `StateSource`-Protokoll, Config-Schicht (`workflowhooker.toml`,
 `checks = []` per Default), Adapter `git` (read-only, `git status
@@ -21,9 +21,9 @@ Umgesetzt: `StateSource`-Protokoll, Config-Schicht (`workflowhooker.toml`,
 dokumentierter Stub, drei einzeln zuschaltbare Checks (`closing_gate`,
 `drift_warning`, `scope_guard`) mit generischer Auto-Deaktivierung nach dem
 MetaFeedbackInjector-Muster, Meldungsbudget + Cooldown (4-Augen-Hook-Regel),
-Provider `claude` und `codex` (Hook-Snippet-Generator ohne `PreToolUse` im
+Provider `claude`, `codex`, `kimi` (Hook-Snippet-Generator ohne `PreToolUse` im
 Default, optionale separate Blocker-Variante) + `manual` (CLI); der
-`git`-Provider bleibt ein dokumentierter Stub. 75 Tests sind grün, darunter
+`git`-Provider bleibt ein dokumentierter Stub. 82 Tests sind grün, darunter
 echte Temp-Git-Repo-Fixtures.
 
 Hooks, die den **Arbeitsablauf** eines Agenten steuern — nicht sein Wissen.

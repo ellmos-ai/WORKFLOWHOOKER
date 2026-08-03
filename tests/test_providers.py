@@ -1,8 +1,13 @@
+from pathlib import Path
+
+import pytest
+
 from workflowhooker.config import ProvidersConfig
 from workflowhooker.providers import PROVIDER_REGISTRY, resolve_provider
 from workflowhooker.providers.claude import ClaudeProvider
 from workflowhooker.providers.codex import CodexProvider
 from workflowhooker.providers.git import GitProvider
+from workflowhooker.providers.kimi import KimiProvider
 from workflowhooker.providers.manual import ManualProvider
 
 
@@ -52,13 +57,6 @@ def test_resolve_provider_picks_claude_first():
 
 def test_registry_has_all_five():
     assert set(PROVIDER_REGISTRY) == {"claude", "codex", "kimi", "git", "manual"}
-
-
-from pathlib import Path
-
-import pytest
-
-from workflowhooker.providers.kimi import KimiProvider
 
 
 def test_kimi_provider_emits_stop_and_userpromptsubmit_in_plain_format():
