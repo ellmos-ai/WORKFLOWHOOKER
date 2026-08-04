@@ -1,14 +1,42 @@
 # workflowhooker
 
-> Last-checked: 2026-08-03
+> Last-checked: 2026-08-04
 > Verification: 82/82 Pytest-Tests 100% grün.
 
-WorkflowHooker (`ellmos-ai/workflowhooker`) ist ein Modul im `ellmos-ai`-Ökosystem für agentische Arbeitsablaufsteuerung, Pre-Tool-Checks, Drift-Warnungen und Abschluss-Gates.
+Canonical repository: https://github.com/ellmos-ai/workflowhooker-provenance
+Owner: ellmos-ai (Ecosystem: open-bricks)
+Primary language: Python (>=3.10)
+License: MIT
+
+WorkflowHooker (`ellmos-ai/workflowhooker-provenance`) ist ein Modul im `ellmos-ai`-Ökosystem für agentische Arbeitsablaufsteuerung, Pre-Tool-Checks, Drift-Warnungen und Abschluss-Gates.
 
 ## Kern-Dokumentation
 
-- [README.md](README.md): Hauptdokumentation (Englisch), Architektur, Abgrenzung zu MemoryHooker, USMC- und ControlCenter-MCP-Integration.
-- [README_de.md](README_de.md): Deutsche Dokumentation und Architekturübersicht.
-- [ROADMAP.md](ROADMAP.md): Entwicklungsfahrplan und Phasengliederung.
-- [ellmos-module.v2.json](ellmos-module.v2.json): Modul-Manifest für den Katalog (`orchestration`/`workflow`).
-- [docs/reference/BACH-injectors.txt](docs/reference/BACH-injectors.txt): Referenz der BACH-Injektormuster als Vorlage.
+- [README.md](README.md): Primary documentation (English), architecture, distinction from MemoryHooker, provider integration.
+- [README_de.md](README_de.md): German documentation and architecture overview.
+- [ROADMAP.md](ROADMAP.md): Development roadmap and phase planning.
+- [ellmos-module.v2.json](ellmos-module.v2.json): Module manifest for the catalog (`orchestration`/`workflow`).
+- [docs/reference/BACH-injectors.txt](docs/reference/BACH-injectors.txt): Reference of BACH injector patterns as blueprint.
+
+## Disambiguation
+
+WorkflowHooker governs **agent execution workflow and process integrity** (e.g. scope drift, verification prompts, closing gates). It is distinct from:
+- `memoryhooker`: Injects persistent memory and domain knowledge into agent context.
+- General CI/CD pipeline hook systems: WorkflowHooker is designed specifically for autonomous LLM agent runtimes (Claude Code, Codex CLI, Kimi Code).
+
+## Search Phrases
+
+```text
+workflowhooker
+WorkflowHooker LLM agent workflow control
+agent process gate drift warning closing gate
+Claude Code hook provider agent runtime
+ellmos-ai workflowhooker-provenance
+```
+
+## Related Ecosystem Projects
+
+- [memoryhooker](https://github.com/ellmos-ai/memoryhooker-provenance): Memory injection and knowledge state adapter for LLM agents.
+- [ellmos-filecommander-mcp](https://github.com/ellmos-ai/ellmos-filecommander-mcp): Filesystem and process execution MCP tool suite.
+- [ellmos-codecommander-mcp](https://github.com/ellmos-ai/ellmos-codecommander-mcp): Code analysis and AST processing MCP server.
+- [ellmos-controlcenter-mcp](https://github.com/ellmos-ai/ellmos-controlcenter-mcp): MCP stack control plane and skill router.

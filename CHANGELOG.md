@@ -4,6 +4,11 @@ Alle nennenswerten Aenderungen an WorkflowHooker.
 
 ## [Unreleased]
 
+### Gewartet (2026-08-04)
+
+- **Discoverability, README-Design & SEO Audit (Pfad B):** Badges in `README.md` & `README_de.md` um `ellmos-ai` Org- und `open-bricks` Ökosystem-Badges erweitert. Timestamps und Testverifikationsdaten (82 passed Pytest-Tests) auf `2026-08-04` aktualisiert.
+- **`llms.txt` Discovery Index:** Vollständiges Upgrade von `llms.txt` mit kanonischen Remote-Links (`https://github.com/ellmos-ai/workflowhooker-provenance`), Disambiguation (Abgrenzung zu `memoryhooker`), Search Phrases, Zielgruppenbeschreibung und Ökosystem-Querverweisen (`memoryhooker`, `ellmos-filecommander-mcp`, `ellmos-codecommander-mcp`, `ellmos-controlcenter-mcp`).
+
 ### Gewartet (2026-08-03)
 
 - **Technische Hygiene & Doku-Wartung (Pfad A):** `llms.txt` Last-checked Datum auf `2026-08-03` und 82/82 verifizierte Pytest-Tests aktualisiert. Badges und Status-Timestamps in `README.md` & `README_de.md` auf 82 passed Tests und Datum `2026-08-03` synchronisiert, Kimi Code Provider in der deutschen Dokumentation ergänzt.
