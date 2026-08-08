@@ -4,6 +4,17 @@ Alle nennenswerten Aenderungen an WorkflowHooker.
 
 ## [Unreleased]
 
+### Hinzugefuegt (2026-08-08)
+
+- **`goal_injector` und `loop_injector`:** Der PreCompact-Hook kann opt-in das
+  Projektziel aus `AUFGABEN.txt`/`GOAL.md` sowie projektbezogene TASKPLAN-Tasks
+  injizieren. `loop-briefing` erzeugt für lokale Runtimes ein deterministisches
+  Briefing aus Ziel, offenen Tasks, Locks und uncommitteter Arbeit; ein
+  Scheduler bleibt bewusst Sache der Runtime.
+- Die read-only TASKPLAN-Quelle filtert offene/aktive Tasks auf das aktuelle
+  Projekt und fällt bei fehlendem Control Plane still zurück. Die Testsuite
+  umfasst jetzt 95/95 grüne Pytest-Tests.
+
 ### Gewartet (2026-08-04)
 
 - **Discoverability, README-Design & SEO Audit (Pfad B):** Badges in `README.md` & `README_de.md` um `ellmos-ai` Org- und `open-bricks` Ökosystem-Badges erweitert. Timestamps und Testverifikationsdaten (82 passed Pytest-Tests) auf `2026-08-04` aktualisiert.

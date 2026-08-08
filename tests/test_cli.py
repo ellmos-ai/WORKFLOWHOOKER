@@ -44,6 +44,80 @@ def test_no_active_checks_by_default_is_silent(tmp_path, capsys):
     assert capsys.readouterr().out == ""
 
 
+def test_precompact_goal_injector_reads_goal_file_when_enabled(tmp_path, capsys):
+    (tmp_path / "GOAL.md").write_text("Projektziel: Kontext halten", encoding="utf-8")
+    config_path = tmp_path / "workflowhooker.toml"
+    config_path.write_text(
+        "[injectors]\ngoal = true\n[mode]\ncooldown_minutes = 0\n",
+        encoding="utf-8",
+    )
+    state_dir = tmp_path / "state"
+
+    exit_code = main(
+        [
+            "--config", str(config_path),
+            "--state-dir", str(state_dir),
+            "--project-dir", str(tmp_path),
+            "hook-run", "PreCompact",
+        ]
+    )
+
+    assert exit_code == 0
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["hookSpecificOutput"]["hookEventName"] == "PreCompact"
+    assert "Projektziel: Kontext halten" in payload["hookSpecificOutput"]["additionalContext"]
+
+
+def test_precompact_goal_injector_respects_session_message_budget(tmp_path, capsys):
+    (tmp_path / "GOAL.md").write_text("Budgetziel", encoding="utf-8")
+    config_path = tmp_path / "workflowhooker.toml"
+    config_path.write_text(
+        "[injectors]\ngoal = true\n[mode]\nmax_messages_per_session = 1\ncooldown_minutes = 0\n",
+        encoding="utf-8",
+    )
+    common = [
+        "--config", str(config_path),
+        "--state-dir", str(tmp_path / "state"),
+        "--project-dir", str(tmp_path),
+        "hook-run", "PreCompact",
+    ]
+
+    assert main(common) == 0
+    assert capsys.readouterr().out.strip()
+    assert main(common) == 0
+    assert capsys.readouterr().out == ""
+
+
+def test_loop_briefing_command_reports_goal_lock_and_git_state(tmp_path, capsys):
+    (tmp_path / "GOAL.md").write_text("Lokales Weckziel", encoding="utf-8")
+    (tmp_path / "LOCK.loop.txt").write_text("owner: test\n", encoding="utf-8")
+
+    exit_code = main(["--project-dir", str(tmp_path), "loop-briefing"])
+
+    assert exit_code == 0
+    output = capsys.readouterr().out
+    assert "Weck-Briefing" in output
+    assert "Lokales Weckziel" in output
+    assert "LOCK.loop.txt" in output
+
+
+def test_loop_briefing_json_format_is_machine_readable(tmp_path, capsys):
+    (tmp_path / "GOAL.md").write_text("JSON-Ziel", encoding="utf-8")
+
+    assert main(["--project-dir", str(tmp_path), "loop-briefing", "--format", "json"]) == 0
+    payload = json.loads(capsys.readouterr().out)
+    assert "JSON-Ziel" in payload["briefing"]
+
+
+def test_goal_command_json_uses_precompact_hook_shape(tmp_path, capsys):
+    (tmp_path / "GOAL.md").write_text("Explizites Ziel", encoding="utf-8")
+
+    assert main(["--project-dir", str(tmp_path), "goal", "--format", "json"]) == 0
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["hookSpecificOutput"]["hookEventName"] == "PreCompact"
+    assert "Explizites Ziel" in payload["hookSpecificOutput"]["additionalContext"]
+
+
 def test_closing_gate_fires_on_lock_file(tmp_path, capsys):
     (tmp_path / "LOCK.txt").write_text("owner: test\n", encoding="utf-8")
     config_path = _write_config(tmp_path, checks=["closing_gate"])

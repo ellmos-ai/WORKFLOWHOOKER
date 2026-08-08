@@ -50,14 +50,29 @@ class ProvidersConfig:
     )
 
 
-VALID_SOURCES = ("files", "git", "taskplan")
+@dataclass
+class InjectorsConfig:
+    """Opt-in context injectors.
+
+    Checks remain silent by default, and so do the injectors.  ``goal`` is
+    intended for the ``PreCompact`` hook; ``loop`` is exposed through the
+    explicit briefing command and is never a scheduler.
+    """
+
+    goal: bool = False
+    loop: bool = False
+
+
+VALID_SOURCES = ("files", "git", "taskplan", "goal")
 
 
 @dataclass
 class SourcesConfig:
     """Welche Zustandsquellen den Projekt-Snapshot bilden.
 
-    ``order`` waehlt die Quellen aus (Default: alle). Wer nur einen Teil will,
+    ``order`` waehlt die Quellen aus (Default: die drei kompatiblen Kernquellen;
+    Goal-Dateien sind dort bereits im ``files``-Adapter enthalten). Wer nur
+    einen Teil will,
     listet ihn auf::
 
         [sources]
@@ -71,7 +86,10 @@ class SourcesConfig:
 
     project_dir: str | None = None  # fuer files-StateSource (LOCK*.txt)
     git_dir: str | None = None  # fuer git-StateSource (Default: project_dir/cwd)
-    order: list[str] = field(default_factory=lambda: list(VALID_SOURCES))
+    # Keep the original three-source default; goal files are also exposed by
+    # ``files`` for backwards compatibility and can be selected explicitly as
+    # a dedicated source with ``order = ["goal"]``.
+    order: list[str] = field(default_factory=lambda: ["files", "git", "taskplan"])
 
 
 @dataclass
@@ -79,6 +97,7 @@ class Config:
     mode: ModeConfig = field(default_factory=ModeConfig)
     checks: ChecksConfig = field(default_factory=ChecksConfig)
     providers: ProvidersConfig = field(default_factory=ProvidersConfig)
+    injectors: InjectorsConfig = field(default_factory=InjectorsConfig)
     sources: SourcesConfig = field(default_factory=SourcesConfig)
 
     def validate(self) -> None:
@@ -155,11 +174,37 @@ def _config_from_dict(data: dict) -> Config:
         claude_events=list(claude_data.get("events", ProvidersConfig().claude_events)),
     )
 
+    injectors_data = data.get("injectors", {})
+    # Accept both the compact boolean form (``goal = true``) and a small
+    # ``{ enabled = true }`` table so hand-written configs remain forgiving.
+    goal_value = injectors_data.get("goal", injectors_data.get("goal_injector", False))
+    loop_value = injectors_data.get("loop", injectors_data.get("loop_injector", False))
+    injectors = InjectorsConfig(
+        goal=_enabled_value(goal_value),
+        loop=_enabled_value(loop_value),
+    )
+
     sources_data = data.get("sources", {})
     sources = SourcesConfig(
         project_dir=sources_data.get("project_dir") or None,
         git_dir=sources_data.get("git_dir") or None,
-        order=[str(name) for name in sources_data.get("order", VALID_SOURCES) if str(name)],
+        order=[
+            str(name)
+            for name in sources_data.get("order", SourcesConfig().order)
+            if str(name)
+        ],
     )
 
-    return Config(mode=mode, checks=checks, providers=providers, sources=sources)
+    return Config(
+        mode=mode,
+        checks=checks,
+        providers=providers,
+        injectors=injectors,
+        sources=sources,
+    )
+
+
+def _enabled_value(value: object) -> bool:
+    if isinstance(value, dict):
+        return bool(value.get("enabled", False))
+    return bool(value)

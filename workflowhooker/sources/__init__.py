@@ -1,4 +1,8 @@
-"""StateSource-Adapter + Komposition mehrerer Quellen zu einem ProjectState."""
+"""StateSource-Adapter + Komposition mehrerer Quellen zu einem ProjectState.
+
+Neben Locks und Git-Diff koennen die Quellen optional Zieltexte und
+projektbezogene TASKPLAN-Tasks liefern.
+"""
 
 from __future__ import annotations
 
@@ -7,12 +11,16 @@ from dataclasses import replace
 from ..protocol import ProjectState, StateSource
 from .files import FilesStateSource
 from .git import GitStateSource
-from .taskplan import TaskplanStateSource
+from .goals import GoalFileStateSource, GoalStateSource
+from .taskplan import TaskPlanStateSource, TaskplanStateSource
 
 __all__ = [
     "FilesStateSource",
     "GitStateSource",
+    "GoalStateSource",
+    "GoalFileStateSource",
     "TaskplanStateSource",
+    "TaskPlanStateSource",
     "CompositeStateSource",
 ]
 
@@ -61,6 +69,10 @@ class CompositeStateSource:
                 changed_top_level_dirs=tuple(
                     sorted(set(merged.changed_top_level_dirs) | set(snap.changed_top_level_dirs))
                 ),
+                goal=snap.goal or merged.goal,
+                goal_sources=tuple(dict.fromkeys(merged.goal_sources + snap.goal_sources)),
+                open_tasks=tuple(dict.fromkeys(merged.open_tasks + snap.open_tasks)),
+                task_ids=tuple(dict.fromkeys(merged.task_ids + snap.task_ids)),
                 meta={**merged.meta, **snap.meta},
             )
         return merged

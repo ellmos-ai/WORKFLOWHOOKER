@@ -8,8 +8,19 @@ Status: v0.2.1 -- Abschluss-Gate + Drift-/Umfangswaechter implementiert
 """
 
 from .config import Config, load_config
+from .injectors import GoalInjector, LoopInjector, build_goal_message, build_loop_briefing
 from .protocol import ProjectState, StateSource
 
 __version__ = "0.2.1"
 
-__all__ = ["ProjectState", "StateSource", "Config", "load_config", "__version__"]
+__all__ = [
+    "ProjectState",
+    "StateSource",
+    "Config",
+    "load_config",
+    "GoalInjector",
+    "LoopInjector",
+    "build_goal_message",
+    "build_loop_briefing",
+    "__version__",
+]

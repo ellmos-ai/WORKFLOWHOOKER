@@ -1,7 +1,7 @@
 # WorkflowHooker — Roadmap
 
-**Stand 2026-07-13:** Gerüst angelegt. Kein Code. Wie MemoryHooker als Experiment geschnitten —
-bewährt es sich nicht, wird es verworfen.
+**Stand 2026-08-08:** Das Gerüst ist als opt-in WorkflowHooker-MVP umgesetzt;
+Provider-Scheduler bleiben bewusst außerhalb dieses Moduls.
 
 ## v0.1 — Ein einziger Hook, gut gemacht
 
@@ -13,9 +13,8 @@ Das sind Fragen mit einer objektiv prüfbaren Antwort — kein Ermessen, keine F
 
 - [x] `StateSource`-Protokoll (`snapshot()` + `available()`) — gebaut
 - [x] Adapter: `git` (uncommittete Arbeit, Diff-Umfang) — gebaut
-- [ ] Adapter: `taskplan` (offene Aufgaben, aktive Locks) — derzeit nur ein
-  konfigurierbarer Stub (`available() == False`); die echte Statusquelle ist
-  noch nicht implementiert
+- [x] Adapter: `taskplan` (projektbezogene offene/aktive Aufgaben) — read-only,
+  optional geladen; ein fehlender TASKPLAN-Control-Plane bleibt still
 - [x] Hook `Stop`: Abschluss-Gate — gebaut und in `~/.claude/settings.json` registriert
 - [x] **Bestandsauswertung 2026-07-28:** 104 persistierte Gate-Meldungen,
   davon 97 aus Transkripten rekonstruierbar. Nur vier waren sicher
@@ -35,14 +34,16 @@ Jeder Check ist ein eigener Schalter. Keiner ist per Default an, bis er sich bew
 - [x] Drift-Warnung (Arbeit entfernt sich von der Aufgabe) — 0.1.0 als Proxy-Heuristik
 - [x] Umfangswächter (Lauf wächst über sein Budget) — 0.1.0 als `scope_guard`
 - [ ] Regelerinnerung zum passenden Zeitpunkt
-- [ ] **`goal_injector` / Aufgaben-Injektor [U 2026-07-23]:** erinnert an das ZIEL der
+- [x] **`goal_injector` / Aufgaben-Injektor [U 2026-07-23]:** erinnert an das ZIEL der
   Sitzung — die positive Hälfte der Drift-Warnung („das Ziel war X" statt „du
   streust"). Ziel-Quellen über StateSources: `taskplan` (aktive Task), Goal-Datei
   (`AUFGABEN.txt`/`GOAL.md`), oder erster User-Prompt der Sitzung (bei SessionStart
   gecacht). Wichtigstes Ereignis: **PreCompact** — das Ziel unmittelbar vor der
   Kontext-Kompaktierung re-injizieren, genau gegen Zielverlust durch Kompaktierung.
   Frequenz-Budget wie immer. **BACH-Erbe: ReminderInjector-Kern.**
-- [ ] **`loop_injector` [U 2026-07-23]:** weckt das Modell periodisch wieder auf.
+  Umsetzung: opt-in `PreCompact`-Hook mit `AUFGABEN.txt`/`GOAL.md` und
+  TASKPLAN-StateSource.
+- [x] **`loop_injector` [U 2026-07-23]:** weckt das Modell periodisch wieder auf.
   Saubere Arbeitsteilung, weil Hooks keine Uhr haben: Der **Taktgeber** ist
   provider-spezifisch (Claude Code: /loop / ScheduleWakeup / Cron; generisch:
   Scheduled Task/cron — als `install-snippet`-Analogon generierbar); der Hooker
@@ -55,7 +56,8 @@ Jeder Check ist ein eigener Schalter. Keiner ist per Default an, bis er sich bew
   (Ollama) über die ellmos-chat-Runtime — dort sitzen Uhr, aktivierbare
   Timestamp-Injection (jeder Prompt gestempelt) und die Runner-Flags
   `--goal`/`--loop` (siehe ellmos-chat TODO). Der Hooker bleibt zuständig für
-  das Briefing, nie für den Takt.
+  das Briefing, nie für den Takt. Umsetzung: `loop-briefing`-CLI mit plain- und
+  JSON-Ausgabe.
 
 ## v0.3 — Nutzerneutralität
 

@@ -8,6 +8,7 @@ Befehle:
                                                     UserPromptSubmit), gibt
                                                     Claude-Code-Hook-Output aus
   python -m workflowhooker providers              Provider-Fallback-Kette
+  python -m workflowhooker loop-briefing          Briefing fuer lokale Weck-Schleifen
   python -m workflowhooker install-snippet        Provider-Hook-Snippet
                                                     ausgeben
 
@@ -25,9 +26,16 @@ from pathlib import Path
 
 from .checks import CHECK_REGISTRY, CheckRunner
 from .config import Config, load_config
+from .injectors import GoalInjector, LoopInjector
 from .providers import PROVIDER_REGISTRY, resolve_provider
 from .providers.claude import ClaudeProvider
-from .sources import CompositeStateSource, FilesStateSource, GitStateSource, TaskplanStateSource
+from .sources import (
+    CompositeStateSource,
+    FilesStateSource,
+    GitStateSource,
+    GoalStateSource,
+    TaskplanStateSource,
+)
 from .state import SessionState, state_path_for_session
 
 
@@ -65,6 +73,34 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     p_hook.set_defaults(func=_cmd_hook_run)
 
+    p_goal = sub.add_parser(
+        "goal",
+        aliases=["goal-inject"],
+        help="Ziel-/Task-Erinnerung fuer PreCompact ausgeben",
+    )
+    p_goal.add_argument(
+        "--format",
+        dest="output_format",
+        choices=["plain", "json"],
+        default="plain",
+        help="Ausgabeformat (plain oder JSON mit additionalContext)",
+    )
+    p_goal.set_defaults(func=_cmd_goal)
+
+    p_loop = sub.add_parser(
+        "loop-briefing",
+        aliases=["loop-inject"],
+        help="Aktuelles Weck-Briefing fuer eine lokale Runtime erzeugen",
+    )
+    p_loop.add_argument(
+        "--format",
+        dest="output_format",
+        choices=["plain", "json"],
+        default="plain",
+        help="Ausgabeformat (plain oder JSON mit briefing)",
+    )
+    p_loop.set_defaults(func=_cmd_loop_briefing)
+
     p_providers = sub.add_parser("providers", help="Provider-Fallback-Kette anzeigen")
     p_providers.set_defaults(func=_cmd_providers)
 
@@ -96,8 +132,9 @@ def _build_state_source(config: Config, project_dir: Path) -> CompositeStateSour
 
     builders = {
         "files": lambda: FilesStateSource(files_dir),
+        "goal": lambda: GoalStateSource(files_dir),
         "git": lambda: GitStateSource(git_dir),
-        "taskplan": lambda: TaskplanStateSource(),
+        "taskplan": lambda: TaskplanStateSource(project_dir),
     }
     return CompositeStateSource(
         [builders[name]() for name in config.sources.order if name in builders]
@@ -107,12 +144,7 @@ def _build_state_source(config: Config, project_dir: Path) -> CompositeStateSour
 def _run_active_checks(config: Config, project_dir: Path, state: SessionState, *, now: float | None = None) -> str | None:
     now = time.time() if now is None else now
 
-    if state.messages_sent >= config.mode.max_messages_per_session:
-        return None
-    if (
-        state.last_message_ts is not None
-        and (now - state.last_message_ts) < config.mode.cooldown_minutes * 60
-    ):
+    if not _message_slot_available(config, state, now):
         return None
 
     source = _build_state_source(config, project_dir)
@@ -123,8 +155,7 @@ def _run_active_checks(config: Config, project_dir: Path, state: SessionState, *
         runtime = state.runtime_for(check_name)
         message = runner.run(check_name, project_state, config, runtime)
         if message is not None:
-            state.messages_sent += 1
-            state.last_message_ts = now
+            _record_message(state, now)
             return message
 
     return None
@@ -144,6 +175,40 @@ def _cmd_check(args) -> int:
     return 0
 
 
+def _cmd_goal(args) -> int:
+    config = load_config(args.config)
+    project_dir = args.project_dir or Path.cwd()
+    message = GoalInjector(_build_state_source(config, project_dir)).generate()
+    if message:
+        if args.output_format == "json":
+            print(
+                json.dumps(
+                    {
+                        "hookSpecificOutput": {
+                            "hookEventName": "PreCompact",
+                            "additionalContext": message,
+                        }
+                    },
+                    ensure_ascii=False,
+                )
+            )
+        else:
+            print(message)
+    return 0
+
+
+def _cmd_loop_briefing(args) -> int:
+    config = load_config(args.config)
+    project_dir = args.project_dir or Path.cwd()
+    message = LoopInjector(_build_state_source(config, project_dir)).generate()
+    if message:
+        if args.output_format == "json":
+            print(json.dumps({"briefing": message}, ensure_ascii=False))
+        else:
+            print(message)
+    return 0
+
+
 def _cmd_hook_run(args) -> int:
     if getattr(args, "block", False) and args.event != "Stop":
         # Blockieren unterdrueckt bei UserPromptSubmit den Prompt und ist bei
@@ -151,7 +216,6 @@ def _cmd_hook_run(args) -> int:
         # dokumentierte Weiterfuehr-Semantik.
         print("--block ist nur fuer das Stop-Event sinnvoll.", file=sys.stderr)
         return 1
-    config = load_config(args.config)
     config = load_config(args.config)
 
     # stdin MUSS vor dem State gelesen werden: Die Sitzungskennung steht nur dort.
@@ -177,6 +241,12 @@ def _cmd_hook_run(args) -> int:
     project_dir = args.project_dir or Path.cwd()
 
     message = _run_active_checks(config, project_dir, state)
+    if message is None and args.event == "PreCompact" and config.injectors.goal:
+        now = time.time()
+        if _message_slot_available(config, state, now):
+            message = GoalInjector(_build_state_source(config, project_dir)).generate()
+            if message:
+                _record_message(state, now)
     state.save(state_path)
 
     if message:
@@ -199,6 +269,20 @@ def _cmd_hook_run(args) -> int:
         else:
             print(json.dumps(output, ensure_ascii=False))
     return 0
+
+
+def _message_slot_available(config: Config, state: SessionState, now: float) -> bool:
+    if state.messages_sent >= config.mode.max_messages_per_session:
+        return False
+    return not (
+        state.last_message_ts is not None
+        and (now - state.last_message_ts) < config.mode.cooldown_minutes * 60
+    )
+
+
+def _record_message(state: SessionState, now: float) -> None:
+    state.messages_sent += 1
+    state.last_message_ts = now
 
 
 def _extract_session_id(payload: dict) -> str | None:

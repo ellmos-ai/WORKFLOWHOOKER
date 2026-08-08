@@ -36,6 +36,10 @@ max_touched_dirs = 2
 
 [checks.scope_guard]
 max_changed_files = 5
+
+[injectors]
+goal = true
+loop = true
 """,
         encoding="utf-8",
     )
@@ -45,6 +49,8 @@ max_changed_files = 5
     assert config.mode.cooldown_minutes == 10
     assert config.checks.drift_warning.max_touched_dirs == 2
     assert config.checks.scope_guard.max_changed_files == 5
+    assert config.injectors.goal is True
+    assert config.injectors.loop is True
 
 
 def test_load_config_rejects_unknown_check(tmp_path: Path):

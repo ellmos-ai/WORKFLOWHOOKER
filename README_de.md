@@ -2,7 +2,7 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Python Version](https://img.shields.io/badge/python-3.10%2B-blue.svg)](pyproject.toml)
-[![Tests](https://img.shields.io/badge/tests-82%20passed-brightgreen.svg)](tests)
+[![Tests](https://img.shields.io/badge/tests-95%20passed-brightgreen.svg)](tests)
 [![ellmos-ai](https://img.shields.io/badge/org-ellmos--ai-purple.svg)](https://github.com/ellmos-ai)
 [![open-bricks](https://img.shields.io/badge/ecosystem-open--bricks-blue.svg)](https://github.com/open-bricks)
 [![ellmos-module](https://img.shields.io/badge/ellmos--module-orchestration%2Fworkflow-purple.svg)](ellmos-module.v2.json)
@@ -13,7 +13,7 @@
 > **KI/LLM-Integrationshinweis:** Dieses Repository ist nach dem `ellmos.module.v2`-Standard für autonome KI-Agenten strukturiert. Siehe [`llms.txt`](llms.txt) für maschinenlesbare Kontextdateien und [`ellmos-module.v2.json`](ellmos-module.v2.json) für das Modulmanifest.
 > Englische Haupt-Dokumentation: [`README.md`](README.md).
 
-**Status: 0.2.1 — Arbeitsablaufsteuerung & Injektormuster.** (Last-checked: 2026-08-04)
+**Status: 0.2.1 — Arbeitsablaufsteuerung & Injektormuster.** (Last-checked: 2026-08-08)
 
 WorkflowHooker bietet Hooks, die den **Arbeitsablauf** autonomer KI-Agenten steuern — nicht deren Wissen.
 
@@ -26,7 +26,7 @@ graph TD
     subgraph StateSources ["Zustands-Quellen (StateSources)"]
         GitSource["Git-Adapter (git status, diff)"]
         FilesSource["Dateien-Adapter (LOCK*.txt)"]
-        TaskPlanSource["TaskPlan-Adapter (Stub)"]
+        TaskPlanSource["TaskPlan-Adapter (offene/aktive Tasks)"]
     end
 
     subgraph Core ["WorkflowHooker Kernel Engine"]
@@ -107,6 +107,22 @@ python -m workflowhooker check
 # 4. Tests ausführen
 python -m pytest
 ```
+
+## Ziel- und Weck-Injektoren
+
+Die Injektoren sind opt-in:
+
+```toml
+[injectors]
+goal = true       # Ziel/Tasks beim PreCompact-Hook
+loop = true       # lokales Weck-Briefing
+```
+
+`goal` liest `AUFGABEN.txt` oder `GOAL.md` sowie projektbezogene offene und
+aktive TASKPLAN-Tasks. `python -m workflowhooker loop-briefing --project-dir .`
+erzeugt für lokale Runtimes ein deterministisches Briefing aus Ziel, Tasks,
+Locks und uncommitteter Arbeit. WorkflowHooker stellt keinen Scheduler; den
+Takt übernimmt Cron, eine Scheduled Task oder die Runtime.
 
 ---
 

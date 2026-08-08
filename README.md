@@ -4,7 +4,7 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Python Version](https://img.shields.io/badge/python-3.10%2B-blue.svg)](pyproject.toml)
-[![Tests](https://img.shields.io/badge/tests-82%20passed-brightgreen.svg)](tests)
+[![Tests](https://img.shields.io/badge/tests-95%20passed-brightgreen.svg)](tests)
 [![ellmos-ai](https://img.shields.io/badge/org-ellmos--ai-purple.svg)](https://github.com/ellmos-ai)
 [![open-bricks](https://img.shields.io/badge/ecosystem-open--bricks-blue.svg)](https://github.com/open-bricks)
 [![ellmos-module](https://img.shields.io/badge/ellmos--module-orchestration%2Fworkflow-purple.svg)](ellmos-module.v2.json)
@@ -15,18 +15,18 @@
 > **KI/LLM-Integrationshinweis:** Dieses Repository ist nach dem `ellmos.module.v2`-Standard für autonome KI-Agenten strukturiert. Siehe [`llms.txt`](llms.txt) für maschinenlesbare Kontextdateien und [`ellmos-module.v2.json`](ellmos-module.v2.json) für das Modulmanifest.
 > Deutsche Dokumentation: [`README_de.md`](README_de.md).
 
-**Status: 0.2.1 — Arbeitsablaufsteuerung & Injektormuster.** (Last-checked: 2026-08-04)
+**Status: 0.2.1 — Arbeitsablaufsteuerung & Injektormuster.** (Last-checked: 2026-08-08)
 
 Umgesetzt: `StateSource`-Protokoll, Config-Schicht (`workflowhooker.toml`,
-`checks = []` per Default), Adapter `git` (read-only, `git status
---porcelain`) + `files` (LOCK*.txt-Konvention) + `taskplan` als
-dokumentierter Stub, drei einzeln zuschaltbare Checks (`closing_gate`,
-`drift_warning`, `scope_guard`) mit generischer Auto-Deaktivierung nach dem
-MetaFeedbackInjector-Muster, Meldungsbudget + Cooldown (4-Augen-Hook-Regel),
-Provider `claude`, `codex`, `kimi` (Hook-Snippet-Generator ohne `PreToolUse` im
-Default, optionale separate Blocker-Variante) + `manual` (CLI); der
-`git`-Provider bleibt ein dokumentierter Stub. 82 Tests sind grün, darunter
-echte Temp-Git-Repo-Fixtures.
+`checks = []` per Default), read-only Adapter `git`, `files` (LOCK*.txt und
+`AUFGABEN.txt`/`GOAL.md`) und optionales `taskplan` (projektbezogene offene und
+aktive Tasks), drei einzeln zuschaltbare Checks (`closing_gate`,
+`drift_warning`, `scope_guard`) sowie die opt-in Injektoren `goal` (PreCompact)
+und `loop-briefing` (lokale Weck-Runtimes). Meldungsbudget + Cooldown bleiben
+die gemeinsame 4-Augen-Bremse. Provider `claude`, `codex`, `kimi`
+(Hook-Snippet-Generator ohne `PreToolUse` im Default, optionale separate
+Blocker-Variante) + `manual` (CLI); der `git`-Provider bleibt ein
+dokumentierter Stub. 95 Tests sind grün, darunter echte Temp-Git-Repo-Fixtures.
 
 Hooks, die den **Arbeitsablauf** eines Agenten steuern — nicht sein Wissen.
 
@@ -37,7 +37,7 @@ graph TD
     subgraph StateSources ["State Sources (Zustands-Quellen)"]
         GitSource["Git Adapter (git status, diff)"]
         FilesSource["Files Adapter (LOCK*.txt)"]
-        TaskPlanSource["TaskPlan Adapter (Stub)"]
+        TaskPlanSource["TaskPlan Adapter (open/active Tasks)"]
     end
 
     subgraph Core ["WorkflowHooker Core Engine"]
@@ -268,11 +268,27 @@ der Hook-Schicht.
    snippet.json` einen Block für `~/.codex/hooks.json`. Codex muss ihn anschließend
    interaktiv über `/hooks` freigeben.
 
+## Ziel- und Weck-Injektoren
+
+Die Injektoren bleiben standardmäßig stumm und werden ausdrücklich in
+`workflowhooker.toml` aktiviert:
+
+```toml
+[injectors]
+goal = true       # Ziel/Tasks beim PreCompact-Hook injizieren
+loop = true       # loop-briefing als lokale Runtime-Schnittstelle freigeben
+```
+
+Der `PreCompact`-Hook liest das Projektziel aus `AUFGABEN.txt` oder `GOAL.md`
+und ergänzt projektbezogene offene/aktive TASKPLAN-Tasks. Ein optionaler
+Taskplan-Ausfall bleibt still. Für lokale Modelle liefert
+`python -m workflowhooker loop-briefing --project-dir .` ein deterministisches
+Briefing aus Ziel, offenen Tasks, Locks und uncommitteter Arbeit; der Taktgeber
+(Cron, Scheduled Task oder Runtime-Loop) bleibt außerhalb von WorkflowHooker.
+Mit `--format json` ist die Ausgabe maschinenlesbar.
+
 ## Was noch nicht umgesetzt ist
 
-- **`taskplan`-StateSource**: nur dokumentierter Stub (`available() ==
-  False`) — Anbindung an TASKPLAN/rinnsal fuer offene Aufgaben ist ARCHITECTURE.md
-  V4, noch nicht gebaut.
 - **`git`-Provider**: keine echte Git-Hook-Installation (`pre-commit`,
   `pre-push`); bleibt Stub bis ROADMAP v0.2+.
 - **Codex-Laufzeitfreigabe**: Provider und Snippet sind implementiert und direkt getestet; die
@@ -288,7 +304,9 @@ der Hook-Schicht.
   Zeitpunkt** (ROADMAP v0.2): noch nicht gebaute Checks.
 - **Custom-Adapter per entry_point** (ROADMAP v0.3): noch nicht gebaut.
 - **Automatisches Eintragen des `claude`-Hook-Snippets** in eine echte
-  `settings.json` (bleibt bewusst manuell).
+   `settings.json` (bleibt bewusst manuell).
+- **Scheduler/Taktgeber:** WorkflowHooker erzeugt nur das Loop-Briefing; die
+  lokale Runtime oder ein geplanter Prozess ruft es auf.
 
 ## Lizenz
 
