@@ -2,7 +2,13 @@
 
 Alle nennenswerten Aenderungen an WorkflowHooker.
 
-## [Unreleased]
+## [0.2.1] - 2026-08-14
+
+### Gewartet (2026-08-14)
+
+- **Technische Hygiene & Ruff-Konfiguration (Pfad A):** `[tool.ruff]` Konfiguration in `pyproject.toml` integriert (`target-version = "py310"`, `line-length = 120`), `ruff check .` 100% sauber validiert.
+- **Metadaten- & Manifest-Paritätstests:** `tests/test_workflowhooker.py` um automatisierte Versionsabgleiche (`__version__`, `ellmos-module.v2.json`, `pyproject.toml`) und Dokumentations-Integritätsprüfungen erweitert (97/97 Pytest-Tests 100% grün).
+- **Dokumentations-Synchronisation:** Badges und Timestamps in `README.md`, `README_de.md` und `llms.txt` auf Stand `2026-08-14` und 97 passed Tests synchronisiert.
 
 ### Hinzugefuegt (2026-08-08)
 
@@ -12,8 +18,7 @@ Alle nennenswerten Aenderungen an WorkflowHooker.
   Briefing aus Ziel, offenen Tasks, Locks und uncommitteter Arbeit; ein
   Scheduler bleibt bewusst Sache der Runtime.
 - Die read-only TASKPLAN-Quelle filtert offene/aktive Tasks auf das aktuelle
-  Projekt und fällt bei fehlendem Control Plane still zurück. Die Testsuite
-  umfasst jetzt 95/95 grüne Pytest-Tests.
+  Projekt und fällt bei fehlendem Control Plane still zurück.
 
 ### Gewartet (2026-08-04)
 
