@@ -25,7 +25,7 @@ class TaskplanStateSource:
         api_module: Any | None = None,
         limit: int = 20,
     ):
-        self.project_dir = Path(project_dir).resolve(strict=False) if project_dir else None
+        self.project_dir = _resolve_project_dir(project_dir)
         self._api = api_module
         self.limit = max(1, int(limit))
 
@@ -134,6 +134,33 @@ def _path_key(value: str) -> str:
     if len(key) >= 3 and key[1:3] == ":/":
         key = f"/mnt/{key[0]}{key[2:]}"
     return key
+
+
+def _looks_absolute(text: str) -> bool:
+    """True for a POSIX- or Windows-style absolute path, native or foreign."""
+    if text.startswith(("/", "\\")):
+        return True
+    return len(text) >= 3 and text[1] == ":" and text[2] in "\\/"
+
+
+def _resolve_project_dir(project_dir: Path | str | None) -> Path | None:
+    """Resolve ``project_dir`` for ``_path_key`` comparison, host-format-safe.
+
+    ``Path.resolve()`` is platform-dependent: on POSIX it does not recognise a
+    Windows-style absolute path (``C:\\work\\demo``) as absolute and silently
+    treats it as one relative path segment, prepending the current working
+    directory -- which then no longer matches a same-content ``project_path``
+    coming from a TASKPLAN row written on a different host (see
+    ``_path_key``). An already absolute path, native or foreign, is therefore
+    kept as given; only a genuinely relative native path is resolved against
+    the current working directory, as before.
+    """
+    if not project_dir:
+        return None
+    text = str(project_dir)
+    if _looks_absolute(text):
+        return Path(text)
+    return Path(project_dir).resolve(strict=False)
 
 
 # Readable aliases for external adapters; retain the historic lowercase
