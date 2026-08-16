@@ -43,11 +43,74 @@ def test_documentation_consistency():
     readme_en = root / "README.md"
     readme_de = root / "README_de.md"
     llms = root / "llms.txt"
+    changelog = root / "CHANGELOG.md"
 
     assert readme_en.exists()
     assert readme_de.exists()
     assert llms.exists()
+    assert changelog.exists()
 
     assert workflowhooker.__version__ in readme_en.read_text(encoding="utf-8")
     assert workflowhooker.__version__ in readme_de.read_text(encoding="utf-8")
     assert "workflowhooker" in llms.read_text(encoding="utf-8")
+    assert workflowhooker.__version__ in changelog.read_text(encoding="utf-8")
+
+
+def test_encoding_and_files_utf8():
+    """Verify that all documentation, manifest, and config files decode cleanly as UTF-8."""
+    root = Path(__file__).parent.parent
+    for file_path in [
+        root / "README.md",
+        root / "README_de.md",
+        root / "llms.txt",
+        root / "CHANGELOG.md",
+        root / "pyproject.toml",
+        root / "ellmos-module.v2.json",
+    ]:
+        assert file_path.exists()
+        raw_bytes = file_path.read_bytes()
+        decoded_text = raw_bytes.decode("utf-8")
+        assert len(decoded_text) > 0
+
+
+def test_ecosystem_matrix_consistency():
+    """Verify that README.md and README_de.md contain sibling ecosystem links."""
+    root = Path(__file__).parent.parent
+    readme_en = root / "README.md"
+    readme_de = root / "README_de.md"
+
+    en_content = readme_en.read_text(encoding="utf-8")
+    de_content = readme_de.read_text(encoding="utf-8")
+
+    for key in [
+        "memoryhooker",
+        "open-bricks",
+        "ellmos-ai",
+        "system-explorer",
+        "policy-registry",
+        "ellmos-delegation-authority",
+        "sqlite-transit-sync",
+    ]:
+        assert key in en_content
+        assert key in de_content
+
+
+def test_security_policy_consistency():
+    """Verify that SECURITY.md exists and specifies execution safety guardrails."""
+    root = Path(__file__).parent.parent
+    security_file = root / "SECURITY.md"
+    assert security_file.exists()
+    content = security_file.read_text(encoding="utf-8")
+    assert "Execution Safety" in content
+    assert "0.2.x" in content
+
+
+def test_roadmap_consistency():
+    """Verify that ROADMAP.md exists and specifies version milestones."""
+    root = Path(__file__).parent.parent
+    roadmap_file = root / "ROADMAP.md"
+    assert roadmap_file.exists()
+    content = roadmap_file.read_text(encoding="utf-8")
+    assert "Roadmap" in content or "ROADMAP" in content
+    assert "0.2" in content
+

@@ -2,7 +2,7 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Python Version](https://img.shields.io/badge/python-3.10%2B-blue.svg)](pyproject.toml)
-[![Tests](https://img.shields.io/badge/tests-97%20passed-brightgreen.svg)](tests)
+[![Tests](https://img.shields.io/badge/tests-101%20passed-brightgreen.svg)](tests)
 [![ellmos-ai](https://img.shields.io/badge/org-ellmos--ai-purple.svg)](https://github.com/ellmos-ai)
 [![open-bricks](https://img.shields.io/badge/ecosystem-open--bricks-blue.svg)](https://github.com/open-bricks)
 [![ellmos-module](https://img.shields.io/badge/ellmos--module-orchestration%2Fworkflow-purple.svg)](ellmos-module.v2.json)
@@ -13,7 +13,7 @@
 > **KI/LLM-Integrationshinweis:** Dieses Repository ist nach dem `ellmos.module.v2`-Standard für autonome KI-Agenten strukturiert. Siehe [`llms.txt`](llms.txt) für maschinenlesbare Kontextdateien und [`ellmos-module.v2.json`](ellmos-module.v2.json) für das Modulmanifest.
 > Englische Haupt-Dokumentation: [`README.md`](README.md).
 
-**Status: 0.2.1 — Arbeitsablaufsteuerung & Injektormuster.** (Last-checked: 2026-08-14)
+**Status: 0.2.1 — Arbeitsablaufsteuerung & Injektormuster.** (Last-checked: 2026-08-16)
 
 WorkflowHooker bietet Hooks, die den **Arbeitsablauf** autonomer KI-Agenten steuern — nicht deren Wissen.
 
@@ -66,6 +66,7 @@ graph TD
 
     BudgetCooldown --> ClaudeProvider
     BudgetCooldown --> CodexProvider
+    BudgetCooldown --> KimiProvider
     BudgetCooldown --> GitHookProvider
     BudgetCooldown --> CLIProvider
 ```
@@ -124,8 +125,26 @@ erzeugt für lokale Runtimes ein deterministisches Briefing aus Ziel, Tasks,
 Locks und uncommitteter Arbeit. WorkflowHooker stellt keinen Scheduler; den
 Takt übernimmt Cron, eine Scheduled Task oder die Runtime.
 
+## Ökosystem & Geschwisterwerkzeuge
+
+WorkflowHooker ist ein integraler Baustein der `ellmos-ai`-Agenteninfrastruktur sowie des übergreifenden `open-bricks`-Ökosystems:
+
+| Werkzeug / Repository | Kategorie | Rolle & Zweck |
+|---|---|---|
+| **[WorkflowHooker](https://github.com/ellmos-ai/workflowhooker)** | `ellmos-ai` / Orchestrierung | Steuerung des Agenten-Arbeitsablaufs, Abschluss-Gates, Drift-Warnungen & Weck-Injektoren |
+| **[MemoryHooker](https://github.com/ellmos-ai/memoryhooker)** | `ellmos-ai` / Kontext | Persistente Wissenseinspeisung und Faktenabruf für Agentensitzungen |
+| **[system-explorer](https://github.com/ellmos-ai/system-explorer)** | `ellmos-ai` / Diagnose | Multi-Agenten-Systemtopologie, Flotteninspektion & transaktionale Receipts |
+| **[policy-registry](https://github.com/ellmos-ai/policy-registry)** | `ellmos-ai` / Governance | Deklarative Zugriffssteuerung, Schema-Validierung & Richtliniendurchsetzung |
+| **[ellmos-delegation-authority](https://github.com/ellmos-ai/ellmos-delegation-authority)** | `ellmos-ai` / Delegation | Token-basiertes Berechtigungs- und Delegationsframework für Agenten |
+| **[sqlite-transit-sync](https://github.com/ellmos-ai/sqlite-transit-sync)** | `ellmos-ai` / Storage | Hochzuverlässige SQLite-Transaktionsreplikation über Host-Knoten hinweg |
+| **[automation-master](https://github.com/dev-bricks/automation-master)** | `dev-bricks` / Automation | Multi-Agenten-Taskqueue, Lease-Koordination und Lock-Orchestrierung |
+| **[DevCenter](https://github.com/dev-bricks/DevCenter)** | `dev-bricks` / Workspace | Zentrale Entwickler-Workbench und lokale Workspace-Verwaltung |
+| **[CodeBox](https://github.com/dev-bricks/CodeBox)** | `dev-bricks` / Entwicklung | Isolierte Code-Ausführung, Plugin-Laufzeitumgebung und Dev-Tooling |
+| **[open-bricks](https://github.com/open-bricks)** | `open-bricks` / Umbrella | Dachorganisation für modulare, interoperable Entwicklungs- und Desktop-Tools |
+
 ---
 
 ## Lizenz
 
 MIT License — Copyright (c) 2026 ellmos-ai
+

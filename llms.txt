@@ -1,7 +1,7 @@
 # workflowhooker
 
-> Last-checked: 2026-08-14
-> Verification: 97/97 Pytest-Tests 100% grün.
+> Last-checked: 2026-08-16
+> Verification: 101/101 Pytest-Tests 100% grün.
 
 Canonical repository: https://github.com/ellmos-ai/workflowhooker-provenance
 Owner: ellmos-ai (Ecosystem: open-bricks)
@@ -38,6 +38,11 @@ ellmos-ai workflowhooker-provenance
 ## Related Ecosystem Projects
 
 - [memoryhooker](https://github.com/ellmos-ai/memoryhooker-provenance): Memory injection and knowledge state adapter for LLM agents.
+- [system-explorer](https://github.com/ellmos-ai/system-explorer): Multi-agent fleet inspection and runtime receipt handling.
+- [policy-registry](https://github.com/ellmos-ai/policy-registry): Declarative security governance and policy enforcement.
+- [ellmos-delegation-authority](https://github.com/ellmos-ai/ellmos-delegation-authority): Multi-agent delegation token and permission authority.
+- [sqlite-transit-sync](https://github.com/ellmos-ai/sqlite-transit-sync): SQLite transactional replication layer.
 - [ellmos-filecommander-mcp](https://github.com/ellmos-ai/ellmos-filecommander-mcp): Filesystem and process execution MCP tool suite.
 - [ellmos-codecommander-mcp](https://github.com/ellmos-ai/ellmos-codecommander-mcp): Code analysis and AST processing MCP server.
 - [ellmos-controlcenter-mcp](https://github.com/ellmos-ai/ellmos-controlcenter-mcp): MCP stack control plane and skill router.
+

@@ -2,7 +2,14 @@
 
 Alle nennenswerten Aenderungen an WorkflowHooker.
 
-## [0.2.1] - 2026-08-14
+## [0.2.1] - 2026-08-16
+
+### Gewartet (2026-08-16)
+
+- **Discoverability, README-Design, Badges & Metadata Parity Check (Pfad B):** Badges in `README.md` & `README_de.md` um Testsuite (101 Passed, 100% grün), `ellmos-ai` Ecosystem und `open-bricks` Umbrella synchronisiert.
+- **Ecosystem & Geschwisterwerkzeuge-Matrix:** Zweisprachige Geschwisterwerkzeuge-Matrix innerhalb der `ellmos-ai`-, `dev-bricks`- und `open-bricks`-Ökosysteme (`memoryhooker`, `system-explorer`, `policy-registry`, `ellmos-delegation-authority`, `sqlite-transit-sync`, `automation-master`, `DevCenter`, `CodeBox`) in `README.md` und `README_de.md` integriert.
+- **Automatisierte Metadaten- & Manifest-Paritätstestsuite:** `tests/test_workflowhooker.py` um UTF-8-Encoding-, Security- und Roadmap-Konsistenztests erweitert (101/101 passed).
+- **`llms.txt` Discovery Index:** Last-checked Timestamp auf `2026-08-16` und 101 verifizierte Tests sowie erweiterte Ökosystem-Querverweise synchronisiert.
 
 ### Gewartet (2026-08-14)
 

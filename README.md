@@ -4,7 +4,7 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Python Version](https://img.shields.io/badge/python-3.10%2B-blue.svg)](pyproject.toml)
-[![Tests](https://img.shields.io/badge/tests-97%20passed-brightgreen.svg)](tests)
+[![Tests](https://img.shields.io/badge/tests-101%20passed-brightgreen.svg)](tests)
 [![ellmos-ai](https://img.shields.io/badge/org-ellmos--ai-purple.svg)](https://github.com/ellmos-ai)
 [![open-bricks](https://img.shields.io/badge/ecosystem-open--bricks-blue.svg)](https://github.com/open-bricks)
 [![ellmos-module](https://img.shields.io/badge/ellmos--module-orchestration%2Fworkflow-purple.svg)](ellmos-module.v2.json)
@@ -15,7 +15,7 @@
 > **KI/LLM-Integrationshinweis:** Dieses Repository ist nach dem `ellmos.module.v2`-Standard für autonome KI-Agenten strukturiert. Siehe [`llms.txt`](llms.txt) für maschinenlesbare Kontextdateien und [`ellmos-module.v2.json`](ellmos-module.v2.json) für das Modulmanifest.
 > Deutsche Dokumentation: [`README_de.md`](README_de.md).
 
-**Status: 0.2.1 — Arbeitsablaufsteuerung & Injektormuster.** (Last-checked: 2026-08-14)
+**Status: 0.2.1 — Arbeitsablaufsteuerung & Injektormuster.** (Last-checked: 2026-08-16)
 
 Umgesetzt: `StateSource`-Protokoll, Config-Schicht (`workflowhooker.toml`,
 `checks = []` per Default), read-only Adapter `git`, `files` (LOCK*.txt und
@@ -26,7 +26,7 @@ und `loop-briefing` (lokale Weck-Runtimes). Meldungsbudget + Cooldown bleiben
 die gemeinsame 4-Augen-Bremse. Provider `claude`, `codex`, `kimi`
 (Hook-Snippet-Generator ohne `PreToolUse` im Default, optionale separate
 Blocker-Variante) + `manual` (CLI); der `git`-Provider bleibt ein
-dokumentierter Stub. 97 Tests sind grün, darunter echte Temp-Git-Repo-Fixtures.
+dokumentierter Stub. 101 Tests sind grün, darunter echte Temp-Git-Repo-Fixtures.
 
 Hooks, die den **Arbeitsablauf** eines Agenten steuern — nicht sein Wissen.
 
@@ -308,6 +308,24 @@ Mit `--format json` ist die Ausgabe maschinenlesbar.
 - **Scheduler/Taktgeber:** WorkflowHooker erzeugt nur das Loop-Briefing; die
   lokale Runtime oder ein geplanter Prozess ruft es auf.
 
+## Ecosystem & Sibling Tools
+
+WorkflowHooker is part of the `ellmos-ai` autonomous agent infrastructure and the broader `open-bricks` open-source umbrella:
+
+| Tool / Repository | Category | Role & Purpose |
+|---|---|---|
+| **[WorkflowHooker](https://github.com/ellmos-ai/workflowhooker)** | `ellmos-ai` / Orchestration | Agent process governance, closing gates, drift alerts & wake-up loop injectors |
+| **[MemoryHooker](https://github.com/ellmos-ai/memoryhooker)** | `ellmos-ai` / Context | Persistent memory injection and knowledge retrieval for AI agent sessions |
+| **[system-explorer](https://github.com/ellmos-ai/system-explorer)** | `ellmos-ai` / Diagnostics | Multi-agent system discovery, topology inspection & runtime receipt handling |
+| **[policy-registry](https://github.com/ellmos-ai/policy-registry)** | `ellmos-ai` / Governance | Declarative access control, schema validation & security policy enforcement |
+| **[ellmos-delegation-authority](https://github.com/ellmos-ai/ellmos-delegation-authority)** | `ellmos-ai` / Delegation | Multi-agent token-based authority & capability delegation framework |
+| **[sqlite-transit-sync](https://github.com/ellmos-ai/sqlite-transit-sync)** | `ellmos-ai` / Storage | High-reliability SQLite transactional state replication across host nodes |
+| **[automation-master](https://github.com/dev-bricks/automation-master)** | `dev-bricks` / Automation | Multi-agent task queue, lease coordinator and lock orchestration |
+| **[DevCenter](https://github.com/dev-bricks/DevCenter)** | `dev-bricks` / Workspace | Unified local developer workbench and workspace orchestrator |
+| **[CodeBox](https://github.com/dev-bricks/CodeBox)** | `dev-bricks` / Development | Sandboxed code evaluation, plugin runtime and devtool playground |
+| **[open-bricks](https://github.com/open-bricks)** | `open-bricks` / Umbrella | Open architecture suite connecting tools, desktops, and agent systems |
+
 ## Lizenz
 
 MIT
+
