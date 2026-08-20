@@ -2,7 +2,13 @@
 
 Alle nennenswerten Aenderungen an WorkflowHooker.
 
-## [0.2.1] - 2026-08-16
+## [0.2.1] - 2026-08-20
+
+### Gewartet (2026-08-20)
+
+- **Technische Hygiene & CI-Härtung (Pfad A):** CI-Workflow (`.github/workflows/ci.yml`) um Python 3.13 Matrix-Support und automatisierten `ruff check .` Lint-Schritt erweitert.
+- **Erweiterte Testsuite & Metadaten-Parität:** `tests/test_workflowhooker.py` um Lizenz- und CI-Workflow-Integritätsprüfungen sowie Timestamp-Konsistenz erweitert (104/104 Pytest-Tests 100% grün).
+- **Dokumentations- und Status-Synchronisation:** Badges und Last-checked Timestamps in `README.md`, `README_de.md` und `llms.txt` auf Stand `2026-08-20` und 104 passed Tests synchronisiert.
 
 ### Gewartet (2026-08-16)
 

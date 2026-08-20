@@ -114,3 +114,39 @@ def test_roadmap_consistency():
     assert "Roadmap" in content or "ROADMAP" in content
     assert "0.2" in content
 
+
+def test_license_integrity():
+    """Verify LICENSE file exists and conforms to standard MIT structure."""
+    root = Path(__file__).parent.parent
+    license_file = root / "LICENSE"
+    assert license_file.exists()
+    content = license_file.read_text(encoding="utf-8")
+    assert "MIT License" in content
+    assert "Lukas Geiger" in content
+
+
+def test_github_workflow_ci_validity():
+    """Verify that GitHub Actions CI workflow exists and specifies Python matrix."""
+    root = Path(__file__).parent.parent
+    ci_file = root / ".github" / "workflows" / "ci.yml"
+    assert ci_file.exists()
+    content = ci_file.read_text(encoding="utf-8")
+    assert "actions/checkout" in content
+    assert "actions/setup-python" in content
+    assert "ruff check" in content
+    assert "pytest" in content
+    for py_ver in ["3.10", "3.11", "3.12", "3.13"]:
+        assert py_ver in content
+
+
+def test_timestamp_currency():
+    """Verify that documentation timestamps reflect the latest verified state."""
+    root = Path(__file__).parent.parent
+    readme_en = (root / "README.md").read_text(encoding="utf-8")
+    readme_de = (root / "README_de.md").read_text(encoding="utf-8")
+    llms = (root / "llms.txt").read_text(encoding="utf-8")
+
+    assert "2026-08-20" in readme_en
+    assert "2026-08-20" in readme_de
+    assert "2026-08-20" in llms
+
