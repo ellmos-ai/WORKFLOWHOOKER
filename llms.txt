@@ -1,7 +1,7 @@
 # workflowhooker
 
-> Last-checked: 2026-08-20
-> Verification: 104/104 Pytest-Tests 100% grün.
+> Last-checked: 2026-08-21
+> Verification: 112/112 Pytest-Tests 100% grün.
 
 Canonical repository: https://github.com/ellmos-ai/workflowhooker-provenance
 Owner: ellmos-ai (Ecosystem: open-bricks)
@@ -14,8 +14,10 @@ WorkflowHooker (`ellmos-ai/workflowhooker-provenance`) ist ein Modul im `ellmos-
 
 - [README.md](README.md): Primary documentation (English), architecture, distinction from MemoryHooker, provider integration.
 - [README_de.md](README_de.md): German documentation and architecture overview.
+- [SECURITY.md](SECURITY.md): Bilingual security policy and Zero-Egress guarantees.
 - [ROADMAP.md](ROADMAP.md): Development roadmap and phase planning.
-- [ellmos-module.v2.json](ellmos-module.v2.json): Module manifest for the catalog (`orchestration`/`workflow`).
+- [CHANGELOG.md](CHANGELOG.md): Complete release history and version tracking.
+- [ellmos-module.v2.json](ellmos-module.v2.json): Module manifest for the catalog (`control`/`workflow`).
 - [docs/reference/BACH-injectors.txt](docs/reference/BACH-injectors.txt): Reference of BACH injector patterns as blueprint.
 - `python -m workflowhooker loop-briefing`: deterministic local-runtime wake-up briefing.
 
@@ -42,7 +44,10 @@ ellmos-ai workflowhooker-provenance
 - [policy-registry](https://github.com/ellmos-ai/policy-registry): Declarative security governance and policy enforcement.
 - [ellmos-delegation-authority](https://github.com/ellmos-ai/ellmos-delegation-authority): Multi-agent delegation token and permission authority.
 - [sqlite-transit-sync](https://github.com/ellmos-ai/sqlite-transit-sync): SQLite transactional replication layer.
+- [automation-master](https://github.com/dev-bricks/automation-master): Task queue, lease coordinator and lock orchestration.
+- [DevCenter](https://github.com/dev-bricks/DevCenter): Unified local developer workbench and workspace orchestrator.
+- [CodeBox](https://github.com/dev-bricks/CodeBox): Sandboxed code evaluation, plugin runtime and devtool playground.
+- [open-bricks](https://github.com/open-bricks): Open architecture suite connecting tools, desktops, and agent systems.
 - [ellmos-filecommander-mcp](https://github.com/ellmos-ai/ellmos-filecommander-mcp): Filesystem and process execution MCP tool suite.
 - [ellmos-codecommander-mcp](https://github.com/ellmos-ai/ellmos-codecommander-mcp): Code analysis and AST processing MCP server.
 - [ellmos-controlcenter-mcp](https://github.com/ellmos-ai/ellmos-controlcenter-mcp): MCP stack control plane and skill router.
-

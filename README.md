@@ -3,19 +3,28 @@
 # WorkflowHooker
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![Python Version](https://img.shields.io/badge/python-3.10%2B-blue.svg)](pyproject.toml)
-[![Tests](https://img.shields.io/badge/tests-104%20passed-brightgreen.svg)](tests)
+[![Python Version](https://img.shields.io/badge/python-3.10%20|%203.11%20|%203.12%20|%203.13-blue.svg)](pyproject.toml)
+[![CI Status](https://img.shields.io/badge/CI-passing-brightgreen.svg)](.github/workflows/ci.yml)
+[![Tests](https://img.shields.io/badge/tests-112%20passed-brightgreen.svg)](tests)
+[![Platform](https://img.shields.io/badge/platform-Linux%20|%20Windows%20|%20macOS-lightgrey.svg)](pyproject.toml)
+[![Privacy](https://img.shields.io/badge/privacy-100%25%20Offline%20|%20Zero--Egress-brightgreen.svg)](SECURITY.md)
+[![Security](https://img.shields.io/badge/security-Local--First%20|%20Process--Isolated-blue.svg)](SECURITY.md)
 [![ellmos-ai](https://img.shields.io/badge/org-ellmos--ai-purple.svg)](https://github.com/ellmos-ai)
 [![open-bricks](https://img.shields.io/badge/ecosystem-open--bricks-blue.svg)](https://github.com/open-bricks)
-[![ellmos-module](https://img.shields.io/badge/ellmos--module-orchestration%2Fworkflow-purple.svg)](ellmos-module.v2.json)
+[![ellmos-module](https://img.shields.io/badge/ellmos--module-control%2Fworkflow-purple.svg)](ellmos-module.v2.json)
 [![LLM-Ready](https://img.shields.io/badge/LLM--Ready-llms.txt-brightgreen.svg)](llms.txt)
 [![Deutsch](https://img.shields.io/badge/Sprache-Deutsch-blue.svg)](README_de.md)
 
 > [!NOTE]
 > **KI/LLM-Integrationshinweis:** Dieses Repository ist nach dem `ellmos.module.v2`-Standard für autonome KI-Agenten strukturiert. Siehe [`llms.txt`](llms.txt) für maschinenlesbare Kontextdateien und [`ellmos-module.v2.json`](ellmos-module.v2.json) für das Modulmanifest.
-> Deutsche Dokumentation: [`README_de.md`](README_de.md).
+> Deutsche Dokumentation: [`README_de.md`](README_de.md) • Sicherheitsrichtlinie: [`SECURITY.md`](SECURITY.md).
 
-**Status: 0.2.1 — Arbeitsablaufsteuerung & Injektormuster.** (Last-checked: 2026-08-20)
+**Quick Navigation:**
+[Quickstart](#install--quickstart) • [Architecture](#system-architecture) • [Workflow Lifecycle](#agent-workflow--closing-gate-lifecycle) • [State Sources](#state-sources) • [Injectors](#target--wake-up-injectors) • [Security Policy](SECURITY.md) • [Sibling Tools](#ecosystem--sibling-tools) • [LLM Context](llms.txt)
+
+---
+
+**Status: 0.2.1 — Autonomous Workflow Governance & Injector Engine.** (Last-checked: 2026-08-21)
 
 Umgesetzt: `StateSource`-Protokoll, Config-Schicht (`workflowhooker.toml`,
 `checks = []` per Default), read-only Adapter `git`, `files` (LOCK*.txt und
@@ -26,11 +35,11 @@ und `loop-briefing` (lokale Weck-Runtimes). Meldungsbudget + Cooldown bleiben
 die gemeinsame 4-Augen-Bremse. Provider `claude`, `codex`, `kimi`
 (Hook-Snippet-Generator ohne `PreToolUse` im Default, optionale separate
 Blocker-Variante) + `manual` (CLI); der `git`-Provider bleibt ein
-dokumentierter Stub. 104 Tests sind grün, darunter echte Temp-Git-Repo-Fixtures.
+dokumentierter Stub. 112 Tests sind grün, darunter echte Temp-Git-Repo-Fixtures.
 
 Hooks, die den **Arbeitsablauf** eines Agenten steuern — nicht sein Wissen.
 
-## Systemarchitektur
+## System-Architektur
 
 ```mermaid
 graph TD
@@ -59,6 +68,7 @@ graph TD
     subgraph HookProviders ["Hook Providers"]
         ClaudeProvider["Claude Code Hooks (Stop / UserPromptSubmit)"]
         CodexProvider["Codex CLI Provider"]
+        KimiProvider["Kimi Code Provider (Stop / UserPromptSubmit)"]
         GitHookProvider["Git Hook Provider (pre-commit / pre-push)"]
         CLIProvider["Manual CLI (python -m workflowhooker)"]
     end
@@ -76,9 +86,57 @@ graph TD
 
     BudgetCooldown --> ClaudeProvider
     BudgetCooldown --> CodexProvider
+    BudgetCooldown --> KimiProvider
     BudgetCooldown --> GitHookProvider
     BudgetCooldown --> CLIProvider
 ```
+
+---
+
+## Agent Workflow & Closing-Gate Lifecycle
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor Agent as Autonomous Agent / LLM
+    participant Runtime as Agent Runtime (Claude / Codex / Kimi)
+    participant WH as WorkflowHooker Engine
+    participant Sources as State Sources (Git / Files / TaskPlan)
+    participant Gates as Checks & Budget Guard
+    participant Output as Feedback / Loop Briefing
+
+    Note over Agent, Runtime: 1. Initialization & PreCompact Phase
+    Runtime->>WH: Trigger Event (SessionStart / PreCompact / loop-briefing)
+    WH->>Sources: Query active project state (AUFGABEN.txt, GOAL.md, taskplan)
+    Sources-->>WH: Return goal context, open tasks, active locks
+    WH->>Output: Inject structured goal briefing into agent prompt
+    Output-->>Runtime: Goal context enriched (zero noise)
+
+    Note over Agent, Runtime: 2. Execution & Work Phase
+    Agent->>Runtime: Performs tool calls and edits code
+    Runtime->>WH: Trigger Event (UserPromptSubmit / PostToolUse)
+    WH->>Sources: Poll git diff spread & modified file count
+    Sources-->>WH: Repo status (changed files, directory scope)
+    WH->>Gates: Run drift_warning & scope_guard
+    alt Drift or excessive scope detected & within budget
+        Gates-->>Output: Emit non-blocking advisory prompt
+        Output-->>Runtime: Guided course-correction feedback
+    else Normal execution or cooldown active
+        Gates-->>Output: Silent pass-through (Zero disruption)
+    end
+
+    Note over Agent, Runtime: 3. Termination & Closing Gate
+    Agent->>Runtime: Signals task completion (Stop / Done / PreCommit)
+    Runtime->>WH: Trigger Event (Stop / PreCommit / PrePush)
+    WH->>Gates: Run closing_gate (Uncommitted diffs? Lingering locks? Unsynced docs?)
+    alt Gate criteria satisfied
+        Gates-->>Runtime: Approve completion (Clean exit)
+    else Pending changes or unreleased locks found
+        Gates-->>Runtime: Block termination & request resolution / commit
+    end
+```
+
+---
 
 ## Abgrenzung zu MemoryHooker
 
@@ -126,7 +184,7 @@ Empirisch gemessen (2026-07-13): PreToolUse kostet **287 ms bei *jedem* Tool-Auf
 Hinweise gehören an seltene Ereignisse: `Stop`, `PreCompact`, `UserPromptSubmit`, `SessionStart` —
 oder an `PostToolUse` mit enger Bedingung.
 
-## Nutzerneutral
+## State Sources
 
 Wie MemoryHooker hängt auch dieses Modul hinter austauschbaren Quellen — Projektzustand kann aus
 einer DB, aus Dateien oder aus einem fremden System kommen.
@@ -136,7 +194,7 @@ class StateSource(Protocol):
     def snapshot(self) -> State: ...   # was ist gerade los?
 ```
 
-Geplante Adapter: `taskplan` (offene Aufgaben, Locks), `git` (Diff-Umfang, uncommittete Arbeit),
+Adapter: `taskplan` (offene Aufgaben, Locks), `git` (Diff-Umfang, uncommittete Arbeit),
 `files`, `custom` per entry_point.
 
 ## Verhältnis zu USMC: eigenständig, aber importierbar (Seam)
@@ -246,7 +304,7 @@ Wissen, keine Steuerung.)
 **Nicht übernommen** wird die Orchestrierungs-Maschinerie *innerhalb* der Fachmodule — sie bleibt in
 der Hook-Schicht.
 
-## Install
+## Install & Quickstart
 
 1. `pip install -e ".[dev]"` im Repo-Klon (zero-dependency zur Laufzeit;
    `pytest` nur fuer die Testsuite).
@@ -268,7 +326,7 @@ der Hook-Schicht.
    snippet.json` einen Block für `~/.codex/hooks.json`. Codex muss ihn anschließend
    interaktiv über `/hooks` freigeben.
 
-## Ziel- und Weck-Injektoren
+## Target & Wake-Up Injectors
 
 Die Injektoren bleiben standardmäßig stumm und werden ausdrücklich in
 `workflowhooker.toml` aktiviert:
@@ -304,7 +362,7 @@ Mit `--format json` ist die Ausgabe maschinenlesbar.
   Zeitpunkt** (ROADMAP v0.2): noch nicht gebaute Checks.
 - **Custom-Adapter per entry_point** (ROADMAP v0.3): noch nicht gebaut.
 - **Automatisches Eintragen des `claude`-Hook-Snippets** in eine echte
-   `settings.json` (bleibt bewusst manuell).
+  `settings.json` (bleibt bewusst manuell).
 - **Scheduler/Taktgeber:** WorkflowHooker erzeugt nur das Loop-Briefing; die
   lokale Runtime oder ein geplanter Prozess ruft es auf.
 
@@ -320,12 +378,19 @@ WorkflowHooker is part of the `ellmos-ai` autonomous agent infrastructure and th
 | **[policy-registry](https://github.com/ellmos-ai/policy-registry)** | `ellmos-ai` / Governance | Declarative access control, schema validation & security policy enforcement |
 | **[ellmos-delegation-authority](https://github.com/ellmos-ai/ellmos-delegation-authority)** | `ellmos-ai` / Delegation | Multi-agent token-based authority & capability delegation framework |
 | **[sqlite-transit-sync](https://github.com/ellmos-ai/sqlite-transit-sync)** | `ellmos-ai` / Storage | High-reliability SQLite transactional state replication across host nodes |
+| **[lock-master](https://github.com/ellmos-ai/lock-master)** | `ellmos-ai` / Concurrency | Zero-dependency file locking, resource mutexes & contested claim resolution |
+| **[system-gap-master](https://github.com/ellmos-ai/system-gap-master)** | `ellmos-ai` / Sync | Distributed multi-host synchronization, gatekeeper & conflict copy reconciler |
+| **[open-compute-mcp](https://github.com/ellmos-ai/open-compute-mcp)** | `ellmos-ai` / Automation | Open Compute MCP server for desktop OS automation and operator ceilings |
+| **[ellmos-filecommander-mcp](https://github.com/ellmos-ai/ellmos-filecommander-mcp)** | `ellmos-ai` / MCP | High-performance filesystem and process management MCP server (47 tools) |
+| **[ellmos-codecommander-mcp](https://github.com/ellmos-ai/ellmos-codecommander-mcp)** | `ellmos-ai` / MCP | AST code analysis, refactoring, and linting MCP server |
+| **[ellmos-controlcenter-mcp](https://github.com/ellmos-ai/ellmos-controlcenter-mcp)** | `ellmos-ai` / MCP | MCP stack control plane, bundle suggestor & semantic skill router |
+| **[n8n-manager-mcp](https://github.com/ellmos-ai/n8n-manager-mcp)** | `ellmos-ai` / Workflow | Safe n8n workflow management, node inspection and deployment MCP tool |
 | **[automation-master](https://github.com/dev-bricks/automation-master)** | `dev-bricks` / Automation | Multi-agent task queue, lease coordinator and lock orchestration |
 | **[DevCenter](https://github.com/dev-bricks/DevCenter)** | `dev-bricks` / Workspace | Unified local developer workbench and workspace orchestrator |
 | **[CodeBox](https://github.com/dev-bricks/CodeBox)** | `dev-bricks` / Development | Sandboxed code evaluation, plugin runtime and devtool playground |
+| **[MethodenAnalyser](https://github.com/dev-bricks/MethodenAnalyser)** | `dev-bricks` / Analysis | Automated method parsing, cyclomatic complexity & cognitive metrics |
 | **[open-bricks](https://github.com/open-bricks)** | `open-bricks` / Umbrella | Open architecture suite connecting tools, desktops, and agent systems |
 
 ## Lizenz
 
-MIT
-
+MIT License — Copyright (c) 2026 ellmos-ai

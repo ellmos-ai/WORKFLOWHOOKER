@@ -2,7 +2,18 @@
 
 Alle nennenswerten Aenderungen an WorkflowHooker.
 
-## [0.2.1] - 2026-08-20
+## [0.2.1] - 2026-08-21
+
+### Gewartet (2026-08-21)
+
+- **Discoverability, README-Design, Badges & Quick Navigation (Pfad B):** Badges in `README.md` & `README_de.md` um Testsuite (112 Passed, 100% grün), CI-Status, Python 3.10-3.13, Plattformen (`Linux | Windows | macOS`), Datenschutz (`100% Offline | Zero-Egress`), Sicherheit (`Local-First | Process-Isolated`), `ellmos-ai` Ecosystem, `open-bricks` Umbrella und strukturierte Schnellnavigation mit `SECURITY.md` synchronisiert.
+- **Interaktives zweisprachiges Mermaid-Sequenzdiagramm:** Vollständiges Sequenzdiagramm für den agentischen Lebenszyklus (Initialisierung & PreCompact Ziel-Briefing -> Ausführung mit drift_warning & scope_guard -> Abschluss & closing_gate Prüfung) in `README.md` und `README_de.md` integriert.
+- **Zweisprachige Sicherheitsrichtlinie (`SECURITY.md`):** Upgrade auf zweisprachige Struktur (`## English` / `## Deutsch`) mit Zero-Egress-Garantien, Non-Elevation (User-Mode-Betrieb), Fail-Closed Budgeting, Geheimnishygienen und direkten Sicherheitskontakten (`security@ellmos.ai`, `support@lukasgeiger.com`, `lukas@open-bricks.org`) sowie GitHub Security Advisories Link.
+- **`pyproject.toml` PEP 621 Standard Classifiers & URLs:** Vollständige Standard-Classifiers (Python 3.10-3.13, OS Independent, Windows, Linux, MacOS), Keywords und `[project.urls]` (Homepage, Documentation, Repository, Bug Tracker, Changelog, Security) integriert.
+- **GitHub Actions CI-Matrix-Härtung:** `.github/workflows/ci.yml` auf Multi-OS Matrix (`ubuntu-latest`, `windows-latest`, `macos-latest`), Python 3.10-3.13 mit pip-Caching, automatisches `ruff check .` Lint-Gate und pytest-Ausführung modernisiert.
+- **Ecosystem & Geschwisterwerkzeuge-Matrix:** Zweisprachige Matrix auf 18 Partner-Repositories über die Ökosysteme `ellmos-ai`, `dev-bricks`, `open-bricks` erweitert (`lock-master`, `system-gap-master`, `open-compute-mcp`, `n8n-manager-mcp`, `MethodenAnalyser`).
+- **Automatisierte Metadaten-, Manifest- & Paritätstestsuite:** `tests/test_metadata.py` mit 8 Contract-Tests implementiert (Version Consistency, Manifest Parity, Portable Links ohne lokale File-URIs, llms.txt Integrity, Readme Badges & Ecosystem Parity, pyproject Tooling Integrity, CI Workflow Parity, Bilingual Security Policy Parity; Pytest-Gesamtsuite auf 112 Tests erweitert, 100% grün).
+- **`llms.txt` Discovery Index:** Last-checked Timestamp auf `2026-08-21`, 112 verifizierte Tests und erweiterte Ökosystem-Querverweise synchronisiert.
 
 ### Gewartet (2026-08-20)
 
