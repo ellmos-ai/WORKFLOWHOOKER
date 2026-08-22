@@ -68,6 +68,29 @@ Dateisystemmutation ergänzt:
    der manuelle `check`-Befehl bleibt unverändert. Dadurch verdrängt ein
    Abschluss-Gate keine nichtblockierenden Start-Hinweise.
 
+## Entscheidung für Slice 3: Entscheidungssicherheit
+
+Die Anforderungen 14–16 werden als eigener opt-in `decision_safety`-Injector
+am `UserPromptSubmit` umgesetzt:
+
+1. Der Injector spricht nur bei engen Entscheidungs- beziehungsweise
+   Entscheidungsreview-Signalen im Prompt und teilt das bestehende globale
+   Meldungsbudget, den Cooldown und die Topic-Deduplizierung.
+2. Er erinnert strikt an diese Reihenfolge: projektbezogene `DECISIONS.md` und
+   Policies; danach zentrale `_DECISIONS`-/TO-DECIDE-Bestände und
+   `SYSTEM-MANIFEST`; danach Gardener plus USMC; danach TOM-lm; erst bei
+   verbleibender Unsicherheit den Nutzer fragen. Keine Stufe wird als bereits
+   ausgeführt behauptet.
+3. Jede dokumentierte Entscheidung soll Basis/Grundlage, Belege und Quellen,
+   betrachtete Alternativen, Faktenstand sowie verbleibende Unsicherheiten
+   enthalten. Der Hook schreibt diese Dokumentation nicht selbst.
+4. Eine Bewertung oder ein Review einer bestehenden Entscheidung ist eine
+   neue Nutzerentscheidung. Sie wird über die `_DECISIONS`-/
+   `TO-DECIDE-USER`-Kette vorgelegt und weder still verbucht noch automatisch
+   als neue Policy adoptiert.
+5. Alle drei Teilhinweise sind separat konfigurierbar. Der Injector liest oder
+   mutiert keine Decision-, Gardener-, USMC-, TOM-lm- oder Policy-Daten.
+
 ## Anforderungsmatrix
 
 | Nr. | Bestand vor Slice | Entscheidung für diesen Slice |
@@ -85,9 +108,9 @@ Dateisystemmutation ergänzt:
 | 11 | nicht vorhanden | Slice 2: konfigurierbarer OneDrive-/Plan-D-Hinweis auf lokalen Spiegel, Git-Sync-Hub und Pointer |
 | 12 | nicht vorhanden | bedingter OneDrive-`fc_*`-Hinweis |
 | 13 | nicht vorhanden | offen; Self-Healing darf nicht nur behauptet werden |
-| 14 | nicht vorhanden | offen; Entscheidungsstatus muss evidenzbasiert erkannt werden |
-| 15 | nicht vorhanden | offen |
-| 16 | nicht vorhanden | offen |
+| 14 | nicht vorhanden | Slice 3: enge Prompt-Erkennung und strikt geordnete advisory Eskalationskette bis zum Nutzer |
+| 15 | nicht vorhanden | Slice 3: verlangt Basis, Belege/Quellen, Alternativen, Faktenstand und Unsicherheiten |
+| 16 | nicht vorhanden | Slice 3: Decision-Review wird als neue Nutzerentscheidung zur TO-DECIDE-Kette geroutet; keine stille Adoption |
 | 17 | nicht vorhanden | offen; Aufgabenform-Erkennung erforderlich |
 | 18 | nicht vorhanden | offen; versionierte Modell-/Kostenquelle erforderlich |
 | 19 | nicht vorhanden | offen; Provider-/Modellkontext erforderlich |
@@ -97,14 +120,16 @@ Dateisystemmutation ergänzt:
 | 23 | teilweise `closing_gate` | Slice 2: präzise Bundle-Commit-Erinnerung ausschließlich bei Dirty-Git am Abschluss |
 | 24 | nicht vorhanden | Slice 2: reine Policy-Erinnerung für Direktkontakt versus autonomen Lauf; kein Push, kein Gate |
 
-Damit liefern Slice 1 und 2 die Anforderungen 1–6, 8–12, 22–24. Offen bleiben
-7 und 13–21.
+Damit liefern Slice 1 bis 3 die Anforderungen 1–6, 8–12, 14–16 und 22–24.
+Offen bleiben 7, 13 und 17–21.
 
 ## Sicherheits- und Fehlergrenzen
 
 - Default bleibt `session_hygiene = false`.
 - Default bleibt auch `repository_discipline = false`; dessen drei Teilhinweise
   können separat deaktiviert werden.
+- Default bleibt auch `decision_safety = false`; dessen drei Teilhinweise sind
+  separat konfigurierbar.
 - Fehlende optionale Systeme werden nicht als verfügbar behauptet.
 - Kein Netzverkehr, kein Subprozess und keine Änderung außerhalb des
   WorkflowHooker-State-Ordners.
@@ -116,6 +141,8 @@ Damit liefern Slice 1 und 2 die Anforderungen 1–6, 8–12, 22–24. Offen blei
   Check-Befund vorhanden, wird kein zusätzlicher Hygiene-Hinweis angehängt.
 - Der Repository-Injector führt weder `git commit` noch `git push`, Clone-,
   Spiegel- oder Pointer-Operationen aus.
+- Der Decision-Injector behauptet keine gelesene Entscheidung und schreibt
+  weder Register noch TO-DECIDE-Dateien.
 
 ## Verifikation
 
@@ -129,4 +156,7 @@ Damit liefern Slice 1 und 2 die Anforderungen 1–6, 8–12, 22–24. Offen blei
   Teilkonfiguration, gemeinsame Budgetierung und Topic-Deduplizierung.
 - Closing-Gate: Bundle-Hinweis nur bei Dirty-Git, nur am `Stop`-Hook; manueller
   Check bleibt verfügbar.
+- Entscheidungssicherheit: Signalerkennung, Reihenfolge der fünf
+  Eskalationsstufen, vollständige Entscheidungsbasis, Review-Routing,
+  Teilkonfiguration, Budget und Deduplizierung.
 - Gesamtsuite, Ruff, Compile, Secret-/Pfadscan und `git diff --check`.

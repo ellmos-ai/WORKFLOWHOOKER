@@ -11,7 +11,7 @@ from __future__ import annotations
 from collections.abc import Iterable
 from pathlib import Path
 
-from .config import RepositoryDisciplineConfig
+from .config import DecisionSafetyConfig, RepositoryDisciplineConfig
 from .protocol import ProjectState, StateSource
 
 
@@ -274,6 +274,105 @@ class RepositoryDisciplineInjector:
     build = generate
 
 
+class DecisionSafetyInjector:
+    """Build non-mutating decision escalation and documentation guidance."""
+
+    name = "decision_safety_injector"
+    event = "UserPromptSubmit"
+
+    _DECISION_CUES = (
+        "entscheidung",
+        "entscheid",
+        "abwäg",
+        "freigabe",
+        "decision",
+        "decide",
+        "trade-off",
+        "tradeoff",
+        "choose between",
+        "choice between",
+    )
+    _REVIEW_CUES = (
+        "bewert",
+        "review",
+        "evaluat",
+        "überprüf",
+        "ueberpruef",
+        "neu prüfen",
+        "reconsider",
+        "korrig",
+    )
+
+    def __init__(self, config: DecisionSafetyConfig | None = None):
+        self.config = config or DecisionSafetyConfig()
+
+    def eligible_topics(self, *, event: str, prompt: str) -> tuple[str, ...]:
+        if event != self.event:
+            return ()
+
+        normalized = prompt.casefold()
+        is_decision = any(cue in normalized for cue in self._DECISION_CUES)
+        if not is_decision:
+            return ()
+        is_review = any(cue in normalized for cue in self._REVIEW_CUES)
+
+        topics: list[str] = []
+        if self.config.remind_escalation_chain:
+            topics.append("escalation_chain")
+        if self.config.require_decision_basis:
+            topics.append("decision_basis")
+        if self.config.route_reviews_to_user and is_review:
+            topics.append("review_to_user")
+        return tuple(topics)
+
+    def generate(
+        self,
+        *,
+        event: str,
+        prompt: str,
+        topics: Iterable[str] | None = None,
+    ) -> str | None:
+        eligible = self.eligible_topics(event=event, prompt=prompt)
+        selected = eligible if topics is None else tuple(
+            topic for topic in topics if topic in eligible
+        )
+        if not selected:
+            return None
+
+        lines = ["[WorkflowHooker] Entscheidungssicherheit (Hinweis, kein Gate):"]
+        if "escalation_chain" in selected:
+            lines.extend(
+                (
+                    "- Eskalationskette strikt in dieser Reihenfolge:",
+                    "  1. Projektbezogene DECISIONS.md und Policies prüfen.",
+                    "  2. Zentrale _DECISIONS-/TO-DECIDE-Bestände und "
+                    "SYSTEM-MANIFEST prüfen.",
+                    "  3. Gardener und USMC gezielt abfragen.",
+                    "  4. TOM-lm über _TOM-lm/avatar/START.md, Skill tom-lm "
+                    "oder /decide-like-me nutzen.",
+                    "  5. Nur bei verbleibender Unsicherheit den Nutzer fragen; "
+                    "nicht raten.",
+                )
+            )
+        if "decision_basis" in selected:
+            lines.append(
+                "- Entscheidungsdokumentation: Basis/Grundlage, Belege und "
+                "Quellen, betrachtete Alternativen, aktuellen Faktenstand und "
+                "verbleibende Unsicherheiten festhalten; nicht nur das Ergebnis."
+            )
+        if "review_to_user" in selected:
+            lines.append(
+                "- Entscheidungsreview erkannt: Die Bewertung ist selbst eine "
+                "neue Nutzerentscheidung und über die _DECISIONS-/"
+                "TO-DECIDE-USER-Kette vorzulegen. Nie still verbuchen oder als "
+                "Policy adoptieren."
+            )
+        return "\n".join(lines)
+
+    message = generate
+    build = generate
+
+
 def _is_onedrive_path(path: Path | str) -> bool:
     normalized_parts = (part.casefold() for part in Path(path).parts)
     return any(
@@ -319,6 +418,7 @@ def _state_from(source: StateSource | None, state: ProjectState | None) -> Proje
 
 __all__ = [
     "GoalInjector",
+    "DecisionSafetyInjector",
     "LoopInjector",
     "RepositoryDisciplineInjector",
     "SessionHygieneInjector",

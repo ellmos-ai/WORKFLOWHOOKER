@@ -5,7 +5,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Python Version](https://img.shields.io/badge/python-3.10%20|%203.11%20|%203.12%20|%203.13-blue.svg)](pyproject.toml)
 [![CI Status](https://img.shields.io/badge/CI-passing-brightgreen.svg)](.github/workflows/ci.yml)
-[![Tests](https://img.shields.io/badge/tests-124%20passed-brightgreen.svg)](tests)
+[![Tests](https://img.shields.io/badge/tests-128%20passed-brightgreen.svg)](tests)
 [![Platform](https://img.shields.io/badge/platform-Linux%20|%20Windows%20|%20macOS-lightgrey.svg)](pyproject.toml)
 [![Privacy](https://img.shields.io/badge/privacy-100%25%20Offline%20|%20Zero--Egress-brightgreen.svg)](SECURITY.md)
 [![Security](https://img.shields.io/badge/security-Local--First%20|%20Process--Isolated-blue.svg)](SECURITY.md)
@@ -33,11 +33,12 @@ aktive Tasks), drei einzeln zuschaltbare Checks (`closing_gate`,
 `drift_warning`, `scope_guard`) sowie die opt-in Injektoren `goal` (PreCompact)
 und `loop-briefing` (lokale Weck-Runtimes), `session_hygiene`
 (nichtblockierende Start-/End-Hinweise) sowie `repository_discipline`
-(Git-/Plan-D-/Push-Policy-Hinweise). Meldungsbudget + Cooldown bleiben
+(Git-/Plan-D-/Push-Policy-Hinweise) und `decision_safety`
+(geordnete Entscheidungseskalation). Meldungsbudget + Cooldown bleiben
 die gemeinsame 4-Augen-Bremse. Provider `claude`, `codex`, `kimi`
 (Hook-Snippet-Generator ohne `PreToolUse` im Default, optionale separate
 Blocker-Variante) + `manual` (CLI); der `git`-Provider bleibt ein
-dokumentierter Stub. 124 Tests sind grün, darunter echte Temp-Git-Repo-Fixtures.
+dokumentierter Stub. 128 Tests sind grün, darunter echte Temp-Git-Repo-Fixtures.
 
 Hooks, die den **Arbeitsablauf** eines Agenten steuern — nicht sein Wissen.
 
@@ -339,11 +340,17 @@ goal = true       # Ziel/Tasks beim PreCompact-Hook injizieren
 loop = true       # loop-briefing als lokale Runtime-Schnittstelle freigeben
 session_hygiene = true  # budgetierte Session-Start-/End-Hinweise
 repository_discipline = true  # Git-/Plan-D-/Push-Policy-Hinweise
+decision_safety = true  # Entscheidungseskalation/-dokumentation
 
 [repository_discipline]
 certify_dirty_worktree = true
 prefer_local_git_mirror = true
 remind_push_policy = true
+
+[decision_safety]
+remind_escalation_chain = true
+require_decision_basis = true
+route_reviews_to_user = true
 ```
 
 Der `PreCompact`-Hook liest das Projektziel aus `AUFGABEN.txt` oder `GOAL.md`
@@ -390,7 +397,22 @@ precise one-bundle commit reminder, and hook execution evaluates this gate only
 on `Stop`. A clean tree or a lock-only finding does not receive commit advice;
 the manual `workflowhooker check` command remains available.
 
-Remaining T-20260731-05 scope: requirements 7 and 13–21.
+### Decision safety (opt-in, advisory)
+
+`decision_safety` reacts only to narrow decision or decision-review signals on
+`UserPromptSubmit`. It preserves the required escalation order: project
+`DECISIONS.md` and policies; central `_DECISIONS`/TO-DECIDE holdings plus
+`SYSTEM-MANIFEST`; Gardener and USMC; TOM-lm; and only then the user if
+uncertainty remains. The reminder never claims that a source was consulted.
+
+It also requires a decision record to include its basis, evidence and sources,
+considered alternatives, current factual state and remaining uncertainty. A
+review or rating of an existing decision is treated as a new user decision and
+routed to the `_DECISIONS`/`TO-DECIDE-USER` chain—never silently recorded or
+adopted as policy. The three reminder components can be disabled separately;
+the injector reads and writes none of the named systems.
+
+Remaining T-20260731-05 scope: requirements 7, 13 and 17–21.
 
 ## Was noch nicht umgesetzt ist
 
@@ -407,8 +429,8 @@ Remaining T-20260731-05 scope: requirements 7 and 13–21.
   feststellbar (Faktentreue: kein geratener Fakt im Meldungstext).
 - **Verifikations-Erinnerung** und die weiteren spezialisierten
   **Regelerinnerungen** aus T-20260731-05 (ROADMAP v0.2): Der opt-in
-  Session-Hygiene- und Repository-Disziplin-Slice sind gebaut; offen bleiben
-  die Anforderungen 7 und 13–21.
+  Session-Hygiene-, Repository-Disziplin- und Entscheidungssicherheits-Slice
+  sind gebaut; offen bleiben die Anforderungen 7, 13 und 17–21.
 - **Custom-Adapter per entry_point** (ROADMAP v0.3): noch nicht gebaut.
 - **Automatisches Eintragen des `claude`-Hook-Snippets** in eine echte
   `settings.json` (bleibt bewusst manuell).

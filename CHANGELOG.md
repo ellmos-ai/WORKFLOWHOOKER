@@ -6,6 +6,15 @@ Alle nennenswerten Aenderungen an WorkflowHooker.
 
 ### Hinzugefügt (2026-08-22)
 
+- **Opt-in `decision_safety`-Injector (T-20260731-05, Slice 3):** Enge
+  Entscheidungssignale lösen eine geordnete, nichtblockierende Eskalationskette aus:
+  Projektentscheidungen/Policies, zentrale `_DECISIONS`-/Manifest-Bestände,
+  Gardener plus USMC, TOM-lm und erst danach der Nutzer. Der Hinweis verlangt
+  Basis, Belege/Quellen, Alternativen, Faktenstand und Unsicherheiten.
+  Entscheidungsreviews werden als neue Nutzerentscheidung zur
+  `TO-DECIDE-USER`-Kette geroutet und nie still verbucht oder als Policy
+  adoptiert. Alle Komponenten teilen Budget/Cooldown und sind einzeln
+  abschaltbar; Gesamtsuite: 128 Tests.
 - **Opt-in `repository_discipline`-Injector (T-20260731-05, Slice 2):**
   Nichtblockierender Handoff für unzugeordnete Dirty-Stände mit Diff-Review,
   nativen Tests, Secret-Signaturscan, Funktionsproben und genau einem

@@ -17,6 +17,10 @@ def test_default_config_has_no_active_checks():
     assert config.repository_discipline.certify_dirty_worktree is True
     assert config.repository_discipline.prefer_local_git_mirror is True
     assert config.repository_discipline.remind_push_policy is True
+    assert config.injectors.decision_safety is False
+    assert config.decision_safety.remind_escalation_chain is True
+    assert config.decision_safety.require_decision_basis is True
+    assert config.decision_safety.route_reviews_to_user is True
 
 
 def test_load_config_missing_file_returns_defaults(tmp_path: Path):
@@ -47,11 +51,17 @@ goal = true
 loop = true
 session_hygiene = { enabled = true }
 repository_discipline = true
+decision_safety = true
 
 [repository_discipline]
 certify_dirty_worktree = false
 prefer_local_git_mirror = true
 remind_push_policy = false
+
+[decision_safety]
+remind_escalation_chain = true
+require_decision_basis = false
+route_reviews_to_user = true
 """,
         encoding="utf-8",
     )
@@ -68,6 +78,10 @@ remind_push_policy = false
     assert config.repository_discipline.certify_dirty_worktree is False
     assert config.repository_discipline.prefer_local_git_mirror is True
     assert config.repository_discipline.remind_push_policy is False
+    assert config.injectors.decision_safety is True
+    assert config.decision_safety.remind_escalation_chain is True
+    assert config.decision_safety.require_decision_basis is False
+    assert config.decision_safety.route_reviews_to_user is True
 
 
 def test_load_config_rejects_unknown_check(tmp_path: Path):

@@ -47,6 +47,14 @@ Jeder Check ist ein eigener Schalter. Keiner ist per Default an, bis er sich bew
   Direktkontakt und autonomem Lauf. Er mutiert weder Dateien noch Git. Das
   Closing-Gate ergänzt nur bei Dirty-Git eine präzise Bundle-Commit-Erinnerung
   und wird im Hook-Pfad ausschließlich am `Stop`-Event ausgewertet.
+- [x] **Entscheidungssicherheits-Slice (T-20260731-05, 2026-08-22):** Ein
+  opt-in Injector reagiert auf enge Entscheidungssignale und erinnert in
+  fester Reihenfolge an Projektentscheidungen/Policies, zentrale
+  `_DECISIONS`-/Manifest-Bestände, Gardener plus USMC, TOM-lm und erst danach
+  den Nutzer. Er verlangt Entscheidungsbasis, Belege, Alternativen und
+  Faktenstand; Decision-Reviews werden als neue Nutzerentscheidung zur
+  TO-DECIDE-Kette geroutet. Keine Quelle wird automatisch gelesen oder
+  geschrieben, keine Bewertung still adoptiert.
 - [x] **`goal_injector` / Aufgaben-Injektor [U 2026-07-23]:** erinnert an das ZIEL der
   Sitzung — die positive Hälfte der Drift-Warnung („das Ziel war X" statt „du
   streust"). Ziel-Quellen über StateSources: `taskplan` (aktive Task), Goal-Datei

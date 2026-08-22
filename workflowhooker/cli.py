@@ -27,6 +27,7 @@ from pathlib import Path
 from .checks import CHECK_REGISTRY, CheckRunner
 from .config import Config, load_config
 from .injectors import (
+    DecisionSafetyInjector,
     GoalInjector,
     LoopInjector,
     RepositoryDisciplineInjector,
@@ -351,6 +352,19 @@ def _run_advisory_injectors(
                 delivered.extend(
                     ("repository_discipline", topic) for topic in pending
                 )
+
+    if config.injectors.decision_safety:
+        decision = DecisionSafetyInjector(config.decision_safety)
+        eligible = decision.eligible_topics(event=event, prompt=prompt)
+        pending = _pending_topics(state, "decision_safety", eligible)
+        decision_message = decision.generate(
+            event=event,
+            prompt=prompt,
+            topics=pending,
+        )
+        if decision_message:
+            messages.append(decision_message)
+            delivered.extend(("decision_safety", topic) for topic in pending)
 
     if not messages:
         return None

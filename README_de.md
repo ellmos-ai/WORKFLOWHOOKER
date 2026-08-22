@@ -3,7 +3,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Python Version](https://img.shields.io/badge/python-3.10%20|%203.11%20|%203.12%20|%203.13-blue.svg)](pyproject.toml)
 [![CI Status](https://img.shields.io/badge/CI-passing-brightgreen.svg)](.github/workflows/ci.yml)
-[![Tests](https://img.shields.io/badge/tests-124%20passed-brightgreen.svg)](tests)
+[![Tests](https://img.shields.io/badge/tests-128%20passed-brightgreen.svg)](tests)
 [![Platform](https://img.shields.io/badge/platform-Linux%20|%20Windows%20|%20macOS-lightgrey.svg)](pyproject.toml)
 [![Datenschutz](https://img.shields.io/badge/datenschutz-100%25%20Offline%20|%20Zero--Egress-brightgreen.svg)](SECURITY.md)
 [![Sicherheit](https://img.shields.io/badge/sicherheit-Local--First%20|%20Prozess--Isoliert-blue.svg)](SECURITY.md)
@@ -146,6 +146,7 @@ sequenceDiagram
 - **Auto-Deaktivierung:** Checks deaktivieren sich selbst, wenn das Fehlermuster nicht mehr auftritt (MetaFeedbackInjector-Muster).
 - **Session-Hygiene (`session_hygiene`):** Optionale, nichtblockierende Hinweise zu Sessionstart/-ende, Quellenprüfung und passenden lokalen Werkzeugen.
 - **Repository-Disziplin (`repository_discipline`):** Optionale Hinweise zu Fremdänderungs-Zertifizierung, Plan D, Bundle-Commits und der Push-Grenze.
+- **Entscheidungssicherheit (`decision_safety`):** Optionale, geordnete Eskalations-, Dokumentations- und Review-Hinweise.
 
 ---
 
@@ -175,11 +176,17 @@ goal = true       # Ziel/Tasks beim PreCompact-Hook
 loop = true       # lokales Weck-Briefing
 session_hygiene = true  # budgetierte Sessionstart-/-ende-Hinweise
 repository_discipline = true  # Git-/Plan-D-/Push-Policy-Hinweise
+decision_safety = true  # Entscheidungseskalation/-dokumentation
 
 [repository_discipline]
 certify_dirty_worktree = true
 prefer_local_git_mirror = true
 remind_push_policy = true
+
+[decision_safety]
+remind_escalation_chain = true
+require_decision_basis = true
+route_reviews_to_user = true
 ```
 
 `goal` liest `AUFGABEN.txt` oder `GOAL.md` sowie projektbezogene offene und
@@ -227,7 +234,24 @@ präzise Ein-Bundle-Commit-Erinnerung, und im Hook-Pfad läuft das Gate nur am
 `Stop`-Event. Ein sauberer Stand oder ein reiner Lock-Befund erhält keinen
 Commit-Hinweis; der manuelle Befehl `workflowhooker check` bleibt verfügbar.
 
-Aus T-20260731-05 bleiben die Anforderungen 7 und 13–21 offen.
+### Entscheidungssicherheit (opt-in, nur Hinweis)
+
+`decision_safety` reagiert am `UserPromptSubmit` nur auf enge Entscheidungs-
+oder Entscheidungsreview-Signale. Die vorgeschriebene Reihenfolge bleibt
+erhalten: projektbezogene `DECISIONS.md` und Policies; zentrale `_DECISIONS`-/
+TO-DECIDE-Bestände plus `SYSTEM-MANIFEST`; Gardener und USMC; TOM-lm; erst
+danach der Nutzer, wenn Unsicherheit verbleibt. Der Hinweis behauptet nie,
+dass eine Quelle bereits geprüft wurde.
+
+Eine Entscheidungsdokumentation soll außerdem Basis, Belege und Quellen,
+betrachtete Alternativen, aktuellen Faktenstand und verbleibende
+Unsicherheiten enthalten. Ein Review oder eine Bewertung einer bestehenden
+Entscheidung gilt als neue Nutzerentscheidung und wird zur `_DECISIONS`-/
+`TO-DECIDE-USER`-Kette geroutet – niemals still verbucht oder als Policy
+adoptiert. Die drei Hinweiskomponenten sind separat abschaltbar; der Injector
+liest und schreibt keines der genannten Systeme.
+
+Aus T-20260731-05 bleiben die Anforderungen 7, 13 und 17–21 offen.
 
 ## Ökosystem & Geschwisterwerkzeuge
 

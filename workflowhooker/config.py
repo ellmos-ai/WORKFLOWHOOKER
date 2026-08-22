@@ -52,6 +52,15 @@ class RepositoryDisciplineConfig:
 
 
 @dataclass
+class DecisionSafetyConfig:
+    """Fine-grained switches for the opt-in decision advisory."""
+
+    remind_escalation_chain: bool = True
+    require_decision_basis: bool = True
+    route_reviews_to_user: bool = True
+
+
+@dataclass
 class ProvidersConfig:
     order: list[str] = field(default_factory=lambda: ["claude", "codex", "git", "manual"])
     claude_events: list[str] = field(
@@ -72,6 +81,7 @@ class InjectorsConfig:
     loop: bool = False
     session_hygiene: bool = False
     repository_discipline: bool = False
+    decision_safety: bool = False
 
 
 VALID_SOURCES = ("files", "git", "taskplan", "goal")
@@ -112,6 +122,7 @@ class Config:
     repository_discipline: RepositoryDisciplineConfig = field(
         default_factory=RepositoryDisciplineConfig
     )
+    decision_safety: DecisionSafetyConfig = field(default_factory=DecisionSafetyConfig)
     sources: SourcesConfig = field(default_factory=SourcesConfig)
 
     def validate(self) -> None:
@@ -201,11 +212,16 @@ def _config_from_dict(data: dict) -> Config:
         "repository_discipline",
         injectors_data.get("repository_discipline_injector", False),
     )
+    decision_value = injectors_data.get(
+        "decision_safety",
+        injectors_data.get("decision_safety_injector", False),
+    )
     injectors = InjectorsConfig(
         goal=_enabled_value(goal_value),
         loop=_enabled_value(loop_value),
         session_hygiene=_enabled_value(hygiene_value),
         repository_discipline=_enabled_value(repository_value),
+        decision_safety=_enabled_value(decision_value),
     )
 
     repository_data = data.get("repository_discipline", {})
@@ -217,6 +233,19 @@ def _config_from_dict(data: dict) -> Config:
             repository_data.get("prefer_local_git_mirror", True)
         ),
         remind_push_policy=bool(repository_data.get("remind_push_policy", True)),
+    )
+
+    decision_data = data.get("decision_safety", {})
+    decision_safety = DecisionSafetyConfig(
+        remind_escalation_chain=bool(
+            decision_data.get("remind_escalation_chain", True)
+        ),
+        require_decision_basis=bool(
+            decision_data.get("require_decision_basis", True)
+        ),
+        route_reviews_to_user=bool(
+            decision_data.get("route_reviews_to_user", True)
+        ),
     )
 
     sources_data = data.get("sources", {})
@@ -236,6 +265,7 @@ def _config_from_dict(data: dict) -> Config:
         providers=providers,
         injectors=injectors,
         repository_discipline=repository_discipline,
+        decision_safety=decision_safety,
         sources=sources,
     )
 

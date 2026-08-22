@@ -1,5 +1,6 @@
-from workflowhooker.config import RepositoryDisciplineConfig
+from workflowhooker.config import DecisionSafetyConfig, RepositoryDisciplineConfig
 from workflowhooker.injectors import (
+    DecisionSafetyInjector,
     GoalInjector,
     LoopInjector,
     RepositoryDisciplineInjector,
@@ -159,4 +160,67 @@ def test_repository_discipline_components_and_event_are_configurable():
         state,
         event="Stop",
         project_dir=r"X:\Example\OneDrive\repo",
+    ) is None
+
+
+def test_decision_safety_preserves_escalation_order_and_decision_basis():
+    injector = DecisionSafetyInjector()
+    message = injector.generate(
+        event="UserPromptSubmit",
+        prompt="Entscheide zwischen den beiden Architekturen.",
+    )
+
+    assert message is not None
+    assert "Hinweis, kein Gate" in message
+    markers = (
+        "1. Projektbezogene DECISIONS.md und Policies",
+        "2. Zentrale _DECISIONS-/TO-DECIDE-Bestände",
+        "3. Gardener und USMC",
+        "4. TOM-lm",
+        "5. Nur bei verbleibender Unsicherheit den Nutzer",
+    )
+    positions = [message.index(marker) for marker in markers]
+    assert positions == sorted(positions)
+    assert "Basis/Grundlage" in message
+    assert "Belege und Quellen" in message
+    assert "betrachtete Alternativen" in message
+    assert "aktuellen Faktenstand" in message
+    assert "verbleibende Unsicherheiten" in message
+    assert "TO-DECIDE-USER-Kette" not in message
+
+
+def test_decision_review_is_routed_as_new_user_decision():
+    message = DecisionSafetyInjector().generate(
+        event="UserPromptSubmit",
+        prompt="Bewerte diese getroffene Entscheidung erneut.",
+    )
+
+    assert message is not None
+    assert "Entscheidungsreview erkannt" in message
+    assert "selbst eine neue Nutzerentscheidung" in message
+    assert "TO-DECIDE-USER-Kette" in message
+    assert "Nie still verbuchen" in message
+    assert "Policy adoptieren" in message
+
+
+def test_decision_safety_is_signal_gated_event_scoped_and_configurable():
+    assert DecisionSafetyInjector().generate(
+        event="UserPromptSubmit",
+        prompt="Führe die vorhandenen Tests aus.",
+    ) is None
+    assert DecisionSafetyInjector().generate(
+        event="Stop",
+        prompt="Entscheidung bewerten",
+    ) is None
+
+    disabled = DecisionSafetyInjector(
+        DecisionSafetyConfig(
+            remind_escalation_chain=False,
+            require_decision_basis=False,
+            route_reviews_to_user=False,
+        )
+    )
+    assert disabled.generate(
+        event="UserPromptSubmit",
+        prompt="Bewerte diese Entscheidung.",
     ) is None

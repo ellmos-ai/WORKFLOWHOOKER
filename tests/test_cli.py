@@ -24,6 +24,7 @@ def _write_config(
     cooldown_minutes=0,
     session_hygiene=False,
     repository_discipline=False,
+    decision_safety=False,
 ) -> Path:
     checks_toml = json.dumps(checks)
     path = tmp_path / "workflowhooker.toml"
@@ -40,6 +41,7 @@ max_changed_files = 1
 [injectors]
 session_hygiene = {str(session_hygiene).lower()}
 repository_discipline = {str(repository_discipline).lower()}
+decision_safety = {str(decision_safety).lower()}
 """,
         encoding="utf-8",
     )
@@ -639,6 +641,55 @@ def test_repository_and_session_hints_share_one_budgeted_message(
         state_dir,
         project_dir,
         {"session_id": "combined", "prompt": "Noch einmal"},
+        monkeypatch,
+        event="UserPromptSubmit",
+    ) == 0
+    assert capsys.readouterr().out == ""
+
+
+def test_decision_safety_topics_are_budgeted_and_deduplicated(
+    tmp_path, capsys, monkeypatch
+):
+    config_path = _write_config(
+        tmp_path,
+        checks=[],
+        max_messages=3,
+        decision_safety=True,
+    )
+    state_dir = tmp_path / "state"
+
+    assert _hook_run(
+        config_path,
+        state_dir,
+        tmp_path,
+        {"session_id": "decision", "prompt": "Entscheide zwischen A und B."},
+        monkeypatch,
+        event="UserPromptSubmit",
+    ) == 0
+    first = json.loads(capsys.readouterr().out)
+    first_message = first["hookSpecificOutput"]["additionalContext"]
+    assert "Eskalationskette" in first_message
+    assert "Entscheidungsdokumentation" in first_message
+    assert "Entscheidungsreview" not in first_message
+
+    assert _hook_run(
+        config_path,
+        state_dir,
+        tmp_path,
+        {"session_id": "decision", "prompt": "Bewerte diese Entscheidung."},
+        monkeypatch,
+        event="UserPromptSubmit",
+    ) == 0
+    second = json.loads(capsys.readouterr().out)
+    second_message = second["hookSpecificOutput"]["additionalContext"]
+    assert "Entscheidungsreview" in second_message
+    assert "Eskalationskette" not in second_message
+
+    assert _hook_run(
+        config_path,
+        state_dir,
+        tmp_path,
+        {"session_id": "decision", "prompt": "Review der Entscheidung."},
         monkeypatch,
         event="UserPromptSubmit",
     ) == 0
