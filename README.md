@@ -5,7 +5,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Python Version](https://img.shields.io/badge/python-3.10%20|%203.11%20|%203.12%20|%203.13-blue.svg)](pyproject.toml)
 [![CI Status](https://img.shields.io/badge/CI-passing-brightgreen.svg)](.github/workflows/ci.yml)
-[![Tests](https://img.shields.io/badge/tests-128%20passed-brightgreen.svg)](tests)
+[![Tests](https://img.shields.io/badge/tests-134%20passed-brightgreen.svg)](tests)
 [![Platform](https://img.shields.io/badge/platform-Linux%20|%20Windows%20|%20macOS-lightgrey.svg)](pyproject.toml)
 [![Privacy](https://img.shields.io/badge/privacy-100%25%20Offline%20|%20Zero--Egress-brightgreen.svg)](SECURITY.md)
 [![Security](https://img.shields.io/badge/security-Local--First%20|%20Process--Isolated-blue.svg)](SECURITY.md)
@@ -34,11 +34,12 @@ aktive Tasks), drei einzeln zuschaltbare Checks (`closing_gate`,
 und `loop-briefing` (lokale Weck-Runtimes), `session_hygiene`
 (nichtblockierende Start-/End-Hinweise) sowie `repository_discipline`
 (Git-/Plan-D-/Push-Policy-Hinweise) und `decision_safety`
-(geordnete Entscheidungseskalation). Meldungsbudget + Cooldown bleiben
+(geordnete Entscheidungseskalation) sowie `orchestration_safety`
+(signalgebundene Orchestrierungs-/Modellökonomie-Hinweise). Meldungsbudget + Cooldown bleiben
 die gemeinsame 4-Augen-Bremse. Provider `claude`, `codex`, `kimi`
 (Hook-Snippet-Generator ohne `PreToolUse` im Default, optionale separate
 Blocker-Variante) + `manual` (CLI); der `git`-Provider bleibt ein
-dokumentierter Stub. 128 Tests sind grün, darunter echte Temp-Git-Repo-Fixtures.
+dokumentierter Stub. 134 Tests sind grün, darunter echte Temp-Git-Repo-Fixtures.
 
 Hooks, die den **Arbeitsablauf** eines Agenten steuern — nicht sein Wissen.
 
@@ -341,6 +342,7 @@ loop = true       # loop-briefing als lokale Runtime-Schnittstelle freigeben
 session_hygiene = true  # budgetierte Session-Start-/End-Hinweise
 repository_discipline = true  # Git-/Plan-D-/Push-Policy-Hinweise
 decision_safety = true  # Entscheidungseskalation/-dokumentation
+orchestration_safety = true  # orchestration and model-economy advisories
 
 [repository_discipline]
 certify_dirty_worktree = true
@@ -351,6 +353,18 @@ remind_push_policy = true
 remind_escalation_chain = true
 require_decision_basis = true
 route_reviews_to_user = true
+
+[orchestration_safety]
+operator_guidance = true
+filecommander_recovery = true
+swarm_guidance = true
+clutch_routing = true
+expensive_model_guidance = true
+fable5_savings = true
+loop_goal_guidance = true
+# Optional explicit runtime evidence; do not guess it from the provider:
+# model_context = "Fable 5"
+expensive_model_markers = ["fable 5", "fable-5", "fable5"]
 ```
 
 Der `PreCompact`-Hook liest das Projektziel aus `AUFGABEN.txt` oder `GOAL.md`
@@ -412,7 +426,33 @@ routed to the `_DECISIONS`/`TO-DECIDE-USER` chain—never silently recorded or
 adopted as policy. The three reminder components can be disabled separately;
 the injector reads and writes none of the named systems.
 
-Remaining T-20260731-05 scope: requirements 7, 13 and 17–21.
+### Orchestration safety (opt-in, advisory)
+
+`orchestration_safety` reacts only to narrow task-form or failure signals on
+`UserPromptSubmit`. It can suggest an operator/worker split, a swarm for
+independent homogeneous bulk work, provider-neutral clutch routing, or a
+Taskplan/runtime loop and Goal mode with explicit stop criteria. It never
+starts or delegates a worker, swarm, loop or goal, and it never chooses or
+switches a model.
+
+A reported FileCommander outage is explicitly treated as an error. The
+advisory hands off checks for registration/configuration, the transport
+handshake, npm consumer resolution/start and a small `fc_get_time` functional
+probe to an authorized repair worker; WorkflowHooker performs no repair and
+starts no MCP server.
+
+Cost and Fable guidance requires explicit model identity from the hook payload
+or deliberate config. Configured expensive-model markers suggest operator or
+focused one-task mode and are a local classification, not a live-price claim.
+Only explicit Fable 5 context adds the documented contract: Opus 4.8 remains
+the main model/worker and Fable 5 is advisor-only. If that model or contract is
+not evidenced as available, the advisory makes no switch or savings claim.
+All topics share the existing global budget, cooldown and per-session
+deduplication and can be disabled by component.
+
+T-20260731-05 requirements 1–24 are covered by tested opt-in advisories or the
+existing objective checks. Coverage does not mean that an external system is
+executed or repaired automatically.
 
 ## Was noch nicht umgesetzt ist
 
@@ -427,10 +467,10 @@ Remaining T-20260731-05 scope: requirements 7, 13 and 17–21.
 - **`scope_guard`**: warnt nur bei Dateizahl-Schwelle, NICHT bei fehlendem
   Testlauf — ob Tests liefen, ist ohne CI-Anbindung nicht zuverlaessig
   feststellbar (Faktentreue: kein geratener Fakt im Meldungstext).
-- **Verifikations-Erinnerung** und die weiteren spezialisierten
-  **Regelerinnerungen** aus T-20260731-05 (ROADMAP v0.2): Der opt-in
-  Session-Hygiene-, Repository-Disziplin- und Entscheidungssicherheits-Slice
-  sind gebaut; offen bleiben die Anforderungen 7, 13 und 17–21.
+- **Verifikations-Erinnerung** als allgemeiner eigener Check (ROADMAP v0.2):
+  Die spezialisierten opt-in Hinweise aus T-20260731-05 sind vollständig
+  gebaut; ein allgemeiner Nachweis, ob beliebige Tests tatsächlich liefen,
+  bleibt ohne CI-Anbindung unzuverlässig.
 - **Custom-Adapter per entry_point** (ROADMAP v0.3): noch nicht gebaut.
 - **Automatisches Eintragen des `claude`-Hook-Snippets** in eine echte
   `settings.json` (bleibt bewusst manuell).

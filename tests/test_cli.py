@@ -25,6 +25,7 @@ def _write_config(
     session_hygiene=False,
     repository_discipline=False,
     decision_safety=False,
+    orchestration_safety=False,
 ) -> Path:
     checks_toml = json.dumps(checks)
     path = tmp_path / "workflowhooker.toml"
@@ -42,6 +43,7 @@ max_changed_files = 1
 session_hygiene = {str(session_hygiene).lower()}
 repository_discipline = {str(repository_discipline).lower()}
 decision_safety = {str(decision_safety).lower()}
+orchestration_safety = {str(orchestration_safety).lower()}
 """,
         encoding="utf-8",
     )
@@ -616,6 +618,7 @@ def test_repository_and_session_hints_share_one_budgeted_message(
         max_messages=1,
         session_hygiene=True,
         repository_discipline=True,
+        orchestration_safety=True,
     )
     state_dir = tmp_path / "state"
     project_dir = tmp_path / "OneDrive" / "project"
@@ -624,7 +627,10 @@ def test_repository_and_session_hints_share_one_budgeted_message(
         config_path,
         state_dir,
         project_dir,
-        {"session_id": "combined", "prompt": "Änderung vorbereiten"},
+        {
+            "session_id": "combined",
+            "prompt": "Delegiere viele gleichförmige Änderungen parallel.",
+        },
         monkeypatch,
         event="UserPromptSubmit",
     ) == 0
@@ -635,6 +641,9 @@ def test_repository_and_session_hints_share_one_budgeted_message(
     assert "Unzugeordneter Dirty-Stand" in message
     assert "Plan D" in message
     assert "Push-Policy" in message
+    assert "Orchestrierung und Modellökonomie" in message
+    assert "Operator-Signal erkannt" in message
+    assert "AgentSwarm" in message
 
     assert _hook_run(
         config_path,
@@ -690,6 +699,67 @@ def test_decision_safety_topics_are_budgeted_and_deduplicated(
         state_dir,
         tmp_path,
         {"session_id": "decision", "prompt": "Review der Entscheidung."},
+        monkeypatch,
+        event="UserPromptSubmit",
+    ) == 0
+    assert capsys.readouterr().out == ""
+
+
+def test_orchestration_safety_uses_explicit_model_context_and_deduplicates_topics(
+    tmp_path, capsys, monkeypatch
+):
+    config_path = _write_config(
+        tmp_path,
+        checks=[],
+        max_messages=3,
+        orchestration_safety=True,
+    )
+    state_dir = tmp_path / "state"
+
+    assert _hook_run(
+        config_path,
+        state_dir,
+        tmp_path,
+        {
+            "session_id": "orchestration",
+            "prompt": "Bearbeite die Aufgabe.",
+            "context": {"model": {"name": "Fable 5"}},
+        },
+        monkeypatch,
+        event="UserPromptSubmit",
+    ) == 0
+    first = json.loads(capsys.readouterr().out)
+    first_message = first["hookSpecificOutput"]["additionalContext"]
+    assert "Expliziter Modellkontext `Fable 5`" in first_message
+    assert "Opus 4.8 als Hauptmodell/Worker" in first_message
+
+    assert _hook_run(
+        config_path,
+        state_dir,
+        tmp_path,
+        {
+            "session_id": "orchestration",
+            "prompt": "FileCommander ist unavailable wegen Handshake-Fehler.",
+            "model": "Fable 5",
+        },
+        monkeypatch,
+        event="UserPromptSubmit",
+    ) == 0
+    second = json.loads(capsys.readouterr().out)
+    second_message = second["hookSpecificOutput"]["additionalContext"]
+    assert "FileCommander-Ausfall ist ein Fehler" in second_message
+    assert "Expliziter Modellkontext" not in second_message
+    assert "Fable-5-Sparschaltung" not in second_message
+
+    assert _hook_run(
+        config_path,
+        state_dir,
+        tmp_path,
+        {
+            "session_id": "no-model",
+            "provider": "Fable 5",
+            "prompt": "Nutze Fable 5 sparsam.",
+        },
         monkeypatch,
         event="UserPromptSubmit",
     ) == 0

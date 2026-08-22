@@ -61,6 +61,21 @@ class DecisionSafetyConfig:
 
 
 @dataclass
+class OrchestrationSafetyConfig:
+    """Fine-grained switches for opt-in orchestration advisories."""
+
+    operator_guidance: bool = True
+    filecommander_recovery: bool = True
+    swarm_guidance: bool = True
+    clutch_routing: bool = True
+    expensive_model_guidance: bool = True
+    fable5_savings: bool = True
+    loop_goal_guidance: bool = True
+    model_context: str | None = None
+    expensive_model_markers: tuple[str, ...] = ("fable 5", "fable-5", "fable5")
+
+
+@dataclass
 class ProvidersConfig:
     order: list[str] = field(default_factory=lambda: ["claude", "codex", "git", "manual"])
     claude_events: list[str] = field(
@@ -82,6 +97,7 @@ class InjectorsConfig:
     session_hygiene: bool = False
     repository_discipline: bool = False
     decision_safety: bool = False
+    orchestration_safety: bool = False
 
 
 VALID_SOURCES = ("files", "git", "taskplan", "goal")
@@ -123,6 +139,9 @@ class Config:
         default_factory=RepositoryDisciplineConfig
     )
     decision_safety: DecisionSafetyConfig = field(default_factory=DecisionSafetyConfig)
+    orchestration_safety: OrchestrationSafetyConfig = field(
+        default_factory=OrchestrationSafetyConfig
+    )
     sources: SourcesConfig = field(default_factory=SourcesConfig)
 
     def validate(self) -> None:
@@ -216,12 +235,17 @@ def _config_from_dict(data: dict) -> Config:
         "decision_safety",
         injectors_data.get("decision_safety_injector", False),
     )
+    orchestration_value = injectors_data.get(
+        "orchestration_safety",
+        injectors_data.get("orchestration_safety_injector", False),
+    )
     injectors = InjectorsConfig(
         goal=_enabled_value(goal_value),
         loop=_enabled_value(loop_value),
         session_hygiene=_enabled_value(hygiene_value),
         repository_discipline=_enabled_value(repository_value),
         decision_safety=_enabled_value(decision_value),
+        orchestration_safety=_enabled_value(orchestration_value),
     )
 
     repository_data = data.get("repository_discipline", {})
@@ -248,6 +272,28 @@ def _config_from_dict(data: dict) -> Config:
         ),
     )
 
+    orchestration_data = data.get("orchestration_safety", {})
+    orchestration_safety = OrchestrationSafetyConfig(
+        operator_guidance=bool(orchestration_data.get("operator_guidance", True)),
+        filecommander_recovery=bool(
+            orchestration_data.get("filecommander_recovery", True)
+        ),
+        swarm_guidance=bool(orchestration_data.get("swarm_guidance", True)),
+        clutch_routing=bool(orchestration_data.get("clutch_routing", True)),
+        expensive_model_guidance=bool(
+            orchestration_data.get("expensive_model_guidance", True)
+        ),
+        fable5_savings=bool(orchestration_data.get("fable5_savings", True)),
+        loop_goal_guidance=bool(
+            orchestration_data.get("loop_goal_guidance", True)
+        ),
+        model_context=_optional_text(orchestration_data.get("model_context")),
+        expensive_model_markers=_string_tuple(
+            orchestration_data.get("expensive_model_markers"),
+            OrchestrationSafetyConfig().expensive_model_markers,
+        ),
+    )
+
     sources_data = data.get("sources", {})
     sources = SourcesConfig(
         project_dir=sources_data.get("project_dir") or None,
@@ -266,6 +312,7 @@ def _config_from_dict(data: dict) -> Config:
         injectors=injectors,
         repository_discipline=repository_discipline,
         decision_safety=decision_safety,
+        orchestration_safety=orchestration_safety,
         sources=sources,
     )
 
@@ -274,3 +321,21 @@ def _enabled_value(value: object) -> bool:
     if isinstance(value, dict):
         return bool(value.get("enabled", False))
     return bool(value)
+
+
+def _optional_text(value: object) -> str | None:
+    if not isinstance(value, str):
+        return None
+    normalized = " ".join(value.split())[:120]
+    return normalized or None
+
+
+def _string_tuple(value: object, default: tuple[str, ...]) -> tuple[str, ...]:
+    if not isinstance(value, list):
+        return default
+    normalized = tuple(
+        text
+        for item in value
+        if (text := " ".join(str(item).split())[:80])
+    )
+    return normalized or default

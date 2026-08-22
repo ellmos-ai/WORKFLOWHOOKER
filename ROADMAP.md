@@ -55,6 +55,17 @@ Jeder Check ist ein eigener Schalter. Keiner ist per Default an, bis er sich bew
   Faktenstand; Decision-Reviews werden als neue Nutzerentscheidung zur
   TO-DECIDE-Kette geroutet. Keine Quelle wird automatisch gelesen oder
   geschrieben, keine Bewertung still adoptiert.
+- [x] **Orchestrierungs-/Self-Healing-/Modellökonomie-Slice
+  (T-20260731-05, 2026-08-22):** Der opt-in Injector erkennt enge
+  Operator-/Delegationssignale, empfiehlt Swarms nur für unabhängige
+  gleichförmige Parallelpakete und verweist für providerneutrales Tier-Routing
+  auf clutch. FileCommander-Ausfälle erhalten einen konkreten
+  Config-/Handshake-/npm-/Funktionsproben-Handoff ohne Auto-Reparatur.
+  Modellkosten- und Fable-Hinweise verlangen expliziten Modellkontext; der
+  Opus-4.8-Worker/Fable-Advisor-Vertrag wird ohne Kontext nicht behauptet.
+  Loop und Goal werden nur bei passenden Signalen vorgeschlagen. Kein Hook
+  startet Agenten, Swarms, Scheduler oder Goals, wechselt Modelle oder mutiert
+  externe Systeme. Damit sind alle 24 Anforderungen des Tickets belegt.
 - [x] **`goal_injector` / Aufgaben-Injektor [U 2026-07-23]:** erinnert an das ZIEL der
   Sitzung — die positive Hälfte der Drift-Warnung („das Ziel war X" statt „du
   streust"). Ziel-Quellen über StateSources: `taskplan` (aktive Task), Goal-Datei

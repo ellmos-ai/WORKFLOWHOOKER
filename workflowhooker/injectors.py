@@ -1,4 +1,4 @@
-"""Goal, loop, and session-hygiene context injectors.
+"""Goal, loop, and opt-in workflow-advisory context injectors.
 
 These injectors are pure formatting layers. They never
 schedule work, mutate a source, or infer whether a task is complete.  A
@@ -11,7 +11,11 @@ from __future__ import annotations
 from collections.abc import Iterable
 from pathlib import Path
 
-from .config import DecisionSafetyConfig, RepositoryDisciplineConfig
+from .config import (
+    DecisionSafetyConfig,
+    OrchestrationSafetyConfig,
+    RepositoryDisciplineConfig,
+)
 from .protocol import ProjectState, StateSource
 
 
@@ -373,6 +377,280 @@ class DecisionSafetyInjector:
     build = generate
 
 
+class OrchestrationSafetyInjector:
+    """Build signal-gated orchestration and model-economy advisories.
+
+    This is deliberately a formatter, not an orchestrator. It never starts a
+    worker, swarm, loop, goal, MCP server, or model route.
+    """
+
+    name = "orchestration_safety_injector"
+    event = "UserPromptSubmit"
+
+    _OPERATOR_CUES = (
+        "operator-modus",
+        "operator mode",
+        "operator workflow",
+        "delegier",
+        "delegate",
+        "worker beauftrag",
+        "assign worker",
+        "arbeitsauftrag aufteilen",
+    )
+    _PARALLEL_CUES = (
+        "parallel",
+        "gleichzeitig",
+        "concurrent",
+        "mehrere agenten",
+        "multiple agents",
+        "swarm",
+        "schwarm",
+    )
+    _BULK_CUES = (
+        "bulk",
+        "batch",
+        "sweep",
+        "viele dateien",
+        "many files",
+        "alle repos",
+        "all repos",
+        "gleichförmig",
+        "gleichfoermig",
+        "homogeneous",
+        "wiederhol",
+        "repeated",
+        "mehrere unabhängige",
+        "mehrere unabhaengige",
+        "independent tasks",
+        "pro system",
+        "swarm",
+        "schwarm",
+    )
+    _DELEGATION_NEGATIONS = (
+        "nicht delegier",
+        "keine delegation",
+        "ohne delegation",
+        "keine subagent",
+        "ohne subagent",
+        "no delegation",
+        "do not delegate",
+        "don't delegate",
+        "no subagent",
+        "without subagent",
+        "kein swarm",
+        "kein schwarm",
+        "ohne swarm",
+        "no swarm",
+        "without swarm",
+    )
+    _FILECOMMANDER_CUES = ("filecommander", "fc_", "fc-")
+    _FAILURE_CUES = (
+        "nicht verfügbar",
+        "nicht verfuegbar",
+        "unavailable",
+        "fehler",
+        "error",
+        "failed",
+        "failure",
+        "timeout",
+        "handshake",
+        "nicht geladen",
+        "not loaded",
+        "fehlt",
+        "missing",
+        "down",
+    )
+    _CLUTCH_CUES = (
+        "clutch",
+        "modellrouting",
+        "model routing",
+        "model-routing",
+        "tier-routing",
+        "tier routing",
+        "provider routing",
+        "provider-routing",
+        "modellkosten",
+        "model cost",
+        "tokenkosten",
+    )
+    _LOOP_CUES = (
+        "/loop",
+        "tasksolver",
+        "taskwriter",
+        "maintainer",
+        "periodisch",
+        "periodic",
+        "wiederkehr",
+        "recurring",
+        "regelmäßig",
+        "regelmaessig",
+        "monitor",
+        "überwach",
+        "ueberwach",
+    )
+    _GOAL_CUES = (
+        "/goal",
+        "goal-modus",
+        "goal mode",
+        "abschlusskriterium",
+        "completion criterion",
+        "completion criteria",
+        "bis fertig",
+        "until complete",
+    )
+    _FABLE5_MARKERS = ("fable 5", "fable-5", "fable5")
+
+    def __init__(self, config: OrchestrationSafetyConfig | None = None):
+        self.config = config or OrchestrationSafetyConfig()
+
+    def eligible_topics(
+        self,
+        *,
+        event: str,
+        prompt: str,
+        model_context: str = "",
+    ) -> tuple[str, ...]:
+        if event != self.event:
+            return ()
+
+        normalized = prompt.casefold()
+        delegation_negated = _contains_any(normalized, self._DELEGATION_NEGATIONS)
+        operator_signal = (
+            not delegation_negated
+            and _contains_any(normalized, self._OPERATOR_CUES)
+        )
+        swarm_signal = (
+            not delegation_negated
+            and _contains_any(normalized, self._PARALLEL_CUES)
+            and _contains_any(normalized, self._BULK_CUES)
+        )
+        explicit_routing = _contains_any(normalized, self._CLUTCH_CUES)
+        filecommander_failure = (
+            _contains_any(normalized, self._FILECOMMANDER_CUES)
+            and _contains_any(normalized, self._FAILURE_CUES)
+        )
+
+        normalized_context = " ".join(model_context.split()).casefold()[:120]
+        expensive_context = bool(normalized_context) and any(
+            marker.casefold() in normalized_context
+            for marker in self.config.expensive_model_markers
+        )
+        fable5_context = bool(normalized_context) and _contains_any(
+            normalized_context, self._FABLE5_MARKERS
+        )
+
+        topics: list[str] = []
+        if self.config.operator_guidance and operator_signal:
+            topics.append("operator")
+        if self.config.filecommander_recovery and filecommander_failure:
+            topics.append("filecommander_recovery")
+        if self.config.swarm_guidance and swarm_signal:
+            topics.append("swarm")
+        if self.config.clutch_routing and (
+            explicit_routing or operator_signal or swarm_signal
+        ):
+            topics.append("clutch")
+        if self.config.expensive_model_guidance and expensive_context:
+            topics.append("expensive_model")
+        if self.config.fable5_savings and fable5_context:
+            topics.append("fable5_savings")
+        if self.config.loop_goal_guidance:
+            if _contains_any(normalized, self._LOOP_CUES):
+                topics.append("loop")
+            if _contains_any(normalized, self._GOAL_CUES):
+                topics.append("goal")
+        return tuple(topics)
+
+    def generate(
+        self,
+        *,
+        event: str,
+        prompt: str,
+        model_context: str = "",
+        topics: Iterable[str] | None = None,
+    ) -> str | None:
+        eligible = self.eligible_topics(
+            event=event,
+            prompt=prompt,
+            model_context=model_context,
+        )
+        selected = eligible if topics is None else tuple(
+            topic for topic in topics if topic in eligible
+        )
+        if not selected:
+            return None
+
+        lines = [
+            "[WorkflowHooker] Orchestrierung und Modellökonomie "
+            "(Hinweis, kein Gate):"
+        ]
+        if "operator" in selected:
+            lines.append(
+                "- Operator-Signal erkannt: Der Operator hält Plan, Grenzen und "
+                "Review; autorisierte Worker können klar getrennte Arbeitspakete "
+                "ausführen. WorkflowHooker startet oder delegiert nichts selbst."
+            )
+        if "filecommander_recovery" in selected:
+            lines.append(
+                "- FileCommander-Ausfall ist ein Fehler. Reparatur-Handoff: "
+                "Registrierung und Config prüfen, Transport-Handshake belegen, "
+                "npm-Consumer-Auflösung und -Start prüfen, danach fc_get_time als "
+                "kleine Funktionsprobe ausführen. Nur ein autorisierter "
+                "Reparatur-Worker darf handeln; WorkflowHooker repariert nichts "
+                "und startet keinen Worker oder MCP-Server."
+            )
+        if "swarm" in selected:
+            lines.append(
+                "- Parallele, gleichförmige Bulk-Arbeit erkannt: Ein AgentSwarm "
+                "ist nur für unabhängige Einheiten mit festem Ownership- und "
+                "Merge-Vertrag geeignet. WorkflowHooker startet keinen Swarm."
+            )
+        if "clutch" in selected:
+            lines.append(
+                "- Modellrouting: clutch als providerneutralen Router mit seinem "
+                "aktuellen Modellkatalog verwenden und die niedrigste ausreichend "
+                "fähige Stufe wählen. WorkflowHooker wählt und routet kein Modell."
+            )
+        if "expensive_model" in selected:
+            context = _safe_model_context(model_context)
+            lines.append(
+                f"- Expliziter Modellkontext `{context}` stimmt mit einem "
+                "konfigurierten Marker für teure Modelle überein: Operator-Modus "
+                "oder fokussierten Eine-Aufgabe-Modus erwägen. Das ist eine "
+                "lokale Config-Klassifikation, kein Live-Preisclaim."
+            )
+        if "fable5_savings" in selected:
+            lines.append(
+                "- Fable-5-Sparschaltung: Dokumentierter Vertrag ist Opus 4.8 "
+                "als Hauptmodell/Worker und Fable 5 nur als Advisor. Wenn Opus 4.8 "
+                "oder dieser Vertrag nicht belegt verfügbar ist, weder wechseln "
+                "noch eine Einsparung behaupten. WorkflowHooker ändert kein Modell."
+            )
+        if "loop" in selected:
+            lines.append(
+                "- Wiederkehrende Arbeit: Einen Taskplan-/Runtime-Loop mit passender "
+                "Rolle (TASKSOLVER, TASKWRITER oder MAINTAINER), Intervall und "
+                "Stopkriterium erwägen. WorkflowHooker startet keinen Loop."
+            )
+        if "goal" in selected:
+            lines.append(
+                "- Explizites Abschlusskriterium erkannt: Goal-Modus mit messbarem "
+                "Kriterium erwägen. WorkflowHooker erstellt oder startet kein Goal."
+            )
+        return "\n".join(lines)
+
+    message = generate
+    build = generate
+
+
+def _contains_any(text: str, cues: tuple[str, ...]) -> bool:
+    return any(cue in text for cue in cues)
+
+
+def _safe_model_context(model_context: str) -> str:
+    return " ".join(model_context.split())[:120]
+
+
 def _is_onedrive_path(path: Path | str) -> bool:
     normalized_parts = (part.casefold() for part in Path(path).parts)
     return any(
@@ -420,6 +698,7 @@ __all__ = [
     "GoalInjector",
     "DecisionSafetyInjector",
     "LoopInjector",
+    "OrchestrationSafetyInjector",
     "RepositoryDisciplineInjector",
     "SessionHygieneInjector",
     "build_goal_message",

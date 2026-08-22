@@ -30,6 +30,7 @@ from .injectors import (
     DecisionSafetyInjector,
     GoalInjector,
     LoopInjector,
+    OrchestrationSafetyInjector,
     RepositoryDisciplineInjector,
     SessionHygieneInjector,
 )
@@ -277,6 +278,11 @@ def _cmd_hook_run(args) -> int:
             state,
             event=args.event,
             prompt=_extract_prompt(payload),
+            model_context=(
+                _extract_model_context(payload)
+                or config.orchestration_safety.model_context
+                or ""
+            ),
         )
     state.save(state_path)
 
@@ -309,6 +315,7 @@ def _run_advisory_injectors(
     *,
     event: str,
     prompt: str,
+    model_context: str = "",
     now: float | None = None,
 ) -> str | None:
     now = time.time() if now is None else now
@@ -365,6 +372,26 @@ def _run_advisory_injectors(
         if decision_message:
             messages.append(decision_message)
             delivered.extend(("decision_safety", topic) for topic in pending)
+
+    if config.injectors.orchestration_safety:
+        orchestration = OrchestrationSafetyInjector(config.orchestration_safety)
+        eligible = orchestration.eligible_topics(
+            event=event,
+            prompt=prompt,
+            model_context=model_context,
+        )
+        pending = _pending_topics(state, "orchestration_safety", eligible)
+        orchestration_message = orchestration.generate(
+            event=event,
+            prompt=prompt,
+            model_context=model_context,
+            topics=pending,
+        )
+        if orchestration_message:
+            messages.append(orchestration_message)
+            delivered.extend(
+                ("orchestration_safety", topic) for topic in pending
+            )
 
     if not messages:
         return None
@@ -428,6 +455,30 @@ def _extract_prompt(payload: dict) -> str:
         value = payload.get(key)
         if isinstance(value, str):
             return value
+    return ""
+
+
+def _extract_model_context(payload: dict) -> str:
+    """Read explicit model identity without inferring it from the provider."""
+
+    def model_text(value: object) -> str:
+        if isinstance(value, str):
+            return " ".join(value.split())[:120]
+        if isinstance(value, dict):
+            for nested_key in ("id", "name", "model"):
+                nested = value.get(nested_key)
+                if isinstance(nested, str):
+                    return " ".join(nested.split())[:120]
+        return ""
+
+    for key in ("model", "model_name", "model_id"):
+        if context := model_text(payload.get(key)):
+            return context
+    context_data = payload.get("context")
+    if isinstance(context_data, dict):
+        for key in ("model", "model_name", "model_id"):
+            if context := model_text(context_data.get(key)):
+                return context
     return ""
 
 

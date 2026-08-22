@@ -6,6 +6,16 @@ Alle nennenswerten Aenderungen an WorkflowHooker.
 
 ### Hinzugefügt (2026-08-22)
 
+- **Opt-in `orchestration_safety`-Injector (T-20260731-05, Slice 4):**
+  Signalgebundene Operator-/Delegations-, Swarm-, clutch-, Loop- und
+  Goal-Hinweise ohne automatischen Spawn, Scheduler-Start oder Modellwechsel.
+  Ein FileCommander-Ausfall erzeugt einen konkreten
+  Config-/Handshake-/npm-/`fc_get_time`-Reparatur-Handoff, aber keine
+  Auto-Reparatur. Kosten- und Fable-Hinweise verlangen expliziten
+  Modellkontext; nur Fable 5 aktiviert den dokumentierten
+  Opus-4.8-Worker/Fable-Advisor-Vertrag ohne Wechsel- oder Einsparungsclaim.
+  Alle 24 Anforderungen aus T-20260731-05 sind damit als getestete opt-in
+  Hinweise oder objektive Bestandschecks abgedeckt; Gesamtsuite: 134 Tests.
 - **Opt-in `decision_safety`-Injector (T-20260731-05, Slice 3):** Enge
   Entscheidungssignale lösen eine geordnete, nichtblockierende Eskalationskette aus:
   Projektentscheidungen/Policies, zentrale `_DECISIONS`-/Manifest-Bestände,
@@ -14,7 +24,7 @@ Alle nennenswerten Aenderungen an WorkflowHooker.
   Entscheidungsreviews werden als neue Nutzerentscheidung zur
   `TO-DECIDE-USER`-Kette geroutet und nie still verbucht oder als Policy
   adoptiert. Alle Komponenten teilen Budget/Cooldown und sind einzeln
-  abschaltbar; Gesamtsuite: 128 Tests.
+  abschaltbar; damaliger Stand der Gesamtsuite: 128 Tests.
 - **Opt-in `repository_discipline`-Injector (T-20260731-05, Slice 2):**
   Nichtblockierender Handoff für unzugeordnete Dirty-Stände mit Diff-Review,
   nativen Tests, Secret-Signaturscan, Funktionsproben und genau einem

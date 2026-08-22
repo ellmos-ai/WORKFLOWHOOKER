@@ -21,6 +21,16 @@ def test_default_config_has_no_active_checks():
     assert config.decision_safety.remind_escalation_chain is True
     assert config.decision_safety.require_decision_basis is True
     assert config.decision_safety.route_reviews_to_user is True
+    assert config.injectors.orchestration_safety is False
+    assert config.orchestration_safety.operator_guidance is True
+    assert config.orchestration_safety.filecommander_recovery is True
+    assert config.orchestration_safety.swarm_guidance is True
+    assert config.orchestration_safety.clutch_routing is True
+    assert config.orchestration_safety.expensive_model_guidance is True
+    assert config.orchestration_safety.fable5_savings is True
+    assert config.orchestration_safety.loop_goal_guidance is True
+    assert config.orchestration_safety.model_context is None
+    assert "fable 5" in config.orchestration_safety.expensive_model_markers
 
 
 def test_load_config_missing_file_returns_defaults(tmp_path: Path):
@@ -52,6 +62,7 @@ loop = true
 session_hygiene = { enabled = true }
 repository_discipline = true
 decision_safety = true
+orchestration_safety = true
 
 [repository_discipline]
 certify_dirty_worktree = false
@@ -62,6 +73,17 @@ remind_push_policy = false
 remind_escalation_chain = true
 require_decision_basis = false
 route_reviews_to_user = true
+
+[orchestration_safety]
+operator_guidance = false
+filecommander_recovery = true
+swarm_guidance = false
+clutch_routing = true
+expensive_model_guidance = true
+fable5_savings = false
+loop_goal_guidance = true
+model_context = "  Opus   4.8  "
+expensive_model_markers = ["Opus 4.8", "Fable 5"]
 """,
         encoding="utf-8",
     )
@@ -82,6 +104,19 @@ route_reviews_to_user = true
     assert config.decision_safety.remind_escalation_chain is True
     assert config.decision_safety.require_decision_basis is False
     assert config.decision_safety.route_reviews_to_user is True
+    assert config.injectors.orchestration_safety is True
+    assert config.orchestration_safety.operator_guidance is False
+    assert config.orchestration_safety.filecommander_recovery is True
+    assert config.orchestration_safety.swarm_guidance is False
+    assert config.orchestration_safety.clutch_routing is True
+    assert config.orchestration_safety.expensive_model_guidance is True
+    assert config.orchestration_safety.fable5_savings is False
+    assert config.orchestration_safety.loop_goal_guidance is True
+    assert config.orchestration_safety.model_context == "Opus 4.8"
+    assert config.orchestration_safety.expensive_model_markers == (
+        "Opus 4.8",
+        "Fable 5",
+    )
 
 
 def test_load_config_rejects_unknown_check(tmp_path: Path):

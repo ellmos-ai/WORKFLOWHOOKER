@@ -1,8 +1,13 @@
-from workflowhooker.config import DecisionSafetyConfig, RepositoryDisciplineConfig
+from workflowhooker.config import (
+    DecisionSafetyConfig,
+    OrchestrationSafetyConfig,
+    RepositoryDisciplineConfig,
+)
 from workflowhooker.injectors import (
     DecisionSafetyInjector,
     GoalInjector,
     LoopInjector,
+    OrchestrationSafetyInjector,
     RepositoryDisciplineInjector,
     SessionHygieneInjector,
 )
@@ -223,4 +228,115 @@ def test_decision_safety_is_signal_gated_event_scoped_and_configurable():
     assert disabled.generate(
         event="UserPromptSubmit",
         prompt="Bewerte diese Entscheidung.",
+    ) is None
+
+
+def test_orchestration_safety_combines_operator_swarm_and_clutch_for_bulk_work():
+    message = OrchestrationSafetyInjector().generate(
+        event="UserPromptSubmit",
+        prompt="Delegiere viele gleichförmige Dateien parallel an Worker.",
+    )
+
+    assert message is not None
+    assert "Operator-Signal erkannt" in message
+    assert "AgentSwarm" in message
+    assert "providerneutralen Router" in message
+    assert "aktuellen Modellkatalog" in message
+    assert "startet oder delegiert nichts selbst" in message
+    assert "startet keinen Swarm" in message
+    assert "wählt und routet kein Modell" in message
+
+
+def test_orchestration_safety_respects_delegation_negation_and_event_scope():
+    injector = OrchestrationSafetyInjector()
+
+    assert injector.generate(
+        event="UserPromptSubmit",
+        prompt="Bearbeite viele Dateien parallel, aber nicht delegieren und kein Swarm.",
+    ) is None
+    assert injector.generate(
+        event="Stop",
+        prompt="Delegiere viele gleichförmige Dateien parallel.",
+    ) is None
+    assert injector.generate(
+        event="UserPromptSubmit",
+        prompt="Bearbeite diese einzelne Datei.",
+    ) is None
+
+
+def test_orchestration_safety_filecommander_failure_has_concrete_handoff():
+    message = OrchestrationSafetyInjector().generate(
+        event="UserPromptSubmit",
+        prompt="FileCommander ist nicht verfügbar: Handshake-Fehler.",
+    )
+
+    assert message is not None
+    assert "FileCommander-Ausfall ist ein Fehler" in message
+    assert "Registrierung und Config" in message
+    assert "Transport-Handshake" in message
+    assert "npm-Consumer-Auflösung" in message
+    assert "fc_get_time" in message
+    assert "autorisierter Reparatur-Worker" in message
+    assert "repariert nichts" in message
+    assert "startet keinen Worker oder MCP-Server" in message
+
+
+def test_orchestration_safety_gates_expensive_and_fable_claims_on_model_context():
+    injector = OrchestrationSafetyInjector()
+
+    prompt_only = injector.generate(
+        event="UserPromptSubmit",
+        prompt="Nutze Fable 5 bitte sparsam.",
+    )
+    assert prompt_only is None
+
+    message = injector.generate(
+        event="UserPromptSubmit",
+        prompt="Bearbeite die Aufgabe.",
+        model_context="Fable 5",
+    )
+    assert message is not None
+    assert "Expliziter Modellkontext `Fable 5`" in message
+    assert "Operator-Modus" in message
+    assert "Eine-Aufgabe-Modus" in message
+    assert "kein Live-Preisclaim" in message
+    assert "Opus 4.8 als Hauptmodell/Worker" in message
+    assert "Fable 5 nur als Advisor" in message
+    assert "weder wechseln noch eine Einsparung behaupten" in message
+    assert "ändert kein Modell" in message
+
+
+def test_orchestration_safety_loop_goal_signals_and_components_are_configurable():
+    message = OrchestrationSafetyInjector().generate(
+        event="UserPromptSubmit",
+        prompt=(
+            "Überwache das regelmäßig im MAINTAINER-Loop bis zum expliziten "
+            "Abschlusskriterium."
+        ),
+    )
+    assert message is not None
+    assert "Taskplan-/Runtime-Loop" in message
+    assert "Stopkriterium" in message
+    assert "startet keinen Loop" in message
+    assert "Goal-Modus" in message
+    assert "erstellt oder startet kein Goal" in message
+
+    disabled = OrchestrationSafetyInjector(
+        OrchestrationSafetyConfig(
+            operator_guidance=False,
+            filecommander_recovery=False,
+            swarm_guidance=False,
+            clutch_routing=False,
+            expensive_model_guidance=False,
+            fable5_savings=False,
+            loop_goal_guidance=False,
+        )
+    )
+    assert disabled.generate(
+        event="UserPromptSubmit",
+        prompt=(
+            "Delegiere viele gleichförmige Dateien parallel; FileCommander ist down; "
+            "nutze /loop und /goal."
+        ),
+        model_context="Fable 5",
     ) is None

@@ -1,7 +1,7 @@
 # workflowhooker
 
 > Last-checked: 2026-08-22
-> Verification: 128/128 Pytest-Tests 100% grün.
+> Verification: 134/134 Pytest-Tests 100% grün.
 
 Canonical repository: https://github.com/ellmos-ai/workflowhooker-provenance
 Owner: ellmos-ai (Ecosystem: open-bricks)
@@ -23,6 +23,7 @@ WorkflowHooker (`ellmos-ai/workflowhooker-provenance`) ist ein Modul im `ellmos-
 - `[injectors] session_hygiene = true`: opt-in, non-blocking start/end guidance with budget and cooldown.
 - `[injectors] repository_discipline = true`: opt-in dirty-state certification, Plan D mirror/pointer, bundle-commit and push-policy guidance; never mutates Git or files.
 - `[injectors] decision_safety = true`: opt-in ordered decision escalation, evidence/basis documentation and TO-DECIDE review routing; never reads or writes decision systems.
+- `[injectors] orchestration_safety = true`: opt-in signal-gated operator, FileCommander recovery-handoff, swarm, clutch, model-economy, loop and goal guidance; never spawns, repairs, schedules, routes or switches anything.
 
 ## Disambiguation
 

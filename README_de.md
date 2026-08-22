@@ -3,7 +3,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Python Version](https://img.shields.io/badge/python-3.10%20|%203.11%20|%203.12%20|%203.13-blue.svg)](pyproject.toml)
 [![CI Status](https://img.shields.io/badge/CI-passing-brightgreen.svg)](.github/workflows/ci.yml)
-[![Tests](https://img.shields.io/badge/tests-128%20passed-brightgreen.svg)](tests)
+[![Tests](https://img.shields.io/badge/tests-134%20passed-brightgreen.svg)](tests)
 [![Platform](https://img.shields.io/badge/platform-Linux%20|%20Windows%20|%20macOS-lightgrey.svg)](pyproject.toml)
 [![Datenschutz](https://img.shields.io/badge/datenschutz-100%25%20Offline%20|%20Zero--Egress-brightgreen.svg)](SECURITY.md)
 [![Sicherheit](https://img.shields.io/badge/sicherheit-Local--First%20|%20Prozess--Isoliert-blue.svg)](SECURITY.md)
@@ -147,6 +147,7 @@ sequenceDiagram
 - **Session-Hygiene (`session_hygiene`):** Optionale, nichtblockierende Hinweise zu Sessionstart/-ende, Quellenprüfung und passenden lokalen Werkzeugen.
 - **Repository-Disziplin (`repository_discipline`):** Optionale Hinweise zu Fremdänderungs-Zertifizierung, Plan D, Bundle-Commits und der Push-Grenze.
 - **Entscheidungssicherheit (`decision_safety`):** Optionale, geordnete Eskalations-, Dokumentations- und Review-Hinweise.
+- **Orchestrierungssicherheit (`orchestration_safety`):** Optionale, signalgebundene Hinweise zu Delegation, Self-Healing-Handoffs und Modellökonomie.
 
 ---
 
@@ -177,6 +178,7 @@ loop = true       # lokales Weck-Briefing
 session_hygiene = true  # budgetierte Sessionstart-/-ende-Hinweise
 repository_discipline = true  # Git-/Plan-D-/Push-Policy-Hinweise
 decision_safety = true  # Entscheidungseskalation/-dokumentation
+orchestration_safety = true  # Orchestrierungs-/Modellökonomie-Hinweise
 
 [repository_discipline]
 certify_dirty_worktree = true
@@ -187,6 +189,18 @@ remind_push_policy = true
 remind_escalation_chain = true
 require_decision_basis = true
 route_reviews_to_user = true
+
+[orchestration_safety]
+operator_guidance = true
+filecommander_recovery = true
+swarm_guidance = true
+clutch_routing = true
+expensive_model_guidance = true
+fable5_savings = true
+loop_goal_guidance = true
+# Optionaler expliziter Laufzeitbeleg; nicht aus dem Provider erraten:
+# model_context = "Fable 5"
+expensive_model_markers = ["fable 5", "fable-5", "fable5"]
 ```
 
 `goal` liest `AUFGABEN.txt` oder `GOAL.md` sowie projektbezogene offene und
@@ -251,7 +265,33 @@ Entscheidung gilt als neue Nutzerentscheidung und wird zur `_DECISIONS`-/
 adoptiert. Die drei Hinweiskomponenten sind separat abschaltbar; der Injector
 liest und schreibt keines der genannten Systeme.
 
-Aus T-20260731-05 bleiben die Anforderungen 7, 13 und 17–21 offen.
+### Orchestrierungssicherheit (opt-in, nur Hinweis)
+
+`orchestration_safety` reagiert am `UserPromptSubmit` nur auf enge Signale zur
+Aufgabenform oder zu einem Ausfall. Der Injector kann eine Aufteilung zwischen
+Operator und Worker, einen Swarm für unabhängige gleichförmige Bulk-Arbeit,
+providerneutrales clutch-Routing oder einen Taskplan-/Runtime-Loop und den
+Goal-Modus mit explizitem Stopkriterium vorschlagen. Er startet oder delegiert
+niemals Worker, Swarms, Loops oder Goals und wählt oder wechselt kein Modell.
+
+Ein gemeldeter FileCommander-Ausfall gilt ausdrücklich als Fehler. Der Hinweis
+übergibt Prüfungen von Registrierung/Config, Transport-Handshake,
+npm-Consumer-Auflösung/-Start und eine kleine `fc_get_time`-Funktionsprobe an
+einen autorisierten Reparatur-Worker; WorkflowHooker repariert nichts und
+startet keinen MCP-Server.
+
+Kosten- und Fable-Hinweise benötigen eine explizite Modellidentität aus dem
+Hook-Payload oder der bewusst gesetzten Config. Konfigurierte Marker für teure
+Modelle empfehlen Operator- oder fokussierten Eine-Aufgabe-Modus und sind eine
+lokale Klassifikation, kein Live-Preisclaim. Nur expliziter Fable-5-Kontext
+ergänzt den dokumentierten Vertrag: Opus 4.8 bleibt Hauptmodell/Worker, Fable 5
+nur Advisor. Ist dieses Modell oder der Vertrag nicht belegt verfügbar, gibt
+es keinen Wechsel- oder Einsparungsclaim. Alle Topics teilen Meldungsbudget,
+Cooldown und sitzungsbezogene Deduplizierung und sind einzeln abschaltbar.
+
+Die Anforderungen 1–24 aus T-20260731-05 sind durch getestete opt-in Hinweise
+oder bestehende objektive Checks abgedeckt. Abdeckung bedeutet nicht, dass ein
+externes System automatisch ausgeführt oder repariert wird.
 
 ## Ökosystem & Geschwisterwerkzeuge
 

@@ -91,6 +91,40 @@ am `UserPromptSubmit` umgesetzt:
 5. Alle drei Teilhinweise sind separat konfigurierbar. Der Injector liest oder
    mutiert keine Decision-, Gardener-, USMC-, TOM-lm- oder Policy-Daten.
 
+## Entscheidung für Slice 4: Orchestrierung und Modellökonomie
+
+Die Restanforderungen 7, 13 und 17–21 werden als opt-in
+`orchestration_safety`-Injector am `UserPromptSubmit` umgesetzt:
+
+1. Operator-, Swarm-, clutch-, Loop- und Goal-Hinweise reagieren nur auf enge
+   Aufgabenform-Signale. Negierte Delegations-/Swarm-Aufträge werden nicht
+   umgedeutet. Der Hook startet selbst weder Worker noch Swarms, Loops oder
+   Goals.
+2. Ein ausdrücklich gemeldeter FileCommander-Ausfall wird als Fehler
+   bezeichnet und erhält einen Reparatur-Handoff: Registrierung/Config prüfen,
+   Transport-Handshake belegen, npm-Consumer-Auflösung und Start prüfen,
+   anschließend eine kleine `fc_get_time`-Funktionsprobe. WorkflowHooker
+   repariert nichts und startet keinen Subagenten; der handelnde Agent soll
+   dafür nur im Rahmen seiner Autorisierung einen Reparatur-Worker beauftragen.
+3. Swarm wird nur bei gleichzeitigem Parallelitäts- und Bulk-/Gleichförmigkeits-
+   signal empfohlen. clutch wird bei explizitem Modell-/Tier-/Kosten-Routing
+   oder einer erkannten Operator-/Swarm-Form als providerneutraler Router
+   genannt; kein Tier wird vom Hook selbst gewählt.
+4. Hinweise zu teuren Modellen brauchen expliziten Modellkontext aus dem
+   Hook-Payload oder aus der bewusst gesetzten Config. Die Liste teurer
+   Modellmarker ist konfigurierbar. Ohne Modellkontext gibt es keinen
+   Kosten- oder Fable-Claim.
+5. Nur expliziter Fable-5-Modellkontext aktiviert die Sparschaltung. Der
+   dokumentierte Vertrag lautet: Opus 4.8 als Hauptmodell/Worker, Fable 5 nur
+   als Advisor. Ist dieser Vertrag oder Opus 4.8 nicht verfügbar, darf der Hook
+   keinen Wechsel- oder Einsparungsclaim behaupten.
+6. Loop- und Goal-Hinweise sind getrennte, einmalige Topics: periodische oder
+   wiederkehrende Arbeit verweist auf Taskplan-/Runtime-Loops; ein explizites
+   Abschlusskriterium auf den Goal-Modus. Kein Scheduler wird gestartet.
+7. Alle Topics teilen das bestehende globale Meldungsbudget, den Cooldown und
+   die persistierte Topic-Deduplizierung; jede Teilfunktion ist separat
+   abschaltbar.
+
 ## Anforderungsmatrix
 
 | Nr. | Bestand vor Slice | Entscheidung für diesen Slice |
@@ -101,27 +135,29 @@ am `UserPromptSubmit` umgesetzt:
 | 4 | nicht vorhanden | erster `UserPromptSubmit` als belegter Ersatztrigger |
 | 5 | nicht vorhanden | Start nennt Skill-Finder/ControlCenter |
 | 6 | nicht vorhanden | bedingter `fc_get_time`-Hinweis |
-| 7 | nicht vorhanden | offen; Operator-Erkennung braucht eigenen Entwurf |
+| 7 | nicht vorhanden | Slice 4: enger Operator-/Delegationshinweis; nie automatischer Spawn |
 | 8 | nicht vorhanden | Start erinnert an Primärquellen-/Web-/Datenbank-Gegencheck |
 | 9 | nicht vorhanden | Start nennt Deklarieren, Kontextsuche, Recherche, Nutzerfrage |
 | 10 | teilweise `closing_gate` | Slice 2: Dirty-Bestand wird konservativ als unzugeordnet behandelt; nichtblockierender Zertifizierungs-Handoff, kein Auto-Commit |
 | 11 | nicht vorhanden | Slice 2: konfigurierbarer OneDrive-/Plan-D-Hinweis auf lokalen Spiegel, Git-Sync-Hub und Pointer |
 | 12 | nicht vorhanden | bedingter OneDrive-`fc_*`-Hinweis |
-| 13 | nicht vorhanden | offen; Self-Healing darf nicht nur behauptet werden |
+| 13 | nicht vorhanden | Slice 4: FileCommander-Ausfall als Fehler mit Config-/Handshake-/npm-/Funktionsproben-Handoff; keine Auto-Reparatur |
 | 14 | nicht vorhanden | Slice 3: enge Prompt-Erkennung und strikt geordnete advisory Eskalationskette bis zum Nutzer |
 | 15 | nicht vorhanden | Slice 3: verlangt Basis, Belege/Quellen, Alternativen, Faktenstand und Unsicherheiten |
 | 16 | nicht vorhanden | Slice 3: Decision-Review wird als neue Nutzerentscheidung zur TO-DECIDE-Kette geroutet; keine stille Adoption |
-| 17 | nicht vorhanden | offen; Aufgabenform-Erkennung erforderlich |
-| 18 | nicht vorhanden | offen; versionierte Modell-/Kostenquelle erforderlich |
-| 19 | nicht vorhanden | offen; Provider-/Modellkontext erforderlich |
-| 20 | nicht vorhanden | offen; Provider-/Modellkontext erforderlich |
-| 21 | Goal/Loop-Bausteine vorhanden | offen; Vorschlagsheuristik fehlt |
+| 17 | nicht vorhanden | Slice 4: Swarm nur bei paralleler, gleichförmiger Bulk-Form |
+| 18 | nicht vorhanden | Slice 4: clutch-Hinweis für providerneutrales, aktuelles Tier-Routing; keine eigene Tierwahl |
+| 19 | nicht vorhanden | Slice 4: teurer Modellkontext empfiehlt Operator- oder fokussierten Eine-Aufgabe-Modus |
+| 20 | nicht vorhanden | Slice 4: nur expliziter Fable-5-Kontext; Opus-4.8-Worker/Fable-Advisor-Vertrag ohne unbelegten Wechselclaim |
+| 21 | Goal/Loop-Bausteine vorhanden | Slice 4: getrennte enge Loop-/Goal-Signale, kein Scheduler-Start |
 | 22 | nicht vorhanden | Start liefert lokalen Skill-Bibliothek-Pointer |
 | 23 | teilweise `closing_gate` | Slice 2: präzise Bundle-Commit-Erinnerung ausschließlich bei Dirty-Git am Abschluss |
 | 24 | nicht vorhanden | Slice 2: reine Policy-Erinnerung für Direktkontakt versus autonomen Lauf; kein Push, kein Gate |
 
-Damit liefern Slice 1 bis 3 die Anforderungen 1–6, 8–12, 14–16 und 22–24.
-Offen bleiben 7, 13 und 17–21.
+Damit liefern Slice 1 bis 4 alle Anforderungen 1–24. „Geliefert“ bedeutet bei
+advisory Anforderungen einen getesteten, opt-in Hinweis mit klarer
+Nicht-Mutationsgrenze – nicht, dass ein externes System automatisch ausgeführt
+oder repariert wird.
 
 ## Sicherheits- und Fehlergrenzen
 
@@ -130,6 +166,8 @@ Offen bleiben 7, 13 und 17–21.
   können separat deaktiviert werden.
 - Default bleibt auch `decision_safety = false`; dessen drei Teilhinweise sind
   separat konfigurierbar.
+- Default bleibt auch `orchestration_safety = false`; dessen sieben
+  Teilhinweise und die teuren Modellmarker sind separat konfigurierbar.
 - Fehlende optionale Systeme werden nicht als verfügbar behauptet.
 - Kein Netzverkehr, kein Subprozess und keine Änderung außerhalb des
   WorkflowHooker-State-Ordners.
@@ -143,6 +181,9 @@ Offen bleiben 7, 13 und 17–21.
   Spiegel- oder Pointer-Operationen aus.
 - Der Decision-Injector behauptet keine gelesene Entscheidung und schreibt
   weder Register noch TO-DECIDE-Dateien.
+- Modell- und Fable-Hinweise entstehen ausschließlich aus explizitem
+  Modellkontext. Der Hook startet keine Agenten, MCP-Server oder Scheduler und
+  wechselt weder Modell noch Provider.
 
 ## Verifikation
 
@@ -159,4 +200,8 @@ Offen bleiben 7, 13 und 17–21.
 - Entscheidungssicherheit: Signalerkennung, Reihenfolge der fünf
   Eskalationsstufen, vollständige Entscheidungsbasis, Review-Routing,
   Teilkonfiguration, Budget und Deduplizierung.
+- Orchestrierung: positive und negierte Operator-/Swarm-Signale,
+  FileCommander-Fehlerhandoff, clutch-Routing, Modellkontext-Gate,
+  Fable-Vertrag, Loop-/Goal-Trennung, Teilkonfiguration, Budget und
+  Deduplizierung.
 - Gesamtsuite, Ruff, Compile, Secret-/Pfadscan und `git diff --check`.
