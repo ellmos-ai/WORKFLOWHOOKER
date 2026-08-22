@@ -5,7 +5,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Python Version](https://img.shields.io/badge/python-3.10%20|%203.11%20|%203.12%20|%203.13-blue.svg)](pyproject.toml)
 [![CI Status](https://img.shields.io/badge/CI-passing-brightgreen.svg)](.github/workflows/ci.yml)
-[![Tests](https://img.shields.io/badge/tests-112%20passed-brightgreen.svg)](tests)
+[![Tests](https://img.shields.io/badge/tests-119%20passed-brightgreen.svg)](tests)
 [![Platform](https://img.shields.io/badge/platform-Linux%20|%20Windows%20|%20macOS-lightgrey.svg)](pyproject.toml)
 [![Privacy](https://img.shields.io/badge/privacy-100%25%20Offline%20|%20Zero--Egress-brightgreen.svg)](SECURITY.md)
 [![Security](https://img.shields.io/badge/security-Local--First%20|%20Process--Isolated-blue.svg)](SECURITY.md)
@@ -24,18 +24,19 @@
 
 ---
 
-**Status: 0.2.1 — Autonomous Workflow Governance & Injector Engine.** (Last-checked: 2026-08-21)
+**Status: 0.2.1 — Autonomous Workflow Governance & Injector Engine.** (Last-checked: 2026-08-22)
 
 Umgesetzt: `StateSource`-Protokoll, Config-Schicht (`workflowhooker.toml`,
 `checks = []` per Default), read-only Adapter `git`, `files` (LOCK*.txt und
 `AUFGABEN.txt`/`GOAL.md`) und optionales `taskplan` (projektbezogene offene und
 aktive Tasks), drei einzeln zuschaltbare Checks (`closing_gate`,
 `drift_warning`, `scope_guard`) sowie die opt-in Injektoren `goal` (PreCompact)
-und `loop-briefing` (lokale Weck-Runtimes). Meldungsbudget + Cooldown bleiben
+und `loop-briefing` (lokale Weck-Runtimes) sowie `session_hygiene`
+(nichtblockierende Start-/End-Hinweise). Meldungsbudget + Cooldown bleiben
 die gemeinsame 4-Augen-Bremse. Provider `claude`, `codex`, `kimi`
 (Hook-Snippet-Generator ohne `PreToolUse` im Default, optionale separate
 Blocker-Variante) + `manual` (CLI); der `git`-Provider bleibt ein
-dokumentierter Stub. 112 Tests sind grün, darunter echte Temp-Git-Repo-Fixtures.
+dokumentierter Stub. 119 Tests sind grün, darunter echte Temp-Git-Repo-Fixtures.
 
 Hooks, die den **Arbeitsablauf** eines Agenten steuern — nicht sein Wissen.
 
@@ -335,6 +336,7 @@ Die Injektoren bleiben standardmäßig stumm und werden ausdrücklich in
 [injectors]
 goal = true       # Ziel/Tasks beim PreCompact-Hook injizieren
 loop = true       # loop-briefing als lokale Runtime-Schnittstelle freigeben
+session_hygiene = true  # budgetierte Session-Start-/End-Hinweise
 ```
 
 Der `PreCompact`-Hook liest das Projektziel aus `AUFGABEN.txt` oder `GOAL.md`
@@ -344,6 +346,21 @@ Taskplan-Ausfall bleibt still. Für lokale Modelle liefert
 Briefing aus Ziel, offenen Tasks, Locks und uncommitteter Arbeit; der Taktgeber
 (Cron, Scheduled Task oder Runtime-Loop) bleibt außerhalb von WorkflowHooker.
 Mit `--format json` ist die Ausgabe maschinenlesbar.
+
+### Session hygiene (opt-in, advisory)
+
+`session_hygiene` uses the first `UserPromptSubmit` in a session as the
+portable start trigger and `Stop` as its end trigger. The start reminder points
+to USMC/Gardener context, the local skill library and a source/uncertainty
+countercheck. Prompt cues for a date or OneDrive add one-time `fc_get_time` or
+FileCommander `fc_*` reminders. Each topic is emitted at most once per session
+and shares the existing global message budget and cooldown.
+
+The injector is guidance, not an execution engine: it does not query Gardener,
+write USMC state, access OneDrive or retain prompt text. It stays non-blocking
+even when a provider invokes `Stop --block`; only an actual check finding may
+use the existing blocking exit code. MemoryHooker remains responsible for
+knowledge recall.
 
 ## Was noch nicht umgesetzt ist
 
@@ -358,8 +375,9 @@ Mit `--format json` ist die Ausgabe maschinenlesbar.
 - **`scope_guard`**: warnt nur bei Dateizahl-Schwelle, NICHT bei fehlendem
   Testlauf — ob Tests liefen, ist ohne CI-Anbindung nicht zuverlaessig
   feststellbar (Faktentreue: kein geratener Fakt im Meldungstext).
-- **Verifikations-Erinnerung** und **Regelerinnerung zum passenden
-  Zeitpunkt** (ROADMAP v0.2): noch nicht gebaute Checks.
+- **Verifikations-Erinnerung** und die weiteren spezialisierten
+  **Regelerinnerungen** aus T-20260731-05 (ROADMAP v0.2): Der opt-in
+  Session-Hygiene-Slice ist gebaut; die übrigen Anforderungen bleiben offen.
 - **Custom-Adapter per entry_point** (ROADMAP v0.3): noch nicht gebaut.
 - **Automatisches Eintragen des `claude`-Hook-Snippets** in eine echte
   `settings.json` (bleibt bewusst manuell).

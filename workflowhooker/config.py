@@ -61,6 +61,7 @@ class InjectorsConfig:
 
     goal: bool = False
     loop: bool = False
+    session_hygiene: bool = False
 
 
 VALID_SOURCES = ("files", "git", "taskplan", "goal")
@@ -179,9 +180,14 @@ def _config_from_dict(data: dict) -> Config:
     # ``{ enabled = true }`` table so hand-written configs remain forgiving.
     goal_value = injectors_data.get("goal", injectors_data.get("goal_injector", False))
     loop_value = injectors_data.get("loop", injectors_data.get("loop_injector", False))
+    hygiene_value = injectors_data.get(
+        "session_hygiene",
+        injectors_data.get("session_hygiene_injector", False),
+    )
     injectors = InjectorsConfig(
         goal=_enabled_value(goal_value),
         loop=_enabled_value(loop_value),
+        session_hygiene=_enabled_value(hygiene_value),
     )
 
     sources_data = data.get("sources", {})

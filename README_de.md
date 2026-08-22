@@ -3,7 +3,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Python Version](https://img.shields.io/badge/python-3.10%20|%203.11%20|%203.12%20|%203.13-blue.svg)](pyproject.toml)
 [![CI Status](https://img.shields.io/badge/CI-passing-brightgreen.svg)](.github/workflows/ci.yml)
-[![Tests](https://img.shields.io/badge/tests-112%20passed-brightgreen.svg)](tests)
+[![Tests](https://img.shields.io/badge/tests-119%20passed-brightgreen.svg)](tests)
 [![Platform](https://img.shields.io/badge/platform-Linux%20|%20Windows%20|%20macOS-lightgrey.svg)](pyproject.toml)
 [![Datenschutz](https://img.shields.io/badge/datenschutz-100%25%20Offline%20|%20Zero--Egress-brightgreen.svg)](SECURITY.md)
 [![Sicherheit](https://img.shields.io/badge/sicherheit-Local--First%20|%20Prozess--Isoliert-blue.svg)](SECURITY.md)
@@ -22,7 +22,7 @@
 
 ---
 
-**Status: 0.2.1 — Arbeitsablaufsteuerung & Injektormuster.** (Last-checked: 2026-08-21)
+**Status: 0.2.1 — Arbeitsablaufsteuerung & Injektormuster.** (Last-checked: 2026-08-22)
 
 WorkflowHooker bietet Hooks, die den **Arbeitsablauf** autonomer KI-Agenten steuern — nicht deren Wissen.
 
@@ -144,6 +144,7 @@ sequenceDiagram
 - **Scope Guard (`scope_guard`):** Schutz vor unkontrollierten Großänderungen ohne Zwischenverifikation.
 - **Frequenz-Budget & Cooldown:** Verhindert Spam-Feedback. Ein Hook spricht nur, wenn eine seltene Regel verletzt wird.
 - **Auto-Deaktivierung:** Checks deaktivieren sich selbst, wenn das Fehlermuster nicht mehr auftritt (MetaFeedbackInjector-Muster).
+- **Session-Hygiene (`session_hygiene`):** Optionale, nichtblockierende Hinweise zu Sessionstart/-ende, Quellenprüfung und passenden lokalen Werkzeugen.
 
 ---
 
@@ -171,6 +172,7 @@ Die Injektoren sind opt-in:
 [injectors]
 goal = true       # Ziel/Tasks beim PreCompact-Hook
 loop = true       # lokales Weck-Briefing
+session_hygiene = true  # budgetierte Sessionstart-/-ende-Hinweise
 ```
 
 `goal` liest `AUFGABEN.txt` oder `GOAL.md` sowie projektbezogene offene und
@@ -178,6 +180,22 @@ aktive TASKPLAN-Tasks. `python -m workflowhooker loop-briefing --project-dir .`
 erzeugt für lokale Runtimes ein deterministisches Briefing aus Ziel, Tasks,
 Locks und uncommitteter Arbeit. WorkflowHooker stellt keinen Scheduler; den
 Takt übernimmt Cron, eine Scheduled Task oder die Runtime.
+
+### Session-Hygiene (opt-in, nur Hinweis)
+
+`session_hygiene` nutzt den ersten `UserPromptSubmit` einer Sitzung als
+portablen Starttrigger und `Stop` als Endtrigger. Der Starthinweis verweist auf
+USMC-/Gardener-Kontext, die lokale Skill-Bibliothek sowie einen Quellen- und
+Unsicherheits-Gegencheck. Prompt-Signale für Datum oder OneDrive ergänzen
+einmalige Erinnerungen an `fc_get_time` beziehungsweise FileCommander-`fc_*`.
+Jedes Thema erscheint höchstens einmal pro Sitzung und teilt sich das
+vorhandene Meldungsbudget und den Cooldown.
+
+Der Injector ist eine Arbeitshilfe, keine Ausführungsmaschine: Er fragt
+Gardener nicht ab, schreibt keinen USMC-State, greift nicht auf OneDrive zu und
+speichert keinen Prompttext. Selbst bei `Stop --block` bleibt er
+nichtblockierend; nur ein echter Check-Befund darf den vorhandenen
+Blockier-Exitcode verwenden. MemoryHooker bleibt für Wissensabruf zuständig.
 
 ## Ökosystem & Geschwisterwerkzeuge
 

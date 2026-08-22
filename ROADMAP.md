@@ -1,6 +1,6 @@
 # WorkflowHooker — Roadmap
 
-**Stand 2026-08-08:** Das Gerüst ist als opt-in WorkflowHooker-MVP umgesetzt;
+**Stand 2026-08-22:** Das Gerüst ist als opt-in WorkflowHooker-MVP umgesetzt;
 Provider-Scheduler bleiben bewusst außerhalb dieses Moduls.
 
 ## v0.1 — Ein einziger Hook, gut gemacht
@@ -34,6 +34,12 @@ Jeder Check ist ein eigener Schalter. Keiner ist per Default an, bis er sich bew
 - [x] Drift-Warnung (Arbeit entfernt sich von der Aufgabe) — 0.1.0 als Proxy-Heuristik
 - [x] Umfangswächter (Lauf wächst über sein Budget) — 0.1.0 als `scope_guard`
 - [ ] Regelerinnerung zum passenden Zeitpunkt
+- [x] **Session-Hygiene-Slice (T-20260731-05, 2026-08-22):** Der erste
+  `UserPromptSubmit` einer Sitzung erinnert opt-in an USMC-/Gardener-Kontext,
+  Skill-Finder sowie Quellen- und Unsicherheitsprüfung. Zeit- und
+  OneDrive-Signale ergänzen einmalige FileCommander-Hinweise; `Stop` erinnert
+  an den USMC-Handoff. Alle Hinweise teilen Budget/Cooldown und bleiben auch
+  unter `--block` advisory. Die übrigen Ticketanforderungen bleiben offen.
 - [x] **`goal_injector` / Aufgaben-Injektor [U 2026-07-23]:** erinnert an das ZIEL der
   Sitzung — die positive Hälfte der Drift-Warnung („das Ziel war X" statt „du
   streust"). Ziel-Quellen über StateSources: `taskplan` (aktive Task), Goal-Datei

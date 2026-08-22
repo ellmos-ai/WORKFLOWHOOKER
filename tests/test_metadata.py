@@ -65,7 +65,7 @@ def test_llms_txt_integrity():
     llms_path = ROOT / "llms.txt"
     assert llms_path.is_file()
     content = llms_path.read_text(encoding="utf-8")
-    assert "Last-checked: 2026-08-21" in content
+    assert "Last-checked: 2026-08-22" in content
     assert "workflowhooker" in content
     assert "ellmos-ai" in content
     assert "open-bricks" in content
@@ -79,7 +79,9 @@ def test_readme_badges_and_ecosystem_parity():
         assert "ellmos--ai" in content
         assert "open--bricks" in content
         assert "llms.txt" in content
-        assert "2026-08-21" in content
+        assert "2026-08-22" in content
+        assert "119%20passed" in content
+        assert "session_hygiene" in content
         assert "SECURITY.md" in content
         assert "memoryhooker" in content
         assert "system-explorer" in content

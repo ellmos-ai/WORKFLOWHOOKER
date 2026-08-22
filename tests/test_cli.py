@@ -15,7 +15,14 @@ def _git(args: list[str], cwd: Path) -> None:
 needs_git = pytest.mark.skipif(shutil.which("git") is None, reason="git nicht installiert")
 
 
-def _write_config(tmp_path: Path, *, checks: list[str], max_messages=3, cooldown_minutes=0) -> Path:
+def _write_config(
+    tmp_path: Path,
+    *,
+    checks: list[str],
+    max_messages=3,
+    cooldown_minutes=0,
+    session_hygiene=False,
+) -> Path:
     checks_toml = json.dumps(checks)
     path = tmp_path / "workflowhooker.toml"
     path.write_text(
@@ -27,6 +34,9 @@ cooldown_minutes = {cooldown_minutes}
 
 [checks.scope_guard]
 max_changed_files = 1
+
+[injectors]
+session_hygiene = {str(session_hygiene).lower()}
 """,
         encoding="utf-8",
     )
@@ -398,3 +408,151 @@ def test_hook_run_block_is_rejected_for_userpromptsubmit(tmp_path, capsys, monke
     )
     assert exit_code == 1
     assert "--block" in capsys.readouterr().err
+
+
+def test_session_hygiene_start_and_later_onedrive_hint_are_each_once(
+    tmp_path, capsys, monkeypatch
+):
+    config_path = _write_config(tmp_path, checks=[], session_hygiene=True)
+    state_dir = tmp_path / "state"
+
+    assert _hook_run(
+        config_path,
+        state_dir,
+        tmp_path,
+        {"session_id": "hygiene", "prompt": "Analysiere das Projekt."},
+        monkeypatch,
+        event="UserPromptSubmit",
+    ) == 0
+    first = json.loads(capsys.readouterr().out)
+    first_message = first["hookSpecificOutput"]["additionalContext"]
+    assert "Sessionstart" in first_message
+    assert "fc_get_time" not in first_message
+
+    assert _hook_run(
+        config_path,
+        state_dir,
+        tmp_path,
+        {"session_id": "hygiene", "prompt": "Prüfe X:\\Example\\OneDrive\\x"},
+        monkeypatch,
+        event="UserPromptSubmit",
+    ) == 0
+    second = json.loads(capsys.readouterr().out)
+    second_message = second["hookSpecificOutput"]["additionalContext"]
+    assert "OneDrive-Bezug" in second_message
+    assert "Sessionstart" not in second_message
+
+    assert _hook_run(
+        config_path,
+        state_dir,
+        tmp_path,
+        {"session_id": "hygiene", "prompt": "Nochmals OneDrive"},
+        monkeypatch,
+        event="UserPromptSubmit",
+    ) == 0
+    assert capsys.readouterr().out == ""
+
+    assert _hook_run(
+        config_path,
+        state_dir,
+        tmp_path,
+        {"session_id": "hygiene-neu", "prompt": "Neue Sitzung"},
+        monkeypatch,
+        event="UserPromptSubmit",
+    ) == 0
+    new_session = json.loads(capsys.readouterr().out)
+    assert "Sessionstart" in new_session["hookSpecificOutput"]["additionalContext"]
+
+
+def test_session_hygiene_stop_block_flag_remains_non_blocking(
+    tmp_path, capsys, monkeypatch
+):
+    import io
+
+    config_path = _write_config(tmp_path, checks=[], session_hygiene=True)
+    monkeypatch.setattr(
+        "sys.stdin",
+        io.StringIO(json.dumps({"session_id": "hygiene-stop"})),
+    )
+
+    exit_code = main(
+        [
+            "--config",
+            str(config_path),
+            "--state-dir",
+            str(tmp_path / "state"),
+            "--project-dir",
+            str(tmp_path),
+            "hook-run",
+            "--format",
+            "plain",
+            "--block",
+            "Stop",
+        ]
+    )
+
+    assert exit_code == 0
+    captured = capsys.readouterr()
+    assert "Sessionende" in captured.out
+    assert captured.err == ""
+
+
+def test_session_hygiene_respects_global_message_budget(tmp_path, capsys, monkeypatch):
+    config_path = _write_config(
+        tmp_path,
+        checks=[],
+        max_messages=1,
+        session_hygiene=True,
+    )
+    state_dir = tmp_path / "state"
+
+    assert _hook_run(
+        config_path,
+        state_dir,
+        tmp_path,
+        {"session_id": "hygiene-budget", "prompt": "Start"},
+        monkeypatch,
+        event="UserPromptSubmit",
+    ) == 0
+    assert capsys.readouterr().out
+
+    assert _hook_run(
+        config_path,
+        state_dir,
+        tmp_path,
+        {"session_id": "hygiene-budget"},
+        monkeypatch,
+        event="Stop",
+    ) == 0
+    assert capsys.readouterr().out == ""
+
+
+def test_session_hygiene_respects_global_cooldown(tmp_path, capsys, monkeypatch):
+    config_path = _write_config(
+        tmp_path,
+        checks=[],
+        max_messages=3,
+        cooldown_minutes=5,
+        session_hygiene=True,
+    )
+    state_dir = tmp_path / "state"
+
+    assert _hook_run(
+        config_path,
+        state_dir,
+        tmp_path,
+        {"session_id": "hygiene-cooldown", "prompt": "Start"},
+        monkeypatch,
+        event="UserPromptSubmit",
+    ) == 0
+    assert capsys.readouterr().out
+
+    assert _hook_run(
+        config_path,
+        state_dir,
+        tmp_path,
+        {"session_id": "hygiene-cooldown"},
+        monkeypatch,
+        event="Stop",
+    ) == 0
+    assert capsys.readouterr().out == ""

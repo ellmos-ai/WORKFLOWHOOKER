@@ -26,7 +26,7 @@ from pathlib import Path
 
 from .checks import CHECK_REGISTRY, CheckRunner
 from .config import Config, load_config
-from .injectors import GoalInjector, LoopInjector
+from .injectors import GoalInjector, LoopInjector, SessionHygieneInjector
 from .providers import PROVIDER_REGISTRY, resolve_provider
 from .providers.claude import ClaudeProvider
 from .sources import (
@@ -241,11 +241,36 @@ def _cmd_hook_run(args) -> int:
     project_dir = args.project_dir or Path.cwd()
 
     message = _run_active_checks(config, project_dir, state)
+    blocking_message = message is not None
     if message is None and args.event == "PreCompact" and config.injectors.goal:
         now = time.time()
         if _message_slot_available(config, state, now):
             message = GoalInjector(_build_state_source(config, project_dir)).generate()
             if message:
+                _record_message(state, now)
+    if message is None and config.injectors.session_hygiene:
+        now = time.time()
+        injector = SessionHygieneInjector()
+        eligible = injector.eligible_topics(
+            event=args.event,
+            prompt=_extract_prompt(payload),
+        )
+        pending = tuple(
+            topic
+            for topic in eligible
+            if state.runtime_for(f"injector:session_hygiene:{topic}").usage_count == 0
+        )
+        if pending and _message_slot_available(config, state, now):
+            message = injector.generate(
+                event=args.event,
+                prompt=_extract_prompt(payload),
+                topics=pending,
+            )
+            if message:
+                for topic in pending:
+                    state.runtime_for(
+                        f"injector:session_hygiene:{topic}"
+                    ).usage_count += 1
                 _record_message(state, now)
     state.save(state_path)
 
@@ -256,7 +281,7 @@ def _cmd_hook_run(args) -> int:
                 "additionalContext": message,
             }
         }
-        if getattr(args, "block", False):
+        if getattr(args, "block", False) and blocking_message:
             # Kimi-Stop-Gate: Exit 2 + stderr blockiert das Turn-Ende und
             # speist die Nachricht als Weiterfuehrung ein (Doku, 2026-07-28).
             # Loop-Bremse: max_messages_per_session + cooldown des Moduls.
@@ -299,6 +324,15 @@ def _extract_session_id(payload: dict) -> str | None:
         return None
     sicher = "".join(z for z in raw if z.isalnum() or z in "-_")[:64]
     return sicher or None
+
+
+def _extract_prompt(payload: dict) -> str:
+    """Read prompt text defensively without retaining it in session state."""
+    for key in ("prompt", "user_prompt", "input"):
+        value = payload.get(key)
+        if isinstance(value, str):
+            return value
+    return ""
 
 
 def _read_stdin_json() -> dict:

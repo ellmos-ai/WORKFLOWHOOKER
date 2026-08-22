@@ -2,6 +2,19 @@
 
 Alle nennenswerten Aenderungen an WorkflowHooker.
 
+## [Unreleased]
+
+### Hinzugefügt (2026-08-22)
+
+- **Opt-in `session_hygiene`-Injector (T-20260731-05, erster Slice):**
+  Budgetierte, pro Sitzung deduplizierte Hinweise zu USMC-/Gardener-Kontext,
+  lokaler Skill-Orientierung, Quellen-/Unsicherheitsprüfung sowie bedingten
+  `fc_get_time`- und OneDrive-`fc_*`-Erinnerungen. `Stop` erinnert an den
+  belegten USMC-Handoff, bleibt aber selbst bei `--block` nichtblockierend.
+- **Design- und Testbeleg:** Vollständige 24-Punkte-Bestandsmatrix unter
+  `docs/T-20260731-05-session-hygiene-design.md`; die offenen Anforderungen
+  werden nicht als umgesetzt ausgewiesen. Gesamtsuite: 119 Tests.
+
 ## [0.2.1] - 2026-08-21
 
 ### Gewartet (2026-08-21)

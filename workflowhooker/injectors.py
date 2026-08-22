@@ -1,12 +1,14 @@
-"""Goal and loop context injectors.
+"""Goal, loop, and session-hygiene context injectors.
 
-Both injectors are pure formatting layers over ``ProjectState``.  They never
+These injectors are pure formatting layers. They never
 schedule work, mutate a source, or infer whether a task is complete.  A
 provider/runtime decides *when* to call them; the CLI's ``loop-briefing``
 command is the local-runtime seam for that wake-up schedule.
 """
 
 from __future__ import annotations
+
+from collections.abc import Iterable
 
 from .protocol import ProjectState, StateSource
 
@@ -90,6 +92,104 @@ class LoopInjector:
     build = generate
 
 
+class SessionHygieneInjector:
+    """Build opt-in, non-blocking workflow reminders for session boundaries.
+
+    The injector only formats guidance. It neither calls the named systems nor
+    stores prompt content. Topic selection lets the runtime remember which
+    one-shot hints were already delivered without coupling this pure layer to
+    the on-disk session-state format.
+    """
+
+    name = "session_hygiene_injector"
+    events = ("UserPromptSubmit", "Stop")
+
+    _TIME_CUES = (
+        "heute",
+        "morgen",
+        "datum",
+        "uhrzeit",
+        "zeit ",
+        "frist",
+        "deadline",
+        "ablauf",
+        "expiry",
+        "judging",
+        "wann",
+        "current date",
+        "current time",
+    )
+    _ONEDRIVE_CUES = ("onedrive", ".topics", ".sync")
+
+    def eligible_topics(self, *, event: str, prompt: str = "") -> tuple[str, ...]:
+        if event == "Stop":
+            return ("end",)
+        if event != "UserPromptSubmit":
+            return ()
+
+        normalized = prompt.casefold()
+        topics = ["start"]
+        if any(cue in normalized for cue in self._TIME_CUES):
+            topics.append("time")
+        if any(cue in normalized for cue in self._ONEDRIVE_CUES):
+            topics.append("onedrive")
+        return tuple(topics)
+
+    def generate(
+        self,
+        *,
+        event: str,
+        prompt: str = "",
+        topics: Iterable[str] | None = None,
+    ) -> str | None:
+        eligible = self.eligible_topics(event=event, prompt=prompt)
+        selected = eligible if topics is None else tuple(
+            topic for topic in topics if topic in eligible
+        )
+        if not selected:
+            return None
+
+        lines = ["[WorkflowHooker] Session-Hygiene (Hinweis, kein Gate):"]
+        if "start" in selected:
+            lines.extend(
+                (
+                    "- Sessionstart: Prüfe den letzten Stand über USMC start/context; "
+                    "halte Zwischenergebnisse mit USMC working fest. Fehlt Kontext, "
+                    "suche zusätzlich mit Gardener.",
+                    "- Werkzeugorientierung: Suche lokale Skills in .AI/.SKILLS über "
+                    "skill-finder beziehungsweise controlcenter_find_skill.",
+                    "- Fakten und Unsicherheit: Prüfe veränderliche oder "
+                    "zitierpflichtige Aussagen mit passenden Web- und "
+                    "Fachdatenbankquellen. Deklariere Nichtwissen, fülle zuerst "
+                    "Kontext/Gedächtnis/Recherche auf und frage sonst den Nutzer, "
+                    "statt zu raten.",
+                    "- Abgrenzung: WorkflowHooker ruft kein Wissen ab; MemoryHooker "
+                    "bleibt für Inhalts-Recall zuständig.",
+                )
+            )
+        if "time" in selected:
+            lines.append(
+                "- Zeitbezug erkannt: Ermittle aktuelle Zeit, Datum oder Frist mit "
+                "FileCommander fc_get_time; rate sie nicht."
+            )
+        if "onedrive" in selected:
+            lines.append(
+                "- OneDrive-Bezug erkannt: Nutze verfügbare FileCommander-"
+                "Werkzeuge mit fc_*-Präfix. Dieser Hinweis bestätigt nicht, dass FileCommander "
+                "verfügbar ist."
+            )
+        if "end" in selected:
+            lines.append(
+                "- Sessionende: Synchronisiere belegte Ergebnisse, offene "
+                "Unsicherheiten und den Handoff über USMC working/end. "
+                "WorkflowHooker schreibt den USMC-State nicht selbst."
+            )
+        return "\n".join(lines)
+
+    message = generate
+    build = generate
+
+
 def build_goal_message(source: StateSource, state: ProjectState | None = None) -> str | None:
     """Functional seam for runtimes that do not want to instantiate a class."""
     return GoalInjector(source).generate(state)
@@ -128,6 +228,7 @@ def _state_from(source: StateSource | None, state: ProjectState | None) -> Proje
 __all__ = [
     "GoalInjector",
     "LoopInjector",
+    "SessionHygieneInjector",
     "build_goal_message",
     "build_loop_briefing",
     "goal_injector",

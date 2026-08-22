@@ -1,4 +1,4 @@
-from workflowhooker.injectors import GoalInjector, LoopInjector
+from workflowhooker.injectors import GoalInjector, LoopInjector, SessionHygieneInjector
 from workflowhooker.protocol import ProjectState
 
 
@@ -41,3 +41,48 @@ def test_loop_injector_includes_all_runtime_state_sections():
 
 def test_loop_injector_is_silent_for_empty_state():
     assert LoopInjector().generate(ProjectState()) is None
+
+
+def test_session_hygiene_start_covers_context_skills_sources_and_uncertainty():
+    message = SessionHygieneInjector().generate(
+        event="UserPromptSubmit",
+        prompt="Bitte analysiere das Projekt.",
+    )
+
+    assert message is not None
+    assert "Hinweis, kein Gate" in message
+    assert "USMC start/context" in message
+    assert "USMC working" in message
+    assert "Gardener" in message
+    assert ".AI/.SKILLS" in message
+    assert "controlcenter_find_skill" in message
+    assert "Web- und Fachdatenbankquellen" in message
+    assert "Deklariere Nichtwissen" in message
+    assert "MemoryHooker" in message
+    assert "fc_get_time" not in message
+    assert "fc_*-Präfix" not in message
+
+
+def test_session_hygiene_adds_time_and_onedrive_hints_only_on_cues():
+    injector = SessionHygieneInjector()
+    prompt = r"Prüfe heute X:\Example\OneDrive\.TOPICS\.SYNC"
+
+    assert injector.eligible_topics(event="UserPromptSubmit", prompt=prompt) == (
+        "start",
+        "time",
+        "onedrive",
+    )
+    message = injector.generate(event="UserPromptSubmit", prompt=prompt)
+    assert message is not None
+    assert "fc_get_time" in message
+    assert "fc_*-Präfix" in message
+
+
+def test_session_hygiene_stop_is_advisory_and_event_filtered():
+    injector = SessionHygieneInjector()
+
+    stop_message = injector.generate(event="Stop")
+    assert stop_message is not None
+    assert "Sessionende" in stop_message
+    assert "USMC working/end" in stop_message
+    assert injector.generate(event="PreCompact") is None

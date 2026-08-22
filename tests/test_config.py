@@ -12,6 +12,7 @@ def test_default_config_has_no_active_checks():
     assert config.mode.cooldown_minutes == 5
     assert config.providers.order == ["claude", "codex", "git", "manual"]
     assert config.providers.claude_events == ["Stop", "PreCompact", "UserPromptSubmit"]
+    assert config.injectors.session_hygiene is False
 
 
 def test_load_config_missing_file_returns_defaults(tmp_path: Path):
@@ -40,6 +41,7 @@ max_changed_files = 5
 [injectors]
 goal = true
 loop = true
+session_hygiene = { enabled = true }
 """,
         encoding="utf-8",
     )
@@ -51,6 +53,7 @@ loop = true
     assert config.checks.scope_guard.max_changed_files == 5
     assert config.injectors.goal is True
     assert config.injectors.loop is True
+    assert config.injectors.session_hygiene is True
 
 
 def test_load_config_rejects_unknown_check(tmp_path: Path):
