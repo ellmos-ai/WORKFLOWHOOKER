@@ -80,8 +80,9 @@ def test_readme_badges_and_ecosystem_parity():
         assert "open--bricks" in content
         assert "llms.txt" in content
         assert "2026-08-22" in content
-        assert "119%20passed" in content
+        assert "124%20passed" in content
         assert "session_hygiene" in content
+        assert "repository_discipline" in content
         assert "SECURITY.md" in content
         assert "memoryhooker" in content
         assert "system-explorer" in content

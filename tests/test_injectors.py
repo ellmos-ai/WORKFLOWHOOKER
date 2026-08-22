@@ -1,4 +1,10 @@
-from workflowhooker.injectors import GoalInjector, LoopInjector, SessionHygieneInjector
+from workflowhooker.config import RepositoryDisciplineConfig
+from workflowhooker.injectors import (
+    GoalInjector,
+    LoopInjector,
+    RepositoryDisciplineInjector,
+    SessionHygieneInjector,
+)
 from workflowhooker.protocol import ProjectState
 
 
@@ -86,3 +92,71 @@ def test_session_hygiene_stop_is_advisory_and_event_filtered():
     assert "Sessionende" in stop_message
     assert "USMC working/end" in stop_message
     assert injector.generate(event="PreCompact") is None
+
+
+def test_repository_discipline_certifies_dirty_state_without_claiming_ownership():
+    injector = RepositoryDisciplineInjector()
+    state = ProjectState(git_available=True, git_dirty=True, uncommitted_files=3)
+
+    message = injector.generate(
+        state,
+        event="UserPromptSubmit",
+        project_dir=r"X:\Local\repo",
+    )
+
+    assert message is not None
+    assert "Hinweis, kein Gate" in message
+    assert "Git beweist keine Urheberschaft" in message
+    assert "Diff-Review" in message
+    assert "native Tests" in message
+    assert "Secret-Signaturscan" in message
+    assert "Funktionsproben" in message
+    assert "EIN kohärentes Bundle" in message
+    assert "niemals automatisch committen" in message
+    assert "Push ist keine Gate-Bedingung" in message
+    assert "Plan D" not in message
+
+
+def test_repository_discipline_detects_onedrive_path_without_mutating_it():
+    injector = RepositoryDisciplineInjector()
+
+    message = injector.generate(
+        ProjectState(),
+        event="UserPromptSubmit",
+        project_dir=r"X:\Example\OneDrive\.TOPICS\project",
+    )
+
+    assert message is not None
+    assert "Plan D" in message
+    assert "lokalen Spiegel" in message
+    assert "Git-Remote als Sync-Hub" in message
+    assert "neutralen Pointer" in message
+    assert "legt nichts davon automatisch an" in message
+    assert "Push-Policy" not in message
+    assert injector.generate(
+        ProjectState(),
+        event="UserPromptSubmit",
+        project_dir=r"X:\Local\onedrive-client\repo",
+    ) is None
+
+
+def test_repository_discipline_components_and_event_are_configurable():
+    injector = RepositoryDisciplineInjector(
+        RepositoryDisciplineConfig(
+            certify_dirty_worktree=False,
+            prefer_local_git_mirror=False,
+            remind_push_policy=False,
+        )
+    )
+    state = ProjectState(git_available=True, git_dirty=True, uncommitted_files=2)
+
+    assert injector.generate(
+        state,
+        event="UserPromptSubmit",
+        project_dir=r"X:\Example\OneDrive\repo",
+    ) is None
+    assert RepositoryDisciplineInjector().generate(
+        state,
+        event="Stop",
+        project_dir=r"X:\Example\OneDrive\repo",
+    ) is None

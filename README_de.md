@@ -3,7 +3,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Python Version](https://img.shields.io/badge/python-3.10%20|%203.11%20|%203.12%20|%203.13-blue.svg)](pyproject.toml)
 [![CI Status](https://img.shields.io/badge/CI-passing-brightgreen.svg)](.github/workflows/ci.yml)
-[![Tests](https://img.shields.io/badge/tests-119%20passed-brightgreen.svg)](tests)
+[![Tests](https://img.shields.io/badge/tests-124%20passed-brightgreen.svg)](tests)
 [![Platform](https://img.shields.io/badge/platform-Linux%20|%20Windows%20|%20macOS-lightgrey.svg)](pyproject.toml)
 [![Datenschutz](https://img.shields.io/badge/datenschutz-100%25%20Offline%20|%20Zero--Egress-brightgreen.svg)](SECURITY.md)
 [![Sicherheit](https://img.shields.io/badge/sicherheit-Local--First%20|%20Prozess--Isoliert-blue.svg)](SECURITY.md)
@@ -145,6 +145,7 @@ sequenceDiagram
 - **Frequenz-Budget & Cooldown:** Verhindert Spam-Feedback. Ein Hook spricht nur, wenn eine seltene Regel verletzt wird.
 - **Auto-Deaktivierung:** Checks deaktivieren sich selbst, wenn das Fehlermuster nicht mehr auftritt (MetaFeedbackInjector-Muster).
 - **Session-Hygiene (`session_hygiene`):** Optionale, nichtblockierende Hinweise zu Sessionstart/-ende, Quellenprüfung und passenden lokalen Werkzeugen.
+- **Repository-Disziplin (`repository_discipline`):** Optionale Hinweise zu Fremdänderungs-Zertifizierung, Plan D, Bundle-Commits und der Push-Grenze.
 
 ---
 
@@ -173,6 +174,12 @@ Die Injektoren sind opt-in:
 goal = true       # Ziel/Tasks beim PreCompact-Hook
 loop = true       # lokales Weck-Briefing
 session_hygiene = true  # budgetierte Sessionstart-/-ende-Hinweise
+repository_discipline = true  # Git-/Plan-D-/Push-Policy-Hinweise
+
+[repository_discipline]
+certify_dirty_worktree = true
+prefer_local_git_mirror = true
+remind_push_policy = true
 ```
 
 `goal` liest `AUFGABEN.txt` oder `GOAL.md` sowie projektbezogene offene und
@@ -196,6 +203,31 @@ Gardener nicht ab, schreibt keinen USMC-State, greift nicht auf OneDrive zu und
 speichert keinen Prompttext. Selbst bei `Stop --block` bleibt er
 nichtblockierend; nur ein echter Check-Befund darf den vorhandenen
 Blockier-Exitcode verwenden. MemoryHooker bleibt für Wissensabruf zuständig.
+
+### Repository-Disziplin (opt-in, nur Hinweis)
+
+`repository_discipline` liest am `UserPromptSubmit` ausschließlich den
+aktuellen Git-Zustand und den Projektpfad. Ein schmutziger Arbeitsbaum wird
+konservativ behandelt: Git beweist keine Urheberschaft, daher benötigen
+vorbestehende oder unzugeordnete Deltas einen Handoff mit Diff-Review, nativen
+Tests, Secret-Signaturscan und Funktionsproben. Nur ausdrücklich übernommene
+Änderungen gehören in einen kohärenten Bundle-Commit; der Injector committet
+niemals fremde Änderungen.
+
+Für einen Projektpfad unter OneDrive empfiehlt der optionale Plan-D-Hinweis
+einen lokalen Git-/Build-Spiegel, das Git-Remote als Sync-Hub und nur einen
+neutralen Pointer in OneDrive. Ein eigener Policy-Hinweis unterscheidet direkte
+Nutzeraufträge zur konkreten Änderung, die Commit plus Push implizieren können,
+von autonomen Läufen, die eine ausdrückliche schriftliche Push-Freigabe
+benötigen. WorkflowHooker klont, verschiebt, committet und pusht nie; Push ist
+keine Gate-Bedingung.
+
+Das `closing_gate` bleibt objektiv: Nur ein schmutziger Git-Stand ergänzt die
+präzise Ein-Bundle-Commit-Erinnerung, und im Hook-Pfad läuft das Gate nur am
+`Stop`-Event. Ein sauberer Stand oder ein reiner Lock-Befund erhält keinen
+Commit-Hinweis; der manuelle Befehl `workflowhooker check` bleibt verfügbar.
+
+Aus T-20260731-05 bleiben die Anforderungen 7 und 13–21 offen.
 
 ## Ökosystem & Geschwisterwerkzeuge
 

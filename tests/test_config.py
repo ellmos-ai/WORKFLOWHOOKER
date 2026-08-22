@@ -13,6 +13,10 @@ def test_default_config_has_no_active_checks():
     assert config.providers.order == ["claude", "codex", "git", "manual"]
     assert config.providers.claude_events == ["Stop", "PreCompact", "UserPromptSubmit"]
     assert config.injectors.session_hygiene is False
+    assert config.injectors.repository_discipline is False
+    assert config.repository_discipline.certify_dirty_worktree is True
+    assert config.repository_discipline.prefer_local_git_mirror is True
+    assert config.repository_discipline.remind_push_policy is True
 
 
 def test_load_config_missing_file_returns_defaults(tmp_path: Path):
@@ -42,6 +46,12 @@ max_changed_files = 5
 goal = true
 loop = true
 session_hygiene = { enabled = true }
+repository_discipline = true
+
+[repository_discipline]
+certify_dirty_worktree = false
+prefer_local_git_mirror = true
+remind_push_policy = false
 """,
         encoding="utf-8",
     )
@@ -54,6 +64,10 @@ session_hygiene = { enabled = true }
     assert config.injectors.goal is True
     assert config.injectors.loop is True
     assert config.injectors.session_hygiene is True
+    assert config.injectors.repository_discipline is True
+    assert config.repository_discipline.certify_dirty_worktree is False
+    assert config.repository_discipline.prefer_local_git_mirror is True
+    assert config.repository_discipline.remind_push_policy is False
 
 
 def test_load_config_rejects_unknown_check(tmp_path: Path):

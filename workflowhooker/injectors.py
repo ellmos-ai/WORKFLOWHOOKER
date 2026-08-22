@@ -9,7 +9,9 @@ command is the local-runtime seam for that wake-up schedule.
 from __future__ import annotations
 
 from collections.abc import Iterable
+from pathlib import Path
 
+from .config import RepositoryDisciplineConfig
 from .protocol import ProjectState, StateSource
 
 
@@ -190,6 +192,96 @@ class SessionHygieneInjector:
     build = generate
 
 
+class RepositoryDisciplineInjector:
+    """Build read-only Git/Plan-D/commit/push policy reminders."""
+
+    name = "repository_discipline_injector"
+    event = "UserPromptSubmit"
+
+    def __init__(self, config: RepositoryDisciplineConfig | None = None):
+        self.config = config or RepositoryDisciplineConfig()
+
+    def eligible_topics(
+        self,
+        state: ProjectState,
+        *,
+        event: str,
+        project_dir: Path | str,
+    ) -> tuple[str, ...]:
+        if event != self.event:
+            return ()
+
+        topics: list[str] = []
+        if (
+            self.config.certify_dirty_worktree
+            and state.git_available
+            and state.git_dirty
+        ):
+            topics.append("dirty_certification")
+        if self.config.prefer_local_git_mirror and _is_onedrive_path(project_dir):
+            topics.append("local_mirror")
+        if self.config.remind_push_policy and state.git_available:
+            topics.append("push_policy")
+        return tuple(topics)
+
+    def generate(
+        self,
+        state: ProjectState,
+        *,
+        event: str,
+        project_dir: Path | str,
+        topics: Iterable[str] | None = None,
+    ) -> str | None:
+        eligible = self.eligible_topics(
+            state,
+            event=event,
+            project_dir=project_dir,
+        )
+        selected = eligible if topics is None else tuple(
+            topic for topic in topics if topic in eligible
+        )
+        if not selected:
+            return None
+
+        lines = ["[WorkflowHooker] Repository-Disziplin (Hinweis, kein Gate):"]
+        if "dirty_certification" in selected:
+            lines.append(
+                f"- Unzugeordneter Dirty-Stand erkannt ({state.uncommitted_files} "
+                "Datei(en)); Git beweist keine Urheberschaft. Behandle "
+                "vorbestehende Deltas bis zum Nachweis als fremd. "
+                "Zertifizierungs-Handoff: Diff-Review, native Tests, "
+                "Secret-Signaturscan und Funktionsproben; danach nur "
+                "ausdrücklich übernommene Änderungen als EIN kohärentes "
+                "Bundle committen. Fremde Deltas niemals automatisch committen."
+            )
+        if "local_mirror" in selected:
+            lines.append(
+                "- OneDrive-Projektpfad erkannt: Git-/Build-Arbeit nach Plan D "
+                "in einem lokalen Spiegel durchführen, das Git-Remote als "
+                "Sync-Hub verwenden und in OneDrive nur einen neutralen Pointer "
+                "belassen. WorkflowHooker legt nichts davon automatisch an."
+            )
+        if "push_policy" in selected:
+            lines.append(
+                "- Push-Policy: Ein direkter Nutzerauftrag zur konkreten Änderung "
+                "darf Commit plus Push implizieren. Im autonomen Lauf nur mit "
+                "ausdrücklichem schriftlichem Pushauftrag pushen. WorkflowHooker "
+                "pusht nie; Push ist keine Gate-Bedingung."
+            )
+        return "\n".join(lines)
+
+    message = generate
+    build = generate
+
+
+def _is_onedrive_path(path: Path | str) -> bool:
+    normalized_parts = (part.casefold() for part in Path(path).parts)
+    return any(
+        part == "onedrive" or part.startswith("onedrive - ")
+        for part in normalized_parts
+    )
+
+
 def build_goal_message(source: StateSource, state: ProjectState | None = None) -> str | None:
     """Functional seam for runtimes that do not want to instantiate a class."""
     return GoalInjector(source).generate(state)
@@ -228,6 +320,7 @@ def _state_from(source: StateSource | None, state: ProjectState | None) -> Proje
 __all__ = [
     "GoalInjector",
     "LoopInjector",
+    "RepositoryDisciplineInjector",
     "SessionHygieneInjector",
     "build_goal_message",
     "build_loop_briefing",

@@ -6,6 +6,7 @@ from pathlib import Path
 import pytest
 
 from workflowhooker.cli import main
+from workflowhooker.protocol import ProjectState
 
 
 def _git(args: list[str], cwd: Path) -> None:
@@ -22,6 +23,7 @@ def _write_config(
     max_messages=3,
     cooldown_minutes=0,
     session_hygiene=False,
+    repository_discipline=False,
 ) -> Path:
     checks_toml = json.dumps(checks)
     path = tmp_path / "workflowhooker.toml"
@@ -37,6 +39,7 @@ max_changed_files = 1
 
 [injectors]
 session_hygiene = {str(session_hygiene).lower()}
+repository_discipline = {str(repository_discipline).lower()}
 """,
         encoding="utf-8",
     )
@@ -554,5 +557,89 @@ def test_session_hygiene_respects_global_cooldown(tmp_path, capsys, monkeypatch)
         {"session_id": "hygiene-cooldown"},
         monkeypatch,
         event="Stop",
+    ) == 0
+    assert capsys.readouterr().out == ""
+
+
+def test_closing_gate_is_stop_specific_in_hook_path(tmp_path, capsys, monkeypatch):
+    class StaticSource:
+        def snapshot(self):
+            return ProjectState(git_available=True, git_dirty=True, uncommitted_files=2)
+
+    monkeypatch.setattr(
+        "workflowhooker.cli._build_state_source",
+        lambda config, project_dir: StaticSource(),
+    )
+    config_path = _write_config(tmp_path, checks=["closing_gate"])
+    state_dir = tmp_path / "state"
+
+    assert _hook_run(
+        config_path,
+        state_dir,
+        tmp_path,
+        {"session_id": "stop-specific", "prompt": "Arbeite weiter"},
+        monkeypatch,
+        event="UserPromptSubmit",
+    ) == 0
+    assert capsys.readouterr().out == ""
+
+    assert _hook_run(
+        config_path,
+        state_dir,
+        tmp_path,
+        {"session_id": "stop-specific"},
+        monkeypatch,
+        event="Stop",
+    ) == 0
+    payload = json.loads(capsys.readouterr().out)
+    message = payload["hookSpecificOutput"]["additionalContext"]
+    assert "Abschluss-Gate" in message
+    assert "EIN kohärentes Bundle" in message
+
+
+def test_repository_and_session_hints_share_one_budgeted_message(
+    tmp_path, capsys, monkeypatch
+):
+    monkeypatch.setattr(
+        "workflowhooker.cli._build_repository_state",
+        lambda config, project_dir: ProjectState(
+            git_available=True,
+            git_dirty=True,
+            uncommitted_files=4,
+        ),
+    )
+    config_path = _write_config(
+        tmp_path,
+        checks=[],
+        max_messages=1,
+        session_hygiene=True,
+        repository_discipline=True,
+    )
+    state_dir = tmp_path / "state"
+    project_dir = tmp_path / "OneDrive" / "project"
+
+    assert _hook_run(
+        config_path,
+        state_dir,
+        project_dir,
+        {"session_id": "combined", "prompt": "Änderung vorbereiten"},
+        monkeypatch,
+        event="UserPromptSubmit",
+    ) == 0
+    payload = json.loads(capsys.readouterr().out)
+    message = payload["hookSpecificOutput"]["additionalContext"]
+    assert "Session-Hygiene" in message
+    assert "Repository-Disziplin" in message
+    assert "Unzugeordneter Dirty-Stand" in message
+    assert "Plan D" in message
+    assert "Push-Policy" in message
+
+    assert _hook_run(
+        config_path,
+        state_dir,
+        project_dir,
+        {"session_id": "combined", "prompt": "Noch einmal"},
+        monkeypatch,
+        event="UserPromptSubmit",
     ) == 0
     assert capsys.readouterr().out == ""

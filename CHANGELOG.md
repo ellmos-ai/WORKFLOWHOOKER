@@ -6,6 +6,16 @@ Alle nennenswerten Aenderungen an WorkflowHooker.
 
 ### Hinzugefügt (2026-08-22)
 
+- **Opt-in `repository_discipline`-Injector (T-20260731-05, Slice 2):**
+  Nichtblockierender Handoff für unzugeordnete Dirty-Stände mit Diff-Review,
+  nativen Tests, Secret-Signaturscan, Funktionsproben und genau einem
+  übernommenen Bundle-Commit; niemals automatisches Committen fremder Deltas.
+  Konfigurierbare Plan-D-/Pointer- und Push-Policy-Hinweise bleiben reine
+  Beratung ohne Clone-, Datei-, Commit- oder Push-Mutation.
+- **Präzisiertes `closing_gate`:** Bundle-Commit-Erinnerung nur bei Dirty-Git,
+  nicht bei sauberem oder reinem Lock-Stand; im Hook-Pfad nur am belegten
+  `Stop`-Event, während der manuelle Check erhalten bleibt. Session- und
+  Repository-Hinweise teilen eine budgetierte Ausgabe. Gesamtsuite: 124 Tests.
 - **Opt-in `session_hygiene`-Injector (T-20260731-05, erster Slice):**
   Budgetierte, pro Sitzung deduplizierte Hinweise zu USMC-/Gardener-Kontext,
   lokaler Skill-Orientierung, Quellen-/Unsicherheitsprüfung sowie bedingten

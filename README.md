@@ -5,7 +5,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Python Version](https://img.shields.io/badge/python-3.10%20|%203.11%20|%203.12%20|%203.13-blue.svg)](pyproject.toml)
 [![CI Status](https://img.shields.io/badge/CI-passing-brightgreen.svg)](.github/workflows/ci.yml)
-[![Tests](https://img.shields.io/badge/tests-119%20passed-brightgreen.svg)](tests)
+[![Tests](https://img.shields.io/badge/tests-124%20passed-brightgreen.svg)](tests)
 [![Platform](https://img.shields.io/badge/platform-Linux%20|%20Windows%20|%20macOS-lightgrey.svg)](pyproject.toml)
 [![Privacy](https://img.shields.io/badge/privacy-100%25%20Offline%20|%20Zero--Egress-brightgreen.svg)](SECURITY.md)
 [![Security](https://img.shields.io/badge/security-Local--First%20|%20Process--Isolated-blue.svg)](SECURITY.md)
@@ -31,12 +31,13 @@ Umgesetzt: `StateSource`-Protokoll, Config-Schicht (`workflowhooker.toml`,
 `AUFGABEN.txt`/`GOAL.md`) und optionales `taskplan` (projektbezogene offene und
 aktive Tasks), drei einzeln zuschaltbare Checks (`closing_gate`,
 `drift_warning`, `scope_guard`) sowie die opt-in Injektoren `goal` (PreCompact)
-und `loop-briefing` (lokale Weck-Runtimes) sowie `session_hygiene`
-(nichtblockierende Start-/End-Hinweise). Meldungsbudget + Cooldown bleiben
+und `loop-briefing` (lokale Weck-Runtimes), `session_hygiene`
+(nichtblockierende Start-/End-Hinweise) sowie `repository_discipline`
+(Git-/Plan-D-/Push-Policy-Hinweise). Meldungsbudget + Cooldown bleiben
 die gemeinsame 4-Augen-Bremse. Provider `claude`, `codex`, `kimi`
 (Hook-Snippet-Generator ohne `PreToolUse` im Default, optionale separate
 Blocker-Variante) + `manual` (CLI); der `git`-Provider bleibt ein
-dokumentierter Stub. 119 Tests sind grün, darunter echte Temp-Git-Repo-Fixtures.
+dokumentierter Stub. 124 Tests sind grün, darunter echte Temp-Git-Repo-Fixtures.
 
 Hooks, die den **Arbeitsablauf** eines Agenten steuern — nicht sein Wissen.
 
@@ -337,6 +338,12 @@ Die Injektoren bleiben standardmäßig stumm und werden ausdrücklich in
 goal = true       # Ziel/Tasks beim PreCompact-Hook injizieren
 loop = true       # loop-briefing als lokale Runtime-Schnittstelle freigeben
 session_hygiene = true  # budgetierte Session-Start-/End-Hinweise
+repository_discipline = true  # Git-/Plan-D-/Push-Policy-Hinweise
+
+[repository_discipline]
+certify_dirty_worktree = true
+prefer_local_git_mirror = true
+remind_push_policy = true
 ```
 
 Der `PreCompact`-Hook liest das Projektziel aus `AUFGABEN.txt` oder `GOAL.md`
@@ -362,6 +369,29 @@ even when a provider invokes `Stop --block`; only an actual check finding may
 use the existing blocking exit code. MemoryHooker remains responsible for
 knowledge recall.
 
+### Repository discipline (opt-in, advisory)
+
+`repository_discipline` reads only the current Git state and project path on
+`UserPromptSubmit`. A dirty worktree is treated conservatively: Git does not
+prove ownership, so pre-existing or unassigned deltas require a handoff with
+diff review, native tests, a secret-signature scan and functional probes.
+Only explicitly adopted changes belong in one coherent bundle commit; the
+injector never commits foreign changes.
+
+For a project path below OneDrive, the optional Plan D reminder recommends a
+local Git/build mirror, the Git remote as synchronization hub and only a
+neutral pointer in OneDrive. A separate policy reminder distinguishes direct
+user change requests—which may imply commit plus push—from autonomous runs,
+which require explicit written push authorization. WorkflowHooker never
+clones, moves, commits or pushes, and push is never a gate condition.
+
+The `closing_gate` itself remains objective: only a dirty Git state adds the
+precise one-bundle commit reminder, and hook execution evaluates this gate only
+on `Stop`. A clean tree or a lock-only finding does not receive commit advice;
+the manual `workflowhooker check` command remains available.
+
+Remaining T-20260731-05 scope: requirements 7 and 13–21.
+
 ## Was noch nicht umgesetzt ist
 
 - **`git`-Provider**: keine echte Git-Hook-Installation (`pre-commit`,
@@ -377,7 +407,8 @@ knowledge recall.
   feststellbar (Faktentreue: kein geratener Fakt im Meldungstext).
 - **Verifikations-Erinnerung** und die weiteren spezialisierten
   **Regelerinnerungen** aus T-20260731-05 (ROADMAP v0.2): Der opt-in
-  Session-Hygiene-Slice ist gebaut; die übrigen Anforderungen bleiben offen.
+  Session-Hygiene- und Repository-Disziplin-Slice sind gebaut; offen bleiben
+  die Anforderungen 7 und 13–21.
 - **Custom-Adapter per entry_point** (ROADMAP v0.3): noch nicht gebaut.
 - **Automatisches Eintragen des `claude`-Hook-Snippets** in eine echte
   `settings.json` (bleibt bewusst manuell).

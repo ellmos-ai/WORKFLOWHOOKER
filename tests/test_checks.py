@@ -19,6 +19,7 @@ def test_closing_gate_fires_on_lock():
     message = check.evaluate(state, Config())
     assert message is not None
     assert "LOCK.txt" in message
+    assert "Bundle" not in message
 
 
 def test_closing_gate_fires_on_dirty_git():
@@ -27,6 +28,8 @@ def test_closing_gate_fires_on_dirty_git():
     message = check.evaluate(state, Config())
     assert message is not None
     assert "4" in message
+    assert "EIN kohärentes Bundle" in message
+    assert "fremde oder unzugeordnete Deltas nicht automatisch" in message
 
 
 def test_closing_gate_mentions_both_problems_together():

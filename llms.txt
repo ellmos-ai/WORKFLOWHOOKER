@@ -1,7 +1,7 @@
 # workflowhooker
 
 > Last-checked: 2026-08-22
-> Verification: 119/119 Pytest-Tests 100% grün.
+> Verification: 124/124 Pytest-Tests 100% grün.
 
 Canonical repository: https://github.com/ellmos-ai/workflowhooker-provenance
 Owner: ellmos-ai (Ecosystem: open-bricks)
@@ -21,6 +21,7 @@ WorkflowHooker (`ellmos-ai/workflowhooker-provenance`) ist ein Modul im `ellmos-
 - [docs/reference/BACH-injectors.txt](docs/reference/BACH-injectors.txt): Reference of BACH injector patterns as blueprint.
 - `python -m workflowhooker loop-briefing`: deterministic local-runtime wake-up briefing.
 - `[injectors] session_hygiene = true`: opt-in, non-blocking start/end guidance with budget and cooldown.
+- `[injectors] repository_discipline = true`: opt-in dirty-state certification, Plan D mirror/pointer, bundle-commit and push-policy guidance; never mutates Git or files.
 
 ## Disambiguation
 

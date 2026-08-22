@@ -40,6 +40,13 @@ Jeder Check ist ein eigener Schalter. Keiner ist per Default an, bis er sich bew
   OneDrive-Signale ergänzen einmalige FileCommander-Hinweise; `Stop` erinnert
   an den USMC-Handoff. Alle Hinweise teilen Budget/Cooldown und bleiben auch
   unter `--block` advisory. Die übrigen Ticketanforderungen bleiben offen.
+- [x] **Repository-Disziplin-Slice (T-20260731-05, 2026-08-22):** Ein
+  separater opt-in Injector erinnert bei unzugeordnetem Dirty-Stand an den
+  Zertifizierungs-Handoff, bei OneDrive-Projektpfaden an lokalen
+  Spiegel/Pointer nach Plan D und in Git-Projekten an die Push-Grenze zwischen
+  Direktkontakt und autonomem Lauf. Er mutiert weder Dateien noch Git. Das
+  Closing-Gate ergänzt nur bei Dirty-Git eine präzise Bundle-Commit-Erinnerung
+  und wird im Hook-Pfad ausschließlich am `Stop`-Event ausgewertet.
 - [x] **`goal_injector` / Aufgaben-Injektor [U 2026-07-23]:** erinnert an das ZIEL der
   Sitzung — die positive Hälfte der Drift-Warnung („das Ziel war X" statt „du
   streust"). Ziel-Quellen über StateSources: `taskplan` (aktive Task), Goal-Datei

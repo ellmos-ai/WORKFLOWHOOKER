@@ -26,7 +26,12 @@ from pathlib import Path
 
 from .checks import CHECK_REGISTRY, CheckRunner
 from .config import Config, load_config
-from .injectors import GoalInjector, LoopInjector, SessionHygieneInjector
+from .injectors import (
+    GoalInjector,
+    LoopInjector,
+    RepositoryDisciplineInjector,
+    SessionHygieneInjector,
+)
 from .providers import PROVIDER_REGISTRY, resolve_provider
 from .providers.claude import ClaudeProvider
 from .sources import (
@@ -141,17 +146,33 @@ def _build_state_source(config: Config, project_dir: Path) -> CompositeStateSour
     )
 
 
-def _run_active_checks(config: Config, project_dir: Path, state: SessionState, *, now: float | None = None) -> str | None:
+def _run_active_checks(
+    config: Config,
+    project_dir: Path,
+    state: SessionState,
+    *,
+    event: str | None = None,
+    now: float | None = None,
+) -> str | None:
     now = time.time() if now is None else now
 
     if not _message_slot_available(config, state, now):
+        return None
+
+    applicable_checks = []
+    for check_name in config.mode.checks:
+        check = CHECK_REGISTRY[check_name]
+        events = getattr(check, "events", None)
+        if event is None or events is None or event in events:
+            applicable_checks.append(check_name)
+    if not applicable_checks:
         return None
 
     source = _build_state_source(config, project_dir)
     project_state = source.snapshot()
 
     runner = CheckRunner(CHECK_REGISTRY)
-    for check_name in config.mode.checks:
+    for check_name in applicable_checks:
         runtime = state.runtime_for(check_name)
         message = runner.run(check_name, project_state, config, runtime)
         if message is not None:
@@ -240,7 +261,7 @@ def _cmd_hook_run(args) -> int:
     state = SessionState.load(state_path)
     project_dir = args.project_dir or Path.cwd()
 
-    message = _run_active_checks(config, project_dir, state)
+    message = _run_active_checks(config, project_dir, state, event=args.event)
     blocking_message = message is not None
     if message is None and args.event == "PreCompact" and config.injectors.goal:
         now = time.time()
@@ -248,30 +269,14 @@ def _cmd_hook_run(args) -> int:
             message = GoalInjector(_build_state_source(config, project_dir)).generate()
             if message:
                 _record_message(state, now)
-    if message is None and config.injectors.session_hygiene:
-        now = time.time()
-        injector = SessionHygieneInjector()
-        eligible = injector.eligible_topics(
+    if message is None:
+        message = _run_advisory_injectors(
+            config,
+            project_dir,
+            state,
             event=args.event,
             prompt=_extract_prompt(payload),
         )
-        pending = tuple(
-            topic
-            for topic in eligible
-            if state.runtime_for(f"injector:session_hygiene:{topic}").usage_count == 0
-        )
-        if pending and _message_slot_available(config, state, now):
-            message = injector.generate(
-                event=args.event,
-                prompt=_extract_prompt(payload),
-                topics=pending,
-            )
-            if message:
-                for topic in pending:
-                    state.runtime_for(
-                        f"injector:session_hygiene:{topic}"
-                    ).usage_count += 1
-                _record_message(state, now)
     state.save(state_path)
 
     if message:
@@ -294,6 +299,83 @@ def _cmd_hook_run(args) -> int:
         else:
             print(json.dumps(output, ensure_ascii=False))
     return 0
+
+
+def _run_advisory_injectors(
+    config: Config,
+    project_dir: Path,
+    state: SessionState,
+    *,
+    event: str,
+    prompt: str,
+    now: float | None = None,
+) -> str | None:
+    now = time.time() if now is None else now
+    if not _message_slot_available(config, state, now):
+        return None
+
+    messages: list[str] = []
+    delivered: list[tuple[str, str]] = []
+
+    if config.injectors.session_hygiene:
+        hygiene = SessionHygieneInjector()
+        eligible = hygiene.eligible_topics(event=event, prompt=prompt)
+        pending = _pending_topics(state, "session_hygiene", eligible)
+        hygiene_message = hygiene.generate(
+            event=event,
+            prompt=prompt,
+            topics=pending,
+        )
+        if hygiene_message:
+            messages.append(hygiene_message)
+            delivered.extend(("session_hygiene", topic) for topic in pending)
+
+    if config.injectors.repository_discipline:
+        repository = RepositoryDisciplineInjector(config.repository_discipline)
+        if event == repository.event:
+            repository_state = _build_repository_state(config, project_dir)
+            eligible = repository.eligible_topics(
+                repository_state,
+                event=event,
+                project_dir=project_dir,
+            )
+            pending = _pending_topics(state, "repository_discipline", eligible)
+            repository_message = repository.generate(
+                repository_state,
+                event=event,
+                project_dir=project_dir,
+                topics=pending,
+            )
+            if repository_message:
+                messages.append(repository_message)
+                delivered.extend(
+                    ("repository_discipline", topic) for topic in pending
+                )
+
+    if not messages:
+        return None
+
+    for injector_name, topic in delivered:
+        state.runtime_for(f"injector:{injector_name}:{topic}").usage_count += 1
+    _record_message(state, now)
+    return "\n\n".join(messages)
+
+
+def _build_repository_state(config: Config, project_dir: Path):
+    git_dir = Path(config.sources.git_dir) if config.sources.git_dir else project_dir
+    return GitStateSource(git_dir).snapshot()
+
+
+def _pending_topics(
+    state: SessionState,
+    injector_name: str,
+    topics: tuple[str, ...],
+) -> tuple[str, ...]:
+    return tuple(
+        topic
+        for topic in topics
+        if state.runtime_for(f"injector:{injector_name}:{topic}").usage_count == 0
+    )
 
 
 def _message_slot_available(config: Config, state: SessionState, now: float) -> bool:

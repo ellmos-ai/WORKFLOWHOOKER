@@ -43,6 +43,15 @@ class ChecksConfig:
 
 
 @dataclass
+class RepositoryDisciplineConfig:
+    """Fine-grained switches for the opt-in repository advisory."""
+
+    certify_dirty_worktree: bool = True
+    prefer_local_git_mirror: bool = True
+    remind_push_policy: bool = True
+
+
+@dataclass
 class ProvidersConfig:
     order: list[str] = field(default_factory=lambda: ["claude", "codex", "git", "manual"])
     claude_events: list[str] = field(
@@ -62,6 +71,7 @@ class InjectorsConfig:
     goal: bool = False
     loop: bool = False
     session_hygiene: bool = False
+    repository_discipline: bool = False
 
 
 VALID_SOURCES = ("files", "git", "taskplan", "goal")
@@ -99,6 +109,9 @@ class Config:
     checks: ChecksConfig = field(default_factory=ChecksConfig)
     providers: ProvidersConfig = field(default_factory=ProvidersConfig)
     injectors: InjectorsConfig = field(default_factory=InjectorsConfig)
+    repository_discipline: RepositoryDisciplineConfig = field(
+        default_factory=RepositoryDisciplineConfig
+    )
     sources: SourcesConfig = field(default_factory=SourcesConfig)
 
     def validate(self) -> None:
@@ -184,10 +197,26 @@ def _config_from_dict(data: dict) -> Config:
         "session_hygiene",
         injectors_data.get("session_hygiene_injector", False),
     )
+    repository_value = injectors_data.get(
+        "repository_discipline",
+        injectors_data.get("repository_discipline_injector", False),
+    )
     injectors = InjectorsConfig(
         goal=_enabled_value(goal_value),
         loop=_enabled_value(loop_value),
         session_hygiene=_enabled_value(hygiene_value),
+        repository_discipline=_enabled_value(repository_value),
+    )
+
+    repository_data = data.get("repository_discipline", {})
+    repository_discipline = RepositoryDisciplineConfig(
+        certify_dirty_worktree=bool(
+            repository_data.get("certify_dirty_worktree", True)
+        ),
+        prefer_local_git_mirror=bool(
+            repository_data.get("prefer_local_git_mirror", True)
+        ),
+        remind_push_policy=bool(repository_data.get("remind_push_policy", True)),
     )
 
     sources_data = data.get("sources", {})
@@ -206,6 +235,7 @@ def _config_from_dict(data: dict) -> Config:
         checks=checks,
         providers=providers,
         injectors=injectors,
+        repository_discipline=repository_discipline,
         sources=sources,
     )
 
