@@ -24,7 +24,7 @@
 
 ---
 
-**Status: 0.2.1 — Autonomous Workflow Governance & Injector Engine.** (Last-checked: 2026-08-24)
+**Status: 0.2.2 — Autonomous Workflow Governance & Injector Engine.** (Last-checked: 2026-08-24)
 
 Umgesetzt: `StateSource`-Protokoll, Config-Schicht (`workflowhooker.toml`,
 `checks = []` per Default), read-only Adapter `git`, `files` (LOCK*.txt und
@@ -32,10 +32,10 @@ Umgesetzt: `StateSource`-Protokoll, Config-Schicht (`workflowhooker.toml`,
 aktive Tasks), drei einzeln zuschaltbare Checks (`closing_gate`,
 `drift_warning`, `scope_guard`) sowie die opt-in Injektoren `goal` (PreCompact)
 und `loop-briefing` (lokale Weck-Runtimes). Meldungsbudget + Cooldown bleiben
-die gemeinsame 4-Augen-Bremse. Provider `claude`, `codex`, `kimi`
+die gemeinsame 4-Augen-Bremse. Provider `claude`, `codex`, `kimi`, `agy`
 (Hook-Snippet-Generator ohne `PreToolUse` im Default, optionale separate
 Blocker-Variante) + `manual` (CLI); der `git`-Provider bleibt ein
-dokumentierter Stub. 117 Tests sind grün, darunter echte Temp-Git-Repo-Fixtures.
+dokumentierter Stub. 120 Tests sind gruen, darunter echte Temp-Git-Repo-Fixtures.
 
 Hooks, die den **Arbeitsablauf** eines Agenten steuern — nicht sein Wissen.
 
@@ -69,6 +69,7 @@ graph TD
         ClaudeProvider["Claude Code Hooks (Stop / UserPromptSubmit)"]
         CodexProvider["Codex CLI Provider"]
         KimiProvider["Kimi Code Provider (Stop / UserPromptSubmit)"]
+        AgyProvider["Antigravity Provider (PreInvocation only)"]
         GitHookProvider["Git Hook Provider (pre-commit / pre-push)"]
         CLIProvider["Manual CLI (python -m workflowhooker)"]
     end
@@ -87,6 +88,7 @@ graph TD
     BudgetCooldown --> ClaudeProvider
     BudgetCooldown --> CodexProvider
     BudgetCooldown --> KimiProvider
+    BudgetCooldown --> AgyProvider
     BudgetCooldown --> GitHookProvider
     BudgetCooldown --> CLIProvider
 ```
@@ -148,7 +150,7 @@ sequenceDiagram
 | **Budgeting & Anti-Spam Guard** | Maximum 3 messages/session | Configurable message budget and cooldown intervals prevent runaway prompt flooding and context window inflation. |
 | **Fail-Closed Closing Gate** | Clean work verification | Prevents premature session exits when uncommitted git diffs, dangling `LOCK*.txt` files, or unfulfilled task items remain. |
 | **Target & Loop Injectors** | PreCompact & wake-up briefings | Enriches context with project goals from `AUFGABEN.txt`/`GOAL.md` and active TASKPLAN items during pre-compact and scheduled wake-up cycles. |
-| **Universal Multi-Runtime Support** | Provider decoupling | Pluggable provider architecture supporting Claude Code (`Stop`, `UserPromptSubmit`, `PreCompact`), Codex CLI, Kimi Code, and manual CLI. |
+| **Universal Multi-Runtime Support** | Provider decoupling | Pluggable provider architecture supporting Claude Code (`Stop`, `UserPromptSubmit`, `PreCompact`), Codex CLI, Kimi Code, Antigravity (agy), and manual CLI. |
 | **Zero Runtime Dependencies** | Extreme portability | Zero external Python package requirements for runtime execution (standard library only; `pytest` and `ruff` for development). |
 
 ---
@@ -367,6 +369,11 @@ Mit `--format json` ist die Ausgabe maschinenlesbar.
 - **Codex-Laufzeitfreigabe**: Provider und Snippet sind implementiert und direkt getestet; die
   jeweilige Codex-Installation muss `~/.codex/hooks.json` dennoch interaktiv über `/hooks`
   freigeben.
+- **agy-Abschluss-Gate**: Fuer Antigravity ist nur `PreInvocation` ->
+  `UserPromptSubmit` verdrahtet (analog `memoryhooker/providers/agy.py`,
+  [G 2026-07-25]). Ein Sitzungsende- oder Vor-Kompaktierungs-Event ist fuer
+  agy NICHT dokumentiert, daher hat `closing_gate` dort KEINE native
+  Bindung -- dokumentierte Luecke, kein geratener Ersatz.
 - **`drift_warning`**: reine Proxy-Heuristik (Streuung ueber Top-Level-
   Ordner) — versteht die eigentliche Aufgabe nicht und kann das laut README
   auch nicht (Ermessensfrage).

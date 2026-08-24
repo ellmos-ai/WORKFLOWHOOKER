@@ -2,6 +2,12 @@
 
 Alle nennenswerten Aenderungen an WorkflowHooker.
 
+## [0.2.2] - 2026-08-24
+
+### Hinzugefuegt (2026-08-24)
+
+- **agy-Provider (Antigravity):** `workflowhooker/providers/agy.py` analog zu `memoryhooker/providers/agy.py` ([G 2026-07-25]) ergaenzt und in `PROVIDER_REGISTRY` registriert. Nur `PreInvocation -> UserPromptSubmit` ist verdrahtet; `PostToolUse` bleibt bewusst unverdrahtet (kein Pro-Tool-Aufruf-Befehl in WorkflowHooker). Dokumentierte Luecke: `closing_gate`/`Stop` hat fuer agy KEINE native Bindung, da kein Sitzungsende-Event bekannt ist -- Fallback bleibt `git`/`manual`. 3 neue Tests (`test_agy_provider_never_emits_pretooluse`, `test_agy_provider_always_available`, `test_resolve_provider_picks_agy_when_ordered`); `test_registry_has_all_five` -> `test_registry_has_all_six`. Live-Probe entfaellt: agy@ASUS-GEI ist seit 2026-08-22 offline (T-20260824-186687831); Unit-Ebene ist verifiziert (120/120 Tests gruen, `ruff check .` clean), Live-Nachweis folgt nach agy-Rueckkehr.
+
 ## [0.2.1] - 2026-08-24
 
 ### Gewartet (2026-08-24)

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from ..config import ProvidersConfig
 from .base import Provider, UnimplementedProvider
+from .agy import AgyProvider
 from .claude import ClaudeProvider
 from .codex import CodexProvider
 from .git import GitProvider
@@ -16,6 +17,7 @@ PROVIDER_REGISTRY: dict[str, Provider] = {
     "git": GitProvider(),
     "manual": ManualProvider(),
     "kimi": KimiProvider(),
+    "agy": AgyProvider(),
 }
 
 __all__ = [
@@ -26,6 +28,7 @@ __all__ = [
     "GitProvider",
     "ManualProvider",
     "KimiProvider",
+    "AgyProvider",
     "PROVIDER_REGISTRY",
     "resolve_provider",
 ]

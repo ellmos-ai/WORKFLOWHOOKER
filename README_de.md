@@ -24,7 +24,7 @@
 
 ---
 
-**Status: 0.2.1 — Arbeitsablaufsteuerung & Injektormuster.** (Last-checked: 2026-08-24)
+**Status: 0.2.2 — Arbeitsablaufsteuerung & Injektormuster.** (Last-checked: 2026-08-24)
 
 WorkflowHooker bietet Hooks, die den **Arbeitsablauf** autonomer KI-Agenten steuern — nicht deren Wissen.
 
@@ -60,6 +60,7 @@ graph TD
         ClaudeProvider["Claude Code Hooks (Stop / UserPromptSubmit)"]
         CodexProvider["Codex CLI Provider"]
         KimiProvider["Kimi Code Provider (Stop / UserPromptSubmit)"]
+        AgyProvider["Antigravity Provider (PreInvocation only)"]
         GitHookProvider["Git Hook Provider (pre-commit / pre-push)"]
         CLIProvider["Manuelle CLI (python -m workflowhooker)"]
     end
@@ -78,6 +79,7 @@ graph TD
     BudgetCooldown --> ClaudeProvider
     BudgetCooldown --> CodexProvider
     BudgetCooldown --> KimiProvider
+    BudgetCooldown --> AgyProvider
     BudgetCooldown --> GitHookProvider
     BudgetCooldown --> CLIProvider
 ```
