@@ -10,7 +10,7 @@ import workflowhooker
 def test_package_metadata():
     """Verify workflowhooker package version is defined."""
     assert hasattr(workflowhooker, "__version__")
-    assert workflowhooker.__version__ == "0.2.2"
+    assert workflowhooker.__version__ == "0.2.3"
 
 
 def test_manifest_validity():

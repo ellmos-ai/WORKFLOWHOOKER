@@ -24,7 +24,7 @@
 
 ---
 
-**Status: 0.2.2 — Arbeitsablaufsteuerung & Injektormuster.** (Last-checked: 2026-08-24)
+**Status: 0.2.3 — Arbeitsablaufsteuerung & Injektormuster.** (Last-checked: 2026-08-24)
 
 WorkflowHooker bietet Hooks, die den **Arbeitsablauf** autonomer KI-Agenten steuern — nicht deren Wissen.
 
@@ -173,6 +173,12 @@ sequenceDiagram
 3. Manuell ausführen: `python -m workflowhooker check` (prüft Projektordner + Git-Status des Arbeitsverzeichnisses).
 4. Claude-Code-Hook generieren: `python -m workflowhooker install-snippet --out snippet.json` erzeugt den `Stop`/`PreCompact`/`UserPromptSubmit`-Block.
 5. Codex-Hook generieren: `python -m workflowhooker install-snippet --provider codex --out snippet.json`.
+
+---
+
+## Kandidaten-Sammler fuer Skill-/Workflow-Extraktion (opt-in)
+
+Trennt den LEICHTEN Live-Hook vom TEUREN Extraktionsschritt: `candidate-collect <Stop|SessionEnd> --provider <name>` schreibt hoechstens EIN redigiertes Envelope (Zeiger, keine Transkriptinhalte) pro Sitzung — stumm, idempotent, fail-open, nur bei `[candidates] enabled = true` aktiv. `candidate-extract [--clear]` ist der rein lesende Offline-Schritt und verweist auf `skill-extractor`/`workflow-extract` als eigentliche Ausfuehrende. Aktivierung bleibt manuell und opt-in je Akteur (kein automatisches Eintragen in `settings.json`/`hooks.json`). Details: `README.md`, Abschnitt "Kandidaten-Sammler fuer Skill-/Workflow-Extraktion".
 
 ---
 

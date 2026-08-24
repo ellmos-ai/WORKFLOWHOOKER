@@ -24,7 +24,7 @@
 
 ---
 
-**Status: 0.2.2 — Autonomous Workflow Governance & Injector Engine.** (Last-checked: 2026-08-24)
+**Status: 0.2.3 — Autonomous Workflow Governance & Injector Engine.** (Last-checked: 2026-08-24)
 
 Umgesetzt: `StateSource`-Protokoll, Config-Schicht (`workflowhooker.toml`,
 `checks = []` per Default), read-only Adapter `git`, `files` (LOCK*.txt und
@@ -35,7 +35,7 @@ und `loop-briefing` (lokale Weck-Runtimes). Meldungsbudget + Cooldown bleiben
 die gemeinsame 4-Augen-Bremse. Provider `claude`, `codex`, `kimi`, `agy`
 (Hook-Snippet-Generator ohne `PreToolUse` im Default, optionale separate
 Blocker-Variante) + `manual` (CLI); der `git`-Provider bleibt ein
-dokumentierter Stub. 120 Tests sind gruen, darunter echte Temp-Git-Repo-Fixtures.
+dokumentierter Stub. 141 Tests sind gruen, darunter echte Temp-Git-Repo-Fixtures.
 
 Hooks, die den **Arbeitsablauf** eines Agenten steuern — nicht sein Wissen.
 
@@ -342,6 +342,47 @@ der Hook-Schicht.
 5. Für Codex erzeugt `python -m workflowhooker install-snippet --provider codex --out
    snippet.json` einen Block für `~/.codex/hooks.json`. Codex muss ihn anschließend
    interaktiv über `/hooks` freigeben.
+
+## Kandidaten-Sammler fuer Skill-/Workflow-Extraktion (opt-in)
+
+Trennt bewusst den LEICHTEN Live-Hook vom TEUREN Extraktionsschritt
+(`TODO.md`, Punkt 2). Zwei getrennte Kommandos:
+
+- **`python -m workflowhooker candidate-collect <Stop|SessionEnd> --provider
+  <name>`** — der Live-Hook. Liest dasselbe stdin-JSON wie `hook-run` und
+  schreibt hoechstens EIN redigiertes Envelope pro Sitzung in die
+  Warteschlange (`<state-dir>/candidates.jsonl`): `provider`, `event`,
+  `session_ref`, `source_anchor` (nur der `transcript_path`-ZEIGER aus dem
+  stdin-JSON, falls vorhanden — niemals Transkriptinhalt), ein paar billige
+  `observed`-Zaehler und `redaction = "pointer-only"`. Kein stdout, keine
+  `hookSpecificOutput`-Injektion — der Agent bekommt davon nichts zu sehen.
+  **Stumm per Default:** ohne `[candidates] enabled = true` in der Config
+  ist der Befehl ein No-Op (kein State-Ordner, keine Datei), selbst wenn der
+  Hook versehentlich verdrahtet ist. **Idempotent:** ein mehrfach feuernder
+  Hook (z. B. mehrere Stop-Events in derselben Sitzung) reiht trotzdem nur
+  einmal ein. **Fail-open:** I/O-Fehler beim Schreiben werden verschluckt,
+  der Hook bricht nie ab.
+- **`python -m workflowhooker candidate-extract [--format plain|json]
+  [--clear]`** — der OFFLINE-Schritt. Rein lesend: listet die Warteschlange
+  auf und verweist auf die Skills, die die eigentliche (teure, semantische)
+  Ableitung ausfuehren — **`skill-extractor`** (Chatverlauf →
+  wiederverwendbarer Skill) bzw. **`workflow-extract`** (Chatverlauf/
+  Automations-Prompt → Cron-/Loop-Automatisierung). Dieser Befehl fuehrt
+  selbst KEINE Extraktion aus.
+
+**Aktivierung bleibt manuell und opt-in, pro Akteur:**
+
+```toml
+[candidates]
+enabled = true       # Default: false -- stumm, bis explizit zugestimmt
+max_records = 500    # bounded queue -- aeltere Eintraege fallen zuerst raus
+```
+
+Wie bei `hook-run` gibt es **kein** automatisches Eintragen in eine echte
+`settings.json`/`hooks.json` — jeder Akteur verdrahtet
+`candidate-collect Stop --provider <name>` (bzw. `SessionEnd`, falls der
+Akteur dieses Event kennt) selbst in seinem eigenen Hook-System, analog zu
+den `hook-run`-Beispielen oben.
 
 ## Target & Wake-Up Injectors
 

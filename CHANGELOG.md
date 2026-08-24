@@ -2,6 +2,12 @@
 
 Alle nennenswerten Aenderungen an WorkflowHooker.
 
+## [0.2.3] - 2026-08-24
+
+### Hinzugefuegt (2026-08-24)
+
+- **Kandidaten-Sammler fuer Skill-/Workflow-Extraktion (opt-in):** `workflowhooker/candidates.py` (`CandidateEvent`, `schema_version=1`, `redaction="pointer-only"`) setzt TODO.md-Punkte 1+2 um. Zwei neue CLI-Kommandos: `candidate-collect <Stop|SessionEnd> --provider <name>` ist der LEICHTE Live-Hook -- liest dasselbe stdin-JSON wie `hook-run`, schreibt hoechstens EIN redigiertes Envelope pro Sitzung (Zeiger auf `transcript_path`, niemals Inhalt) in eine bounded JSONL-Warteschlange, ist stumm ohne Ausgabe, idempotent pro Sitzung (`SessionState.candidate_enqueued`), fail-open bei I/O-Fehlern und per Default AUS (`[candidates] enabled = false`). `candidate-extract [--format plain|json] [--clear]` ist der rein lesende OFFLINE-Schritt -- listet die Warteschlange und verweist auf `skill-extractor`/`workflow-extract` als tatsaechliche Ausfuehrende; fuehrt selbst KEINE Extraktion aus (teure Extraktion bleibt bewusst ausserhalb des Hooks). Neue Config-Sektion `[candidates]` (`enabled`, `max_records`). 21 neue Tests (`tests/test_candidates.py` + CLI-/Config-Erweiterungen); 141/141 Tests gruen, `ruff check .` clean. README/README_de dokumentieren Aktivierung als manuellen, opt-in Schritt je Akteur (kein automatisches Eintragen in `settings.json`/`hooks.json`).
+
 ## [0.2.2] - 2026-08-24
 
 ### Hinzugefuegt (2026-08-24)

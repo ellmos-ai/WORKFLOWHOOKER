@@ -398,3 +398,162 @@ def test_hook_run_block_is_rejected_for_userpromptsubmit(tmp_path, capsys, monke
     )
     assert exit_code == 1
     assert "--block" in capsys.readouterr().err
+
+
+def _write_candidates_config(tmp_path: Path, *, enabled: bool = True, max_records: int = 500) -> Path:
+    path = tmp_path / "workflowhooker.toml"
+    path.write_text(
+        f"""
+[candidates]
+enabled = {"true" if enabled else "false"}
+max_records = {max_records}
+""",
+        encoding="utf-8",
+    )
+    return path
+
+
+def test_candidate_collect_is_silent_no_op_without_config(tmp_path, capsys, monkeypatch):
+    """[candidates].enabled defaults to false -- an accidentally wired hook
+    must stay a stumm No-Op (README-Kernregel: nichts ist ohne explizite
+    Zustimmung aktiv)."""
+    state_dir = tmp_path / "state"
+    import io
+
+    monkeypatch.setattr("sys.stdin", io.StringIO(json.dumps({"session_id": "s1", "transcript_path": "/tmp/t.jsonl"})))
+    exit_code = main(
+        ["--state-dir", str(state_dir), "candidate-collect", "Stop", "--provider", "claude"]
+    )
+    assert exit_code == 0
+    assert not state_dir.exists()
+    captured = capsys.readouterr()
+    assert captured.out == "" and captured.err == ""
+
+
+def test_candidate_collect_enqueues_a_pointer_only_envelope(tmp_path, monkeypatch):
+    config_path = _write_candidates_config(tmp_path)
+    state_dir = tmp_path / "state"
+    import io
+
+    monkeypatch.setattr(
+        "sys.stdin",
+        io.StringIO(json.dumps({"session_id": "s1", "cwd": "/proj", "transcript_path": "/proj/t.jsonl"})),
+    )
+    exit_code = main(
+        [
+            "--config", str(config_path), "--state-dir", str(state_dir),
+            "candidate-collect", "Stop", "--provider", "claude",
+        ]
+    )
+    assert exit_code == 0
+
+    from workflowhooker.candidates import default_queue_path, read_all
+
+    events = read_all(default_queue_path(state_dir))
+    assert len(events) == 1
+    assert events[0].provider == "claude"
+    assert events[0].event == "Stop"
+    assert events[0].session_ref == "s1"
+    assert events[0].source_anchor == "/proj/t.jsonl"
+    assert events[0].redaction == "pointer-only"
+
+
+def test_candidate_collect_is_idempotent_per_session(tmp_path, monkeypatch):
+    config_path = _write_candidates_config(tmp_path)
+    state_dir = tmp_path / "state"
+    import io
+
+    for _ in range(3):
+        monkeypatch.setattr("sys.stdin", io.StringIO(json.dumps({"session_id": "same-session"})))
+        assert main(
+            [
+                "--config", str(config_path), "--state-dir", str(state_dir),
+                "candidate-collect", "Stop", "--provider", "claude",
+            ]
+        ) == 0
+
+    from workflowhooker.candidates import default_queue_path, read_all
+
+    events = read_all(default_queue_path(state_dir))
+    assert len(events) == 1, "wiederholte Stop-Aufrufe derselben Sitzung duerfen nicht mehrfach einreihen"
+
+
+def test_candidate_collect_never_emits_output(tmp_path, capsys, monkeypatch):
+    """Der Live-Hook bleibt stumm gegenueber dem Agenten -- keine
+    hookSpecificOutput-Injektion, keine sichtbare Nachricht."""
+    config_path = _write_candidates_config(tmp_path)
+    state_dir = tmp_path / "state"
+    import io
+
+    monkeypatch.setattr("sys.stdin", io.StringIO(json.dumps({"session_id": "s1"})))
+    main(
+        [
+            "--config", str(config_path), "--state-dir", str(state_dir),
+            "candidate-collect", "SessionEnd", "--provider", "codex",
+        ]
+    )
+    captured = capsys.readouterr()
+    assert captured.out == "" and captured.err == ""
+
+
+def test_candidate_extract_lists_enqueued_events_and_points_to_extractor_skills(tmp_path, capsys, monkeypatch):
+    config_path = _write_candidates_config(tmp_path)
+    state_dir = tmp_path / "state"
+    import io
+
+    monkeypatch.setattr("sys.stdin", io.StringIO(json.dumps({"session_id": "s1", "transcript_path": "/x/t.jsonl"})))
+    main(
+        [
+            "--config", str(config_path), "--state-dir", str(state_dir),
+            "candidate-collect", "Stop", "--provider", "claude",
+        ]
+    )
+
+    exit_code = main(["--state-dir", str(state_dir), "candidate-extract"])
+    assert exit_code == 0
+    out = capsys.readouterr().out
+    assert "s1" in out
+    assert "/x/t.jsonl" in out
+    assert "skill-extractor" in out
+    assert "workflow-extract" in out
+
+
+def test_candidate_extract_json_format(tmp_path, capsys, monkeypatch):
+    config_path = _write_candidates_config(tmp_path)
+    state_dir = tmp_path / "state"
+    import io
+
+    monkeypatch.setattr("sys.stdin", io.StringIO(json.dumps({"session_id": "s1"})))
+    main(
+        [
+            "--config", str(config_path), "--state-dir", str(state_dir),
+            "candidate-collect", "Stop", "--provider", "claude",
+        ]
+    )
+
+    main(["--state-dir", str(state_dir), "candidate-extract", "--format", "json"])
+    out = json.loads(capsys.readouterr().out)
+    assert isinstance(out, list)
+    assert out[0]["session_ref"] == "s1"
+
+
+def test_candidate_extract_clear_empties_the_queue(tmp_path, capsys, monkeypatch):
+    config_path = _write_candidates_config(tmp_path)
+    state_dir = tmp_path / "state"
+    import io
+
+    monkeypatch.setattr("sys.stdin", io.StringIO(json.dumps({"session_id": "s1"})))
+    main(
+        [
+            "--config", str(config_path), "--state-dir", str(state_dir),
+            "candidate-collect", "Stop", "--provider", "claude",
+        ]
+    )
+
+    main(["--state-dir", str(state_dir), "candidate-extract", "--clear"])
+    capsys.readouterr()
+
+    exit_code = main(["--state-dir", str(state_dir), "candidate-extract"])
+    assert exit_code == 0
+    out = capsys.readouterr().out
+    assert "Keine Kandidaten-Signale" in out

@@ -11,7 +11,7 @@ from .config import Config, load_config
 from .injectors import GoalInjector, LoopInjector, build_goal_message, build_loop_briefing
 from .protocol import ProjectState, StateSource
 
-__version__ = "0.2.2"
+__version__ = "0.2.3"
 
 __all__ = [
     "ProjectState",

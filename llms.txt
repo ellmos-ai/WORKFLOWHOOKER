@@ -1,7 +1,7 @@
 # workflowhooker
 
 > Last-checked: 2026-08-24
-> Verification: 120/120 Pytest-Tests 100% grün.
+> Verification: 141/141 Pytest-Tests 100% grün.
 
 Canonical repository: https://github.com/ellmos-ai/workflowhooker-provenance
 Owner: ellmos-ai (Ecosystem: open-bricks)

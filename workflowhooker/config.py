@@ -63,6 +63,22 @@ class InjectorsConfig:
     loop: bool = False
 
 
+@dataclass
+class CandidatesConfig:
+    """Opt-in Kandidaten-Sammler fuer die spaetere Skill-/Workflow-Extraktion
+    (``candidate-collect``/``candidate-extract`` in ``cli.py``).
+
+    Bleibt wie alle anderen Mechanismen per Default aus: Der Live-Hook
+    schreibt NUR, wenn ``enabled = true`` gesetzt ist -- selbst ein
+    versehentlich verdrahteter Hook bleibt sonst ein stiller No-Op.
+    ``max_records`` begrenzt die Warteschlangendatei (bounded queue statt
+    unbegrenztem Wachstum).
+    """
+
+    enabled: bool = False
+    max_records: int = 500
+
+
 VALID_SOURCES = ("files", "git", "taskplan", "goal")
 
 
@@ -99,6 +115,7 @@ class Config:
     providers: ProvidersConfig = field(default_factory=ProvidersConfig)
     injectors: InjectorsConfig = field(default_factory=InjectorsConfig)
     sources: SourcesConfig = field(default_factory=SourcesConfig)
+    candidates: CandidatesConfig = field(default_factory=CandidatesConfig)
 
     def validate(self) -> None:
         unknown = [c for c in self.mode.checks if c not in VALID_CHECKS]
@@ -116,6 +133,8 @@ class Config:
                 f"[sources].order enthaelt unbekannte Quellen {unknown_sources}; "
                 f"gueltig sind {VALID_SOURCES}"
             )
+        if self.candidates.max_records < 0:
+            raise ValueError("[candidates].max_records darf nicht negativ sein")
 
 
 def default_config() -> Config:
@@ -195,12 +214,19 @@ def _config_from_dict(data: dict) -> Config:
         ],
     )
 
+    candidates_data = data.get("candidates", {})
+    candidates = CandidatesConfig(
+        enabled=_enabled_value(candidates_data.get("enabled", False)),
+        max_records=candidates_data.get("max_records", CandidatesConfig.max_records),
+    )
+
     return Config(
         mode=mode,
         checks=checks,
         providers=providers,
         injectors=injectors,
         sources=sources,
+        candidates=candidates,
     )
 
 

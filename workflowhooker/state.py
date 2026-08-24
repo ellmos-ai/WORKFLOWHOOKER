@@ -40,6 +40,11 @@ class SessionState:
     # diesem Muster).
     last_message_ts: float | None = None
     checks: dict[str, CheckRuntime] = field(default_factory=dict)
+    # Idempotenz-Guard fuer den Kandidaten-Sammler (candidates.py,
+    # "candidate-collect"): hoechstens EIN Envelope je Sitzung, auch wenn
+    # der Hook mehrfach feuert (4-Augen-Hook-Regel: wiederholter Aufruf darf
+    # nicht mehrfach wirken).
+    candidate_enqueued: bool = False
 
     @classmethod
     def load(cls, path: Path) -> "SessionState":
@@ -58,6 +63,7 @@ class SessionState:
             messages_sent=data.get("messages_sent", 0),
             last_message_ts=data.get("last_message_ts"),
             checks=checks,
+            candidate_enqueued=data.get("candidate_enqueued", False),
         )
 
     def save(self, path: Path) -> None:
@@ -66,6 +72,7 @@ class SessionState:
             "messages_sent": self.messages_sent,
             "last_message_ts": self.last_message_ts,
             "checks": {name: asdict(runtime) for name, runtime in self.checks.items()},
+            "candidate_enqueued": self.candidate_enqueued,
         }
         path.write_text(json.dumps(data), encoding="utf-8")
 

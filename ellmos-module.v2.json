@@ -5,7 +5,7 @@
   "category": "control",
   "kind": "workflow",
   "status": "released",
-  "version": "0.2.2",
+  "version": "0.2.3",
   "visibility": "private",
   "provides": [
     "workflow.hook",

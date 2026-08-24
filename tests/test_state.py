@@ -8,6 +8,7 @@ def test_load_missing_returns_defaults(tmp_path: Path):
     assert state.messages_sent == 0
     assert state.last_message_ts is None
     assert state.checks == {}
+    assert state.candidate_enqueued is False
 
 
 def test_save_and_load_roundtrip(tmp_path: Path):
@@ -42,3 +43,12 @@ def test_state_path_for_session_differs_by_session_id(tmp_path: Path):
     a = state_path_for_session("s1", tmp_path)
     b = state_path_for_session("s2", tmp_path)
     assert a != b
+
+
+def test_candidate_enqueued_roundtrip(tmp_path: Path):
+    path = tmp_path / "state.json"
+    state = SessionState(candidate_enqueued=True)
+    state.save(path)
+
+    loaded = SessionState.load(path)
+    assert loaded.candidate_enqueued is True

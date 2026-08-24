@@ -65,3 +65,31 @@ def test_config_validate_rejects_negative_budget():
     config.mode.max_messages_per_session = -1
     with pytest.raises(ValueError):
         config.validate()
+
+
+def test_candidates_disabled_by_default():
+    config = Config()
+    assert config.candidates.enabled is False
+    assert config.candidates.max_records == 500
+
+
+def test_load_config_parses_candidates_section(tmp_path: Path):
+    path = tmp_path / "workflowhooker.toml"
+    path.write_text(
+        """
+[candidates]
+enabled = true
+max_records = 50
+""",
+        encoding="utf-8",
+    )
+    config = load_config(path)
+    assert config.candidates.enabled is True
+    assert config.candidates.max_records == 50
+
+
+def test_config_validate_rejects_negative_max_records():
+    config = Config()
+    config.candidates.max_records = -1
+    with pytest.raises(ValueError):
+        config.validate()
