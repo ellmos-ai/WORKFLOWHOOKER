@@ -1,7 +1,7 @@
 # workflowhooker
 
-> Last-checked: 2026-08-21
-> Verification: 112/112 Pytest-Tests 100% grün.
+> Last-checked: 2026-08-24
+> Verification: 117/117 Pytest-Tests 100% grün.
 
 Canonical repository: https://github.com/ellmos-ai/workflowhooker-provenance
 Owner: ellmos-ai (Ecosystem: open-bricks)
@@ -44,10 +44,15 @@ ellmos-ai workflowhooker-provenance
 - [policy-registry](https://github.com/ellmos-ai/policy-registry): Declarative security governance and policy enforcement.
 - [ellmos-delegation-authority](https://github.com/ellmos-ai/ellmos-delegation-authority): Multi-agent delegation token and permission authority.
 - [sqlite-transit-sync](https://github.com/ellmos-ai/sqlite-transit-sync): SQLite transactional replication layer.
-- [automation-master](https://github.com/dev-bricks/automation-master): Task queue, lease coordinator and lock orchestration.
-- [DevCenter](https://github.com/dev-bricks/DevCenter): Unified local developer workbench and workspace orchestrator.
-- [CodeBox](https://github.com/dev-bricks/CodeBox): Sandboxed code evaluation, plugin runtime and devtool playground.
-- [open-bricks](https://github.com/open-bricks): Open architecture suite connecting tools, desktops, and agent systems.
+- [lock-master](https://github.com/ellmos-ai/lock-master): Zero-dependency file locking, resource mutexes & contested claim resolution.
+- [system-gap-master](https://github.com/ellmos-ai/system-gap-master): Distributed multi-host synchronization and conflict copy reconciler.
+- [open-compute-mcp](https://github.com/ellmos-ai/open-compute-mcp): Open Compute MCP server for desktop OS automation.
 - [ellmos-filecommander-mcp](https://github.com/ellmos-ai/ellmos-filecommander-mcp): Filesystem and process execution MCP tool suite.
 - [ellmos-codecommander-mcp](https://github.com/ellmos-ai/ellmos-codecommander-mcp): Code analysis and AST processing MCP server.
 - [ellmos-controlcenter-mcp](https://github.com/ellmos-ai/ellmos-controlcenter-mcp): MCP stack control plane and skill router.
+- [n8n-manager-mcp](https://github.com/ellmos-ai/n8n-manager-mcp): Safe n8n workflow management, node inspection and deployment MCP tool.
+- [automation-master](https://github.com/dev-bricks/automation-master): Task queue, lease coordinator and lock orchestration.
+- [DevCenter](https://github.com/dev-bricks/DevCenter): Unified local developer workbench and workspace orchestrator.
+- [CodeBox](https://github.com/dev-bricks/CodeBox): Sandboxed code evaluation, plugin runtime and devtool playground.
+- [MethodenAnalyser](https://github.com/dev-bricks/MethodenAnalyser): Automated method parsing, cyclomatic complexity & cognitive metrics.
+- [open-bricks](https://github.com/open-bricks): Open architecture suite connecting tools, desktops, and agent systems.

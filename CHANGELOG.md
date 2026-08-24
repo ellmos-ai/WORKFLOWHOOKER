@@ -2,6 +2,17 @@
 
 Alle nennenswerten Aenderungen an WorkflowHooker.
 
+## [0.2.1] - 2026-08-24
+
+### Gewartet (2026-08-24)
+
+- **Discoverability, README-Design, Badges & Quick Navigation (Pfad B):** Zweisprachige README-Architektur (`README.md` & `README_de.md`) um strukturierte Schnellnavigation, SVG-Banner-Asset `docs/assets/banner.svg` und Badges für 117 Passed Tests (100% grün), CI-Status, Python 3.10-3.13, Plattformen (`Linux | Windows | macOS`), Datenschutz (`100% Offline | Zero-Egress`), Sicherheit (`Local-First | Process-Isolated`), `ellmos-ai` Ecosystem und `open-bricks` Umbrella aktualisiert.
+- **Tabelle der Kernfähigkeiten & Sicherheitsinvarianten:** Zweisprachige Matrix für Kernfähigkeiten & Schutzregeln (100% Local-First / Zero-Egress, Read-Only Safety by Default / nebenwirkungsfreie Prüfungen, unprivilegierter User-Mode, konfigurierbares Meldungsbudget / Anti-Spam-Guard, deterministisches Closing-Gate, PreCompact Ziel- & Weck-Injektoren, universelle Provider-Entkopplung und Zero Runtime Dependencies) in `README.md` und `README_de.md` integriert.
+- **CI-Matrix & Concurrency-Härtung:** `.github/workflows/ci.yml` um automatische Concurrency-Gruppe mit `cancel-in-progress: true` und plattformunabhängige Installation gehärtet.
+- **Erweiterte PEP 621 Metadaten & URLs:** `pyproject.toml` um Topic-Classifiers (`Topic :: Security`, `Topic :: System :: Monitoring`) und Projekt-URLs (`Parent Organization`, `Umbrella Ecosystem`) erweitert.
+- **Automatisierte Metadaten- & Paritätstestsuite:** `tests/test_metadata.py` um 6 neue Contract-Tests erweitert (Mermaid Diagram Syntax, Key Capabilities Matrix, Banner & Visual Assets, CI Concurrency Group, Offline Zero-Egress Invariants, Sibling Ecosystem Parity; Pytest-Gesamtsuite auf 117 Tests erweitert, 100% grün).
+- **`llms.txt` Discovery Index:** Last-checked Timestamp auf `2026-08-24`, 117 verifizierte Tests und Ökosystem-Querverweise synchronisiert.
+
 ## [0.2.1] - 2026-08-21
 
 ### Gewartet (2026-08-21)

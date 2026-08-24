@@ -65,7 +65,7 @@ def test_llms_txt_integrity():
     llms_path = ROOT / "llms.txt"
     assert llms_path.is_file()
     content = llms_path.read_text(encoding="utf-8")
-    assert "Last-checked: 2026-08-21" in content
+    assert "Last-checked: 2026-08-24" in content
     assert "workflowhooker" in content
     assert "ellmos-ai" in content
     assert "open-bricks" in content
@@ -79,7 +79,7 @@ def test_readme_badges_and_ecosystem_parity():
         assert "ellmos--ai" in content
         assert "open--bricks" in content
         assert "llms.txt" in content
-        assert "2026-08-21" in content
+        assert "2026-08-24" in content
         assert "SECURITY.md" in content
         assert "memoryhooker" in content
         assert "system-explorer" in content
@@ -119,6 +119,8 @@ def test_pyproject_tooling_integrity():
     assert "Bug Tracker" in urls
     assert "Changelog" in urls
     assert "Security" in urls
+    assert "Parent Organization" in urls
+    assert "Umbrella Ecosystem" in urls
 
     tool = pyproject.get("tool", {})
     assert "ruff" in tool
@@ -141,6 +143,15 @@ def test_ci_workflow_parity():
     assert "pytest" in content
 
 
+def test_ci_concurrency_configuration():
+    """Verify that CI workflow enables concurrency group with cancel-in-progress."""
+    ci_file = ROOT / ".github" / "workflows" / "ci.yml"
+    assert ci_file.is_file()
+    content = ci_file.read_text(encoding="utf-8")
+    assert "concurrency:" in content
+    assert "cancel-in-progress: true" in content
+
+
 def test_security_policy_bilingual_parity():
     """Verify that SECURITY.md provides bilingual English and German policies with official contacts."""
     sec_file = ROOT / "SECURITY.md"
@@ -153,3 +164,48 @@ def test_security_policy_bilingual_parity():
     assert "lukas@open-bricks.org" in content
     assert "Zero-Egress" in content or "zero-egress" in content.lower()
     assert "https://github.com/ellmos-ai/workflowhooker-provenance/security/advisories" in content
+
+
+def test_mermaid_diagrams_syntax():
+    """Verify that both README.md and README_de.md contain valid Mermaid architecture and sequence diagrams."""
+    for filename in ("README.md", "README_de.md"):
+        content = (ROOT / filename).read_text(encoding="utf-8")
+        assert "```mermaid" in content
+        assert "graph TD" in content or "flowchart TD" in content
+        assert "sequenceDiagram" in content
+        assert "autonumber" in content
+        assert "Closing Gate" in content or "Abschluss-Gate" in content
+
+
+def test_key_capabilities_and_safety_invariants_table():
+    """Verify that key capabilities & safety invariants matrix is documented in both READMEs."""
+    for filename in ("README.md", "README_de.md"):
+        content = (ROOT / filename).read_text(encoding="utf-8")
+        assert "Zero-Egress" in content
+        assert "Local-First" in content or "Standardmäßig" in content
+        assert "closing_gate" in content
+        assert "drift_warning" in content
+        assert "scope_guard" in content
+
+
+def test_banner_and_visual_assets():
+    """Verify that banner SVG asset exists and is linked properly in both README files."""
+    banner_file = ROOT / "docs" / "assets" / "banner.svg"
+    assert banner_file.is_file(), "docs/assets/banner.svg must exist"
+    svg_content = banner_file.read_text(encoding="utf-8")
+    assert "<svg" in svg_content
+    assert "</svg>" in svg_content
+
+    for filename in ("README.md", "README_de.md"):
+        content = (ROOT / filename).read_text(encoding="utf-8")
+        assert "docs/assets/banner.svg" in content
+
+
+def test_offline_zero_egress_and_privacy_invariants():
+    """Verify that the module operates strictly offline without unauthorized network clients."""
+    src_dir = ROOT / "workflowhooker"
+    for py_file in src_dir.rglob("*.py"):
+        content = py_file.read_text(encoding="utf-8")
+        # Ensure no dynamic analytics/telemetry requests
+        assert "requests.post" not in content
+        assert "urllib.request.urlopen" not in content

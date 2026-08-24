@@ -146,7 +146,7 @@ def test_timestamp_currency():
     readme_de = (root / "README_de.md").read_text(encoding="utf-8")
     llms = (root / "llms.txt").read_text(encoding="utf-8")
 
-    assert "2026-08-21" in readme_en
-    assert "2026-08-21" in readme_de
-    assert "2026-08-21" in llms
+    assert "2026-08-24" in readme_en
+    assert "2026-08-24" in readme_de
+    assert "2026-08-24" in llms
 

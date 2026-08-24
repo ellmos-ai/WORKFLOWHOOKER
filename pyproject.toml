@@ -26,6 +26,7 @@ keywords = [
 classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
+    "Intended Audience :: System Administrators",
     "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent",
     "Operating System :: Microsoft :: Windows",
@@ -39,6 +40,7 @@ classifiers = [
     "Topic :: Software Development :: Libraries :: Application Frameworks",
     "Topic :: Software Development :: Quality Assurance",
     "Topic :: System :: Monitoring",
+    "Topic :: Security",
 ]
 dependencies = []
 
@@ -52,6 +54,8 @@ Repository = "https://github.com/ellmos-ai/workflowhooker-provenance.git"
 "Bug Tracker" = "https://github.com/ellmos-ai/workflowhooker-provenance/issues"
 Changelog = "https://github.com/ellmos-ai/workflowhooker-provenance/blob/master/CHANGELOG.md"
 Security = "https://github.com/ellmos-ai/workflowhooker-provenance/blob/master/SECURITY.md"
+"Parent Organization" = "https://github.com/ellmos-ai"
+"Umbrella Ecosystem" = "https://github.com/open-bricks"
 
 [project.scripts]
 workflowhooker = "workflowhooker.cli:main"

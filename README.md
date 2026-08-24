@@ -5,7 +5,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Python Version](https://img.shields.io/badge/python-3.10%20|%203.11%20|%203.12%20|%203.13-blue.svg)](pyproject.toml)
 [![CI Status](https://img.shields.io/badge/CI-passing-brightgreen.svg)](.github/workflows/ci.yml)
-[![Tests](https://img.shields.io/badge/tests-112%20passed-brightgreen.svg)](tests)
+[![Tests](https://img.shields.io/badge/tests-117%20passed-brightgreen.svg)](tests)
 [![Platform](https://img.shields.io/badge/platform-Linux%20|%20Windows%20|%20macOS-lightgrey.svg)](pyproject.toml)
 [![Privacy](https://img.shields.io/badge/privacy-100%25%20Offline%20|%20Zero--Egress-brightgreen.svg)](SECURITY.md)
 [![Security](https://img.shields.io/badge/security-Local--First%20|%20Process--Isolated-blue.svg)](SECURITY.md)
@@ -20,11 +20,11 @@
 > Deutsche Dokumentation: [`README_de.md`](README_de.md) • Sicherheitsrichtlinie: [`SECURITY.md`](SECURITY.md).
 
 **Quick Navigation:**
-[Quickstart](#install--quickstart) • [Architecture](#system-architecture) • [Workflow Lifecycle](#agent-workflow--closing-gate-lifecycle) • [State Sources](#state-sources) • [Injectors](#target--wake-up-injectors) • [Security Policy](SECURITY.md) • [Sibling Tools](#ecosystem--sibling-tools) • [LLM Context](llms.txt)
+[Quickstart](#install--quickstart) • [Architecture](#system-architecture) • [Workflow Lifecycle](#agent-workflow--closing-gate-lifecycle) • [Key Capabilities](#key-capabilities--safety-invariants) • [State Sources](#state-sources) • [Injectors](#target--wake-up-injectors) • [Security Policy](SECURITY.md) • [Sibling Tools](#ecosystem--sibling-tools) • [LLM Context](llms.txt)
 
 ---
 
-**Status: 0.2.1 — Autonomous Workflow Governance & Injector Engine.** (Last-checked: 2026-08-21)
+**Status: 0.2.1 — Autonomous Workflow Governance & Injector Engine.** (Last-checked: 2026-08-24)
 
 Umgesetzt: `StateSource`-Protokoll, Config-Schicht (`workflowhooker.toml`,
 `checks = []` per Default), read-only Adapter `git`, `files` (LOCK*.txt und
@@ -35,7 +35,7 @@ und `loop-briefing` (lokale Weck-Runtimes). Meldungsbudget + Cooldown bleiben
 die gemeinsame 4-Augen-Bremse. Provider `claude`, `codex`, `kimi`
 (Hook-Snippet-Generator ohne `PreToolUse` im Default, optionale separate
 Blocker-Variante) + `manual` (CLI); der `git`-Provider bleibt ein
-dokumentierter Stub. 112 Tests sind grün, darunter echte Temp-Git-Repo-Fixtures.
+dokumentierter Stub. 117 Tests sind grün, darunter echte Temp-Git-Repo-Fixtures.
 
 Hooks, die den **Arbeitsablauf** eines Agenten steuern — nicht sein Wissen.
 
@@ -135,6 +135,21 @@ sequenceDiagram
         Gates-->>Runtime: Block termination & request resolution / commit
     end
 ```
+
+---
+
+## Key Capabilities & Safety Invariants
+
+| Invariant / Capability | Guarantee | Architectural Implementation |
+|---|---|---|
+| **100% Local-First & Zero-Egress** | Absolute offline privacy | No network calls, telemetry, or external API pings. All state checks run purely against local files, Git repository, and process environment. |
+| **Read-Only Safety by Default** | Non-mutating inspections | All check runners (`closing_gate`, `drift_warning`, `scope_guard`) and state sources perform read-only evaluations without mutating repository state. |
+| **Non-Elevation / User-Mode** | Minimal privilege principle | Operates entirely in standard user space without requiring root or administrator privileges. |
+| **Budgeting & Anti-Spam Guard** | Maximum 3 messages/session | Configurable message budget and cooldown intervals prevent runaway prompt flooding and context window inflation. |
+| **Fail-Closed Closing Gate** | Clean work verification | Prevents premature session exits when uncommitted git diffs, dangling `LOCK*.txt` files, or unfulfilled task items remain. |
+| **Target & Loop Injectors** | PreCompact & wake-up briefings | Enriches context with project goals from `AUFGABEN.txt`/`GOAL.md` and active TASKPLAN items during pre-compact and scheduled wake-up cycles. |
+| **Universal Multi-Runtime Support** | Provider decoupling | Pluggable provider architecture supporting Claude Code (`Stop`, `UserPromptSubmit`, `PreCompact`), Codex CLI, Kimi Code, and manual CLI. |
+| **Zero Runtime Dependencies** | Extreme portability | Zero external Python package requirements for runtime execution (standard library only; `pytest` and `ruff` for development). |
 
 ---
 
