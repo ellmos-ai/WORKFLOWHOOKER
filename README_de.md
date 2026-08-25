@@ -5,7 +5,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Python Version](https://img.shields.io/badge/python-3.10%20|%203.11%20|%203.12%20|%203.13-blue.svg)](pyproject.toml)
 [![CI Status](https://img.shields.io/badge/CI-passing-brightgreen.svg)](.github/workflows/ci.yml)
-[![Tests](https://img.shields.io/badge/tests-117%20passed-brightgreen.svg)](tests)
+[![Tests](https://img.shields.io/badge/tests-168%20passed-brightgreen.svg)](tests)
 [![Platform](https://img.shields.io/badge/platform-Linux%20|%20Windows%20|%20macOS-lightgrey.svg)](pyproject.toml)
 [![Datenschutz](https://img.shields.io/badge/datenschutz-100%25%20Offline%20|%20Zero--Egress-brightgreen.svg)](SECURITY.md)
 [![Sicherheit](https://img.shields.io/badge/sicherheit-Local--First%20|%20Prozess--Isoliert-blue.svg)](SECURITY.md)
@@ -20,11 +20,11 @@
 > Englische Haupt-Dokumentation: [`README.md`](README.md) • Sicherheitsrichtlinie: [`SECURITY.md`](SECURITY.md).
 
 **Schnellnavigation:**
-[Schnellstart](#schnellstart--installation) • [Architektur](#systemarchitektur) • [Workflow-Lebenszyklus](#agenten-workflow--closing-gate-lebenszyklus) • [Kernfähigkeiten](#kernfähigkeiten--sicherheitsinvarianten) • [Injektoren](#ziel--und-weck-injektoren) • [Sicherheitsrichtlinie](SECURITY.md) • [Geschwisterwerkzeuge](#ökosystem--geschwisterwerkzeuge) • [LLM-Kontext](llms.txt)
+[Schnellstart](#schnellstart--installation) • [Architektur](#systemarchitektur) • [Workflow-Lebenszyklus](#agenten-workflow--closing-gate-lebenszyklus) • [Kernfähigkeiten](#kernfähigkeiten--sicherheitsinvarianten) • [Injektoren](#ziel--und-weck-injektoren) • [Session-Start-Hooker](#session-start-hooker-seit-030) • [Sicherheitsrichtlinie](SECURITY.md) • [Geschwisterwerkzeuge](#ökosystem--geschwisterwerkzeuge) • [LLM-Kontext](llms.txt)
 
 ---
 
-**Status: 0.2.3 — Arbeitsablaufsteuerung & Injektormuster.** (Last-checked: 2026-08-24)
+**Status: 0.3.0 — Arbeitsablaufsteuerung & Injektormuster.** (Last-checked: 2026-08-25)
 
 WorkflowHooker bietet Hooks, die den **Arbeitsablauf** autonomer KI-Agenten steuern — nicht deren Wissen.
 
@@ -141,7 +141,8 @@ sequenceDiagram
 | **Meldungsbudget & Anti-Spam** | Max. 3 Meldungen / Session | Konfigurierbare Meldungsobergrenzen und Cooldown-Timer verhindern Kontextüberlastung und Prompt-Dauerfeuer. |
 | **Deterministisches Closing-Gate** | Verlässliche Arbeitsabnahme | Verhindert vorzeitige Beendigung bei uncommitteten Diffs, verwaisten `LOCK*.txt`-Sperren oder offenen Aufgaben. |
 | **Ziel- & Loop-Injektoren** | PreCompact & Weck-Briefings | Speist Projektziele aus `AUFGABEN.txt`/`GOAL.md` und TASKPLAN-Tasks bei PreCompact und periodischen Weckzyklen in den Agentenkontext ein. |
-| **Laufzeitunabhängige Provider** | Plattformunabhängige Hooks | Modulare Provider-Architektur für Claude Code (`Stop`, `UserPromptSubmit`, `PreCompact`), Codex CLI, Kimi Code und manuelle CLI. |
+| **Policy-/Ortsinjektor** (0.3.0) | Scope-bewusster SessionStart-Kontext | Liest `policy-registry`-Regeln direkt (kein CLI-Subprozess) und loest eine kleine `source-resolver`-Rollenliste auf; beides zu EINER Nachricht kombiniert (siehe [Session-Start-Hooker](#session-start-hooker-seit-030)). |
+| **Laufzeitunabhängige Provider** | Plattformunabhängige Hooks | Modulare Provider-Architektur für Claude Code (`Stop`, `UserPromptSubmit`, `PreCompact`, `SessionStart`), Codex CLI, Kimi Code und manuelle CLI. |
 | **Zero Runtime Dependencies** | Maximale Portabilität | Keine externen Python-Laufzeitabhängigkeiten (reine Standardbibliothek; `pytest` und `ruff` nur für Entwicklung). |
 
 ---
@@ -193,6 +194,22 @@ loop = true       # loop-briefing als lokale Runtime-Schnittstelle freigeben
 ```
 
 Für lokale Modelle liefert `python -m workflowhooker loop-briefing --project-dir .` ein deterministisches Briefing aus Ziel, offenen Tasks, Locks und uncommitteter Arbeit.
+
+---
+
+## Session-Start-Hooker (seit 0.3.0)
+
+`SessionStart` ist seit 0.3.0 ein vollwertiges `hook-run`-Event. Zwei weitere Injektoren sind ausdrücklich opt-in:
+
+```toml
+[injectors]
+policy = true     # Projektbezogene policy-registry-Regeln beim SessionStart
+location = true   # Bekannte Orte per source-resolver-Rolle beim SessionStart
+```
+
+`PolicyInjector` liest `~/.policy-registry/registry.json` **direkt** (kein `import policy_registry`, kein CLI-Subprozess — das Paket ist nicht installiert und dessen CLI-Adapter braucht bis zu 15s pro Aufruf). Die Projektzugehörigkeit wird ohne Katalog-I/O aus dem Pfad abgeleitet; nur projekt-/pipeline-spezifische Regeln werden gezeigt, globale Regeln (`system-wide`) **nicht** — die stehen bereits im redundant-statischen Kern von CLAUDE.md (siehe unten). `LocationInjector` löst eine kleine Rollenliste über `source_resolver.resolve()` auf, lazy und fail-open, ohne die langsame `policy.registry`-Rolle. Beide Injektoren werden bei SessionStart zu **einer** Nachricht zusammengefasst, damit zwei Injektoren nicht zwei von `mode.max_messages_per_session` verbrauchen.
+
+**Sicherheits-/Faktentreue-Kernsätze bleiben statisch (Entscheidung H3=A):** Sicherheits- und integritätsnahe Kernsätze in CLAUDE.md (z. B. Zugangsdaten-Regeln, Faktentreue-Kernsatz, Sprachregeln) werden **nicht** durch `PolicyInjector` ersetzt, sondern bleiben zusätzlich wortwörtlich in CLAUDE.md stehen — ein Registry-Ausfall darf bei einer Sicherheitsregel nie stillschweigend „Regel fehlt" bedeuten (Fail-closed, dasselbe Prinzip wie überall sonst in diesem System). Entschieden 2026-08-25 (`D-20260825-009`, Option A); verankert in Ticket `T-20260825-860165488`, das auf die bestehende Wiederherstellungs-Kette der Agenten-Regeldateien (`agents-bridge`, `T-20260822-901323804`) verweist — diese Kette transportiert die statischen Kernsätze byte-treu zwischen Hosts, die Injektoren hier sind eine ergänzende dynamische Schicht darüber, kein Ersatz.
 
 ---
 

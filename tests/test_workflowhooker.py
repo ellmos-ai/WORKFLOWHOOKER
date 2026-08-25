@@ -10,7 +10,7 @@ import workflowhooker
 def test_package_metadata():
     """Verify workflowhooker package version is defined."""
     assert hasattr(workflowhooker, "__version__")
-    assert workflowhooker.__version__ == "0.2.3"
+    assert workflowhooker.__version__ == "0.3.0"
 
 
 def test_manifest_validity():
@@ -146,7 +146,7 @@ def test_timestamp_currency():
     readme_de = (root / "README_de.md").read_text(encoding="utf-8")
     llms = (root / "llms.txt").read_text(encoding="utf-8")
 
-    assert "2026-08-24" in readme_en
-    assert "2026-08-24" in readme_de
-    assert "2026-08-24" in llms
+    assert "2026-08-25" in readme_en
+    assert "2026-08-25" in readme_de
+    assert "2026-08-25" in llms
 

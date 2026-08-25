@@ -88,6 +88,99 @@ def test_precompact_goal_injector_respects_session_message_budget(tmp_path, caps
     assert capsys.readouterr().out == ""
 
 
+def _write_registry(tmp_path: Path, entries: list) -> Path:
+    registry = tmp_path / "registry.json"
+    registry.write_text(json.dumps({"schema": "test.v1", "entries": entries}), encoding="utf-8")
+    return registry
+
+
+def test_session_start_combines_policy_and_location_into_one_message(tmp_path, capsys, monkeypatch):
+    registry = _write_registry(
+        tmp_path,
+        [{"id": "P-100", "title": "Test-Regel", "scope": ".SOFTWARE", "status": "active"}],
+    )
+    project_dir = tmp_path / "OneDrive" / ".TOPICS" / ".SOFTWARE" / "app"
+    project_dir.mkdir(parents=True)
+
+    config_path = tmp_path / "workflowhooker.toml"
+    config_path.write_text(
+        "[injectors]\n"
+        "policy = true\n"
+        "location = true\n"
+        f'[injectors.policy_config]\nregistry_path = "{registry.as_posix()}"\n'
+        "[injectors.location_config]\nroles = []\n"
+        "[mode]\ncooldown_minutes = 0\n",
+        encoding="utf-8",
+    )
+
+    exit_code = main(
+        [
+            "--config", str(config_path),
+            "--state-dir", str(tmp_path / "state"),
+            "--project-dir", str(project_dir),
+            "hook-run", "SessionStart",
+        ]
+    )
+
+    assert exit_code == 0
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["hookSpecificOutput"]["hookEventName"] == "SessionStart"
+    context = payload["hookSpecificOutput"]["additionalContext"]
+    assert "P-100" in context
+    assert "Test-Regel" in context
+
+
+def test_session_start_is_silent_by_default(tmp_path, capsys):
+    config_path = tmp_path / "workflowhooker.toml"
+    config_path.write_text("", encoding="utf-8")
+
+    exit_code = main(
+        [
+            "--config", str(config_path),
+            "--state-dir", str(tmp_path / "state"),
+            "--project-dir", str(tmp_path),
+            "hook-run", "SessionStart",
+        ]
+    )
+
+    assert exit_code == 0
+    assert capsys.readouterr().out == ""
+
+
+def test_session_start_one_combined_message_consumes_one_budget_slot(tmp_path, capsys):
+    registry = _write_registry(
+        tmp_path,
+        [{"id": "P-100", "title": "Test-Regel", "scope": ".SOFTWARE", "status": "active"}],
+    )
+    project_dir = tmp_path / "OneDrive" / ".TOPICS" / ".SOFTWARE" / "app"
+    project_dir.mkdir(parents=True)
+
+    config_path = tmp_path / "workflowhooker.toml"
+    config_path.write_text(
+        "[injectors]\n"
+        "policy = true\n"
+        "location = true\n"
+        f'[injectors.policy_config]\nregistry_path = "{registry.as_posix()}"\n'
+        "[injectors.location_config]\nroles = []\n"
+        "[mode]\nmax_messages_per_session = 1\ncooldown_minutes = 0\n",
+        encoding="utf-8",
+    )
+    common = [
+        "--config", str(config_path),
+        "--state-dir", str(tmp_path / "state"),
+        "--project-dir", str(project_dir),
+        "hook-run", "SessionStart",
+    ]
+
+    # First call: one combined message, spending exactly ONE budget slot --
+    # not two, even though two injectors fired (README, Abschnitt
+    # "Session-Start-Hooker").
+    assert main(common) == 0
+    assert capsys.readouterr().out.strip()
+    assert main(common) == 0
+    assert capsys.readouterr().out == ""
+
+
 def test_loop_briefing_command_reports_goal_lock_and_git_state(tmp_path, capsys):
     (tmp_path / "GOAL.md").write_text("Lokales Weckziel", encoding="utf-8")
     (tmp_path / "LOCK.loop.txt").write_text("owner: test\n", encoding="utf-8")
@@ -177,7 +270,7 @@ def test_install_snippet_has_no_pretooluse(tmp_path, capsys):
     assert exit_code == 0
     data = json.loads(out_path.read_text(encoding="utf-8"))
     assert "PreToolUse" not in data["hooks"]
-    assert set(data["hooks"]) == {"Stop", "PreCompact", "UserPromptSubmit"}
+    assert set(data["hooks"]) == {"Stop", "PreCompact", "UserPromptSubmit", "SessionStart"}
 
 
 def test_install_snippet_supports_codex(tmp_path, capsys):

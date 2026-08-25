@@ -93,3 +93,49 @@ def test_config_validate_rejects_negative_max_records():
     config.candidates.max_records = -1
     with pytest.raises(ValueError):
         config.validate()
+
+
+def test_policy_and_location_injectors_disabled_by_default():
+    config = default_config()
+    assert config.injectors.policy is False
+    assert config.injectors.location is False
+    assert config.injectors.policy_config.registry_path is None
+    assert config.injectors.policy_config.max_entries == 5
+    assert config.injectors.location_config.roles == [
+        "resources.inventory",
+        "decisions.ledger",
+        "user.model",
+        "memory.curated",
+    ]
+
+
+def test_load_config_parses_policy_and_location_injectors(tmp_path: Path):
+    path = tmp_path / "workflowhooker.toml"
+    path.write_text(
+        """
+[injectors]
+policy = true
+location = true
+
+[injectors.policy_config]
+registry_path = "/custom/registry.json"
+max_entries = 3
+
+[injectors.location_config]
+roles = ["resources.inventory", "user.model"]
+""",
+        encoding="utf-8",
+    )
+    config = load_config(path)
+    assert config.injectors.policy is True
+    assert config.injectors.location is True
+    assert config.injectors.policy_config.registry_path == "/custom/registry.json"
+    assert config.injectors.policy_config.max_entries == 3
+    assert config.injectors.location_config.roles == ["resources.inventory", "user.model"]
+
+
+def test_config_validate_rejects_negative_policy_max_entries():
+    config = Config()
+    config.injectors.policy_config.max_entries = -1
+    with pytest.raises(ValueError):
+        config.validate()

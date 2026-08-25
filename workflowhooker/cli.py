@@ -5,8 +5,21 @@ Befehle:
   python -m workflowhooker check                manueller Aufruf
   python -m workflowhooker hook-run <event>       stdin-JSON lesen (Event:
                                                     Stop/PreCompact/
-                                                    UserPromptSubmit), gibt
-                                                    Claude-Code-Hook-Output aus
+                                                    UserPromptSubmit/
+                                                    SessionStart), gibt
+                                                    Claude-Code-Hook-Output aus.
+                                                    Checks laufen wie bei
+                                                    jedem Event unverandert
+                                                    mit (kein Event-Filter);
+                                                    an echtem SessionStart
+                                                    bleiben sie in der Praxis
+                                                    still, weil ihre
+                                                    Ausloeser (Drift, Scope,
+                                                    Lock) angesammelte
+                                                    Sitzungsarbeit
+                                                    voraussetzen, die zu
+                                                    diesem Zeitpunkt noch
+                                                    nicht existiert.
   python -m workflowhooker providers              Provider-Fallback-Kette
   python -m workflowhooker loop-briefing          Briefing fuer lokale Weck-Schleifen
   python -m workflowhooker install-snippet        Provider-Hook-Snippet
@@ -38,7 +51,7 @@ from pathlib import Path
 from .candidates import CandidateEvent, clear as clear_candidates, default_queue_path, enqueue, read_all
 from .checks import CHECK_REGISTRY, CheckRunner
 from .config import Config, load_config
-from .injectors import GoalInjector, LoopInjector
+from .injectors import GoalInjector, LocationInjector, LoopInjector, PolicyInjector
 from .providers import PROVIDER_REGISTRY, resolve_provider
 from .providers.claude import ClaudeProvider
 from .sources import (
@@ -70,7 +83,7 @@ def _build_parser() -> argparse.ArgumentParser:
     p_check.set_defaults(func=_cmd_check)
 
     p_hook = sub.add_parser("hook-run", help="stdin-JSON lesen, Claude-Code-Hook-Output schreiben")
-    p_hook.add_argument("event", choices=["Stop", "PreCompact", "UserPromptSubmit"])
+    p_hook.add_argument("event", choices=["Stop", "PreCompact", "UserPromptSubmit", "SessionStart"])
     p_hook.add_argument(
         "--format",
         dest="output_format",
@@ -185,6 +198,35 @@ def _build_state_source(config: Config, project_dir: Path) -> CompositeStateSour
     )
 
 
+def _build_session_start_message(config: Config, project_dir: Path) -> str | None:
+    """Combine Policy- and Ortsinjektor output into ONE message.
+
+    Deliberately a single combined message, not two separate ones: two
+    SessionStart injectors would otherwise spend two of
+    ``mode.max_messages_per_session`` on the very first turn, starving the
+    rest of the session's message budget for checks/goal (README, Abschnitt
+    "Session-Start-Hooker"). Either half may be empty; the whole call
+    returns ``None`` only if both are.
+    """
+    parts: list[str] = []
+    if config.injectors.policy:
+        policy_config = config.injectors.policy_config
+        registry_path = Path(policy_config.registry_path) if policy_config.registry_path else None
+        policy_message = PolicyInjector(
+            registry_path=registry_path, max_entries=policy_config.max_entries
+        ).generate(project_dir)
+        if policy_message:
+            parts.append(policy_message)
+    if config.injectors.location:
+        roles = tuple(config.injectors.location_config.roles)
+        location_message = LocationInjector(roles=roles or None).generate(project_dir)
+        if location_message:
+            parts.append(location_message)
+    if not parts:
+        return None
+    return "\n\n".join(parts)
+
+
 def _run_active_checks(config: Config, project_dir: Path, state: SessionState, *, now: float | None = None) -> str | None:
     now = time.time() if now is None else now
 
@@ -289,6 +331,14 @@ def _cmd_hook_run(args) -> int:
         now = time.time()
         if _message_slot_available(config, state, now):
             message = GoalInjector(_build_state_source(config, project_dir)).generate()
+            if message:
+                _record_message(state, now)
+    if message is None and args.event == "SessionStart" and (
+        config.injectors.policy or config.injectors.location
+    ):
+        now = time.time()
+        if _message_slot_available(config, state, now):
+            message = _build_session_start_message(config, project_dir)
             if message:
                 _record_message(state, now)
     state.save(state_path)

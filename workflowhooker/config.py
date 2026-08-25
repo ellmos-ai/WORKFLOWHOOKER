@@ -51,16 +51,51 @@ class ProvidersConfig:
 
 
 @dataclass
+class PolicyInjectorConfig:
+    """See ``injectors.PolicyInjector``. ``registry_path`` overrides the
+    default ``~/.policy-registry/registry.json``; ``None`` keeps the
+    default. ``max_entries`` bounds the token cost of one SessionStart
+    message (README: "Injektor darf kein zweites CLAUDE.md werden")."""
+
+    registry_path: str | None = None
+    max_entries: int = 5
+
+
+@dataclass
+class LocationInjectorConfig:
+    """See ``injectors.LocationInjector``. ``roles`` are source-resolver
+    role names; the default set deliberately excludes ``policy.registry``
+    (see LocationInjector docstring -- PolicyInjector covers that role)."""
+
+    roles: list[str] = field(
+        default_factory=lambda: [
+            "resources.inventory",
+            "decisions.ledger",
+            "user.model",
+            "memory.curated",
+        ]
+    )
+
+
+@dataclass
 class InjectorsConfig:
     """Opt-in context injectors.
 
     Checks remain silent by default, and so do the injectors.  ``goal`` is
     intended for the ``PreCompact`` hook; ``loop`` is exposed through the
-    explicit briefing command and is never a scheduler.
+    explicit briefing command and is never a scheduler.  ``policy`` and
+    ``location`` are both intended for the ``SessionStart`` hook; their
+    output is combined into a single message so two SessionStart injectors
+    never spend two slots of ``mode.max_messages_per_session`` (README,
+    Abschnitt "Session-Start-Hooker").
     """
 
     goal: bool = False
     loop: bool = False
+    policy: bool = False
+    location: bool = False
+    policy_config: PolicyInjectorConfig = field(default_factory=PolicyInjectorConfig)
+    location_config: LocationInjectorConfig = field(default_factory=LocationInjectorConfig)
 
 
 @dataclass
@@ -135,6 +170,8 @@ class Config:
             )
         if self.candidates.max_records < 0:
             raise ValueError("[candidates].max_records darf nicht negativ sein")
+        if self.injectors.policy_config.max_entries < 0:
+            raise ValueError("[injectors.policy_config].max_entries darf nicht negativ sein")
 
 
 def default_config() -> Config:
@@ -198,9 +235,31 @@ def _config_from_dict(data: dict) -> Config:
     # ``{ enabled = true }`` table so hand-written configs remain forgiving.
     goal_value = injectors_data.get("goal", injectors_data.get("goal_injector", False))
     loop_value = injectors_data.get("loop", injectors_data.get("loop_injector", False))
+    policy_value = injectors_data.get("policy", injectors_data.get("policy_injector", False))
+    location_value = injectors_data.get("location", injectors_data.get("location_injector", False))
+
+    policy_config_data = injectors_data.get("policy_config", {})
+    policy_config = PolicyInjectorConfig(
+        registry_path=policy_config_data.get("registry_path") or None,
+        max_entries=policy_config_data.get("max_entries", PolicyInjectorConfig.max_entries),
+    )
+
+    location_config_data = injectors_data.get("location_config", {})
+    location_config = LocationInjectorConfig(
+        roles=[
+            str(role)
+            for role in location_config_data.get("roles", LocationInjectorConfig().roles)
+            if str(role)
+        ],
+    )
+
     injectors = InjectorsConfig(
         goal=_enabled_value(goal_value),
         loop=_enabled_value(loop_value),
+        policy=_enabled_value(policy_value),
+        location=_enabled_value(location_value),
+        policy_config=policy_config,
+        location_config=location_config,
     )
 
     sources_data = data.get("sources", {})
