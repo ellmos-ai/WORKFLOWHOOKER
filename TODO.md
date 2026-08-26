@@ -18,6 +18,11 @@ and non-authoritative boundary.
   as the actual extractors, never runs extraction itself. Activation in any
   given agent's hook config remains a manual, documented, opt-in step --
   README "Install & Quickstart".)
+- [x] Add an explicit, read-only boot-context lint for dated Agy run reports,
+  positive boot-file log targets, and duplicated Sidecar prompt drift. Keep it
+  opt-in and outside SessionStart wiring so it diagnoses policy violations
+  without becoming policy authority.
+  (`boot-context-lint`, 2026-08-26, T-20260826-153886115.)
 - [ ] Add a deterministic replay fixture for event sequences and prove that
   cooldown, idle-disable and closing-gate results are stable.
 - [ ] Require immutable candidates, holdout cases, explicit approval and

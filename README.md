@@ -5,7 +5,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Python Version](https://img.shields.io/badge/python-3.10%20|%203.11%20|%203.12%20|%203.13-blue.svg)](pyproject.toml)
 [![CI Status](https://img.shields.io/badge/CI-passing-brightgreen.svg)](.github/workflows/ci.yml)
-[![Tests](https://img.shields.io/badge/tests-168%20passed-brightgreen.svg)](tests)
+[![Tests](https://img.shields.io/badge/tests-177%20passed-brightgreen.svg)](tests)
 [![Platform](https://img.shields.io/badge/platform-Linux%20|%20Windows%20|%20macOS-lightgrey.svg)](pyproject.toml)
 [![Privacy](https://img.shields.io/badge/privacy-100%25%20Offline%20|%20Zero--Egress-brightgreen.svg)](SECURITY.md)
 [![Security](https://img.shields.io/badge/security-Local--First%20|%20Process--Isolated-blue.svg)](SECURITY.md)
@@ -24,7 +24,7 @@
 
 ---
 
-**Status: 0.3.0 — Autonomous Workflow Governance & Injector Engine.** (Last-checked: 2026-08-25)
+**Status: 0.3.0 — Autonomous Workflow Governance & Injector Engine.** (Last-checked: 2026-08-26)
 
 Umgesetzt: `StateSource`-Protokoll, Config-Schicht (`workflowhooker.toml`,
 `checks = []` per Default), read-only Adapter `git`, `files` (LOCK*.txt und
@@ -36,7 +36,7 @@ aktive Tasks), drei einzeln zuschaltbare Checks (`closing_gate`,
 Meldungsbudget + Cooldown bleiben die gemeinsame 4-Augen-Bremse. Provider
 `claude`, `codex`, `kimi`, `agy` (Hook-Snippet-Generator ohne `PreToolUse` im
 Default, optionale separate Blocker-Variante) + `manual` (CLI); der
-`git`-Provider bleibt ein dokumentierter Stub. 168 Tests sind gruen, darunter
+`git`-Provider bleibt ein dokumentierter Stub. 177 Tests sind grün, darunter
 echte Temp-Git-Repo-Fixtures.
 
 Hooks, die den **Arbeitsablauf** eines Agenten steuern — nicht sein Wissen.
@@ -153,6 +153,7 @@ sequenceDiagram
 | **Fail-Closed Closing Gate** | Clean work verification | Prevents premature session exits when uncommitted git diffs, dangling `LOCK*.txt` files, or unfulfilled task items remain. |
 | **Target & Loop Injectors** | PreCompact & wake-up briefings | Enriches context with project goals from `AUFGABEN.txt`/`GOAL.md` and active TASKPLAN items during pre-compact and scheduled wake-up cycles. |
 | **Session-Start Policy/Location Injectors** (0.3.0) | Scope-aware SessionStart context | Reads `policy-registry` scoped rules directly (no CLI subprocess) and resolves a small `source-resolver` role set (no `policy.registry` role -- see [Session-Start-Hooker](#session-start-hooker-seit-030)); both combined into ONE message so SessionStart never spends two budget slots. |
+| **Boot-Context-Lint** | Opt-in contamination and sidecar drift diagnosis | Read-only scan of explicitly named Markdown/JSON files; detects dated Agy run reports, positive `GPT.md`/`CLAUDE.md`/`GEMINI.md` log targets, and `args[3]`/`prompt` drift without installing a hook. |
 | **Universal Multi-Runtime Support** | Provider decoupling | Pluggable provider architecture supporting Claude Code (`Stop`, `UserPromptSubmit`, `PreCompact`, `SessionStart`), Codex CLI, Kimi Code, Antigravity (agy), and manual CLI. |
 | **Zero Runtime Dependencies** | Extreme portability | Zero external Python package requirements for runtime execution (standard library only; `pytest` and `ruff` for development). |
 
@@ -178,6 +179,25 @@ Zwischenchecks und Kurskorrekturen, die heute niemand stellt:
 - **Verifikations-Erinnerung:** „Du erklärst gerade etwas für fertig — hast du es ausgeführt?"
 - **Drift-Warnung:** Der Agent arbeitet seit N Schritten an etwas anderem als der Aufgabe.
 - **Kosten-/Umfangswächter:** Ein Lauf wächst über sein Budget hinaus.
+
+## Boot-Context-Lint (opt-in, read-only)
+
+Der Diagnosebefehl prüft ausschließlich die explizit übergebenen Dateien und
+ändert nichts:
+
+```powershell
+python -m workflowhooker boot-context-lint --format json `
+  C:\Users\User\CLAUDE.md `
+  C:\Users\User\.gemini\GEMINI.md `
+  C:\Users\User\.gemini\config\sidecars\task-name\sidecar.json
+```
+
+Exit `0` bedeutet keine Befunde; Exit `1` bedeutet mindestens einen Befund.
+Sidecar-JSON wird in beiden belegten Formen (`args[3]` oder
+`schedule.args[3]`) geprüft. Explizite Verbote wie „Schreibe niemals
+Laufberichte in CLAUDE.md“ sind kein positiver Writer und bleiben sauber. Der
+Befehl ist kein Policy-Register, wird nicht automatisch in `SessionStart`
+verdrahtet und führt keine Bereinigung aus.
 - **Abschluss-Gate:** Vor dem Beenden — Steuerdateien nachgezogen? Lock entfernt? Committet?
 - **Regelerinnerung:** Projektspezifische Konventionen zum richtigen Zeitpunkt statt als
   Dauer-Präambel, die im Kontext untergeht.

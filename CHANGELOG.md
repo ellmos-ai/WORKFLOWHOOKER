@@ -2,6 +2,22 @@
 
 Alle nennenswerten Aenderungen an WorkflowHooker.
 
+## [Unreleased] - 2026-08-26
+
+### Hinzugefügt
+
+- **Opt-in Boot-Context-Lint:** `boot-context-lint PATH... [--format plain|json]`
+  prüft explizit benannte Markdown-Bootdateien und Antigravity-Sidecar-JSON rein
+  lesend. Er erkennt datierte Agy-Lauf-/Statusberichte, positive
+  Laufprotokollziele in `GPT.md`, `CLAUDE.md` oder `GEMINI.md` sowie Drift zwischen den belegten
+  Promptfeldern (`args[3]`/`schedule.args[3]` und `prompt`). Klare
+  Verbotsformulierungen und bestätigte Regel-/Promptreparaturen werden nicht als
+  Writer gewertet. Keine automatische
+  Hook- oder SessionStart-Verdrahtung, keine neue Regelautorität.
+- **9 Regressionstests:** Markdown-Laufbericht, dauerhafte Regeln/Pfadupdates,
+  beide Sidecar-Schemata, Anti-Log-Negation, erlaubte Regel-/Promptreparatur,
+  Prompt-Parität und CLI-Exit-/JSON-Vertrag; Gesamtsuite 177/177 grün.
+
 ## [0.3.0] - 2026-08-25
 
 ### Hinzugefuegt (2026-08-25)

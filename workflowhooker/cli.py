@@ -35,6 +35,10 @@ Befehle:
                                                     skill-extractor/
                                                     workflow-extract
                                                     (extrahiert selbst nichts)
+  python -m workflowhooker boot-context-lint ...  Opt-in Read-only-Lint fuer
+                                                    Boot-Markdown und Sidecar-
+                                                    JSON; installiert keinen
+                                                    Hook und aendert nichts
 
 Kein Check ist per Default aktiv (``[mode] checks = []``) -- ohne Config
 bleibt das Modul vollstaendig stumm, wie im README gefordert.
@@ -48,6 +52,7 @@ import sys
 import time
 from pathlib import Path
 
+from .boot_context_lint import lint_path
 from .candidates import CandidateEvent, clear as clear_candidates, default_queue_path, enqueue, read_all
 from .checks import CHECK_REGISTRY, CheckRunner
 from .config import Config, load_config
@@ -170,6 +175,20 @@ def _build_parser() -> argparse.ArgumentParser:
         "--clear", action="store_true", help="Warteschlange nach der Ausgabe leeren"
     )
     p_candidate_extract.set_defaults(func=_cmd_candidate_extract)
+
+    p_boot_lint = sub.add_parser(
+        "boot-context-lint",
+        help="Boot-Markdown und Sidecar-JSON rein lesend auf Laufprotokoll-Drift prüfen",
+    )
+    p_boot_lint.add_argument("paths", nargs="+", type=Path, help="Explizit zu prüfende Dateien")
+    p_boot_lint.add_argument(
+        "--format",
+        dest="output_format",
+        choices=["plain", "json"],
+        default="plain",
+        help="Ausgabeformat (plain oder JSON)",
+    )
+    p_boot_lint.set_defaults(func=_cmd_boot_context_lint)
 
     return parser
 
@@ -533,6 +552,22 @@ def _cmd_candidate_extract(args) -> int:
     if args.clear:
         clear_candidates(queue_path)
     return 0
+
+
+def _cmd_boot_context_lint(args) -> int:
+    """Opt-in Diagnose; keine Hook-Registrierung und keine Mutation."""
+    findings = [finding for path in args.paths for finding in lint_path(path)]
+    if args.output_format == "json":
+        print(json.dumps([finding.to_dict() for finding in findings], ensure_ascii=False))
+    else:
+        for finding in findings:
+            location = finding.path
+            if finding.line is not None:
+                location += f":{finding.line}"
+            if finding.field:
+                location += f" [{finding.field}]"
+            print(f"{finding.code} {location}: {finding.message}")
+    return 1 if findings else 0
 
 
 if __name__ == "__main__":  # pragma: no cover

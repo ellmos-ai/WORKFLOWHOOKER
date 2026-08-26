@@ -5,7 +5,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Python Version](https://img.shields.io/badge/python-3.10%20|%203.11%20|%203.12%20|%203.13-blue.svg)](pyproject.toml)
 [![CI Status](https://img.shields.io/badge/CI-passing-brightgreen.svg)](.github/workflows/ci.yml)
-[![Tests](https://img.shields.io/badge/tests-168%20passed-brightgreen.svg)](tests)
+[![Tests](https://img.shields.io/badge/tests-177%20passed-brightgreen.svg)](tests)
 [![Platform](https://img.shields.io/badge/platform-Linux%20|%20Windows%20|%20macOS-lightgrey.svg)](pyproject.toml)
 [![Datenschutz](https://img.shields.io/badge/datenschutz-100%25%20Offline%20|%20Zero--Egress-brightgreen.svg)](SECURITY.md)
 [![Sicherheit](https://img.shields.io/badge/sicherheit-Local--First%20|%20Prozess--Isoliert-blue.svg)](SECURITY.md)
@@ -24,7 +24,7 @@
 
 ---
 
-**Status: 0.3.0 — Arbeitsablaufsteuerung & Injektormuster.** (Last-checked: 2026-08-25)
+**Status: 0.3.0 — Arbeitsablaufsteuerung & Injektormuster.** (Last-checked: 2026-08-26)
 
 WorkflowHooker bietet Hooks, die den **Arbeitsablauf** autonomer KI-Agenten steuern — nicht deren Wissen.
 
@@ -142,6 +142,7 @@ sequenceDiagram
 | **Deterministisches Closing-Gate** | Verlässliche Arbeitsabnahme | Verhindert vorzeitige Beendigung bei uncommitteten Diffs, verwaisten `LOCK*.txt`-Sperren oder offenen Aufgaben. |
 | **Ziel- & Loop-Injektoren** | PreCompact & Weck-Briefings | Speist Projektziele aus `AUFGABEN.txt`/`GOAL.md` und TASKPLAN-Tasks bei PreCompact und periodischen Weckzyklen in den Agentenkontext ein. |
 | **Policy-/Ortsinjektor** (0.3.0) | Scope-bewusster SessionStart-Kontext | Liest `policy-registry`-Regeln direkt (kein CLI-Subprozess) und loest eine kleine `source-resolver`-Rollenliste auf; beides zu EINER Nachricht kombiniert (siehe [Session-Start-Hooker](#session-start-hooker-seit-030)). |
+| **Boot-Context-Lint** | Opt-in Diagnose für Kontamination und Sidecar-Drift | Rein lesende Prüfung explizit benannter Markdown-/JSON-Dateien; erkennt datierte Agy-Laufberichte, positive Logziele in `GPT.md`/`CLAUDE.md`/`GEMINI.md` und Drift zwischen `args[3]` und `prompt`, ohne einen Hook zu installieren. |
 | **Laufzeitunabhängige Provider** | Plattformunabhängige Hooks | Modulare Provider-Architektur für Claude Code (`Stop`, `UserPromptSubmit`, `PreCompact`, `SessionStart`), Codex CLI, Kimi Code und manuelle CLI. |
 | **Zero Runtime Dependencies** | Maximale Portabilität | Keine externen Python-Laufzeitabhängigkeiten (reine Standardbibliothek; `pytest` und `ruff` nur für Entwicklung). |
 
@@ -168,6 +169,21 @@ sequenceDiagram
 ---
 
 ## Schnellstart & Installation
+
+### Boot-Context-Lint (opt-in, rein lesend)
+
+```powershell
+python -m workflowhooker boot-context-lint --format json `
+  C:\Users\User\CLAUDE.md `
+  C:\Users\User\.gemini\GEMINI.md `
+  C:\Users\User\.gemini\config\sidecars\task-name\sidecar.json
+```
+
+Exit `0` bedeutet keine Befunde; Exit `1` bedeutet mindestens einen Befund.
+Der Lint versteht top-level `args[3]` und `schedule.args[3]`, behandelt klare
+Verbotsformulierungen nicht als positiven Writer und verändert keine Datei.
+Er ist keine Regelautorität und wird nicht automatisch an `SessionStart`
+gebunden.
 
 1. `pip install -e ".[dev]"` im Repo-Klon (zero-dependency zur Laufzeit; `pytest` nur für die Testsuite).
 2. `workflowhooker.toml` anlegen und **explizit** die gewünschten Checks eintragen (`[mode] checks = ["closing_gate"]`).
