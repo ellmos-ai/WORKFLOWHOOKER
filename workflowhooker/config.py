@@ -100,18 +100,23 @@ class InjectorsConfig:
 
 @dataclass
 class CandidatesConfig:
-    """Opt-in Kandidaten-Sammler fuer die spaetere Skill-/Workflow-Extraktion
-    (``candidate-collect``/``candidate-extract`` in ``cli.py``).
+    """Opt-in lifecycle spool for later skill/workflow extraction.
 
     Bleibt wie alle anderen Mechanismen per Default aus: Der Live-Hook
     schreibt NUR, wenn ``enabled = true`` gesetzt ist -- selbst ein
     versehentlich verdrahteter Hook bleibt sonst ein stiller No-Op.
-    ``max_records`` begrenzt die Warteschlangendatei (bounded queue statt
-    unbegrenztem Wachstum).
+    ``max_records`` begrenzt terminale Job-/Receipt-Paare; aktive oder
+    aufschiebbare Arbeit wird nie nur fuer ein Groessenlimit verworfen.
     """
 
     enabled: bool = False
     max_records: int = 500
+    extractor_version: str = "workflow-extract@1.1.0+skill-extractor@1.0.0"
+    privacy_class: str = "local-private"
+    max_tokens_per_job: int = 12_000
+    max_jobs_per_session: int = 3
+    max_jobs_per_day: int = 20
+    lease_seconds: int = 900
 
 
 VALID_SOURCES = ("files", "git", "taskplan", "goal")
@@ -170,6 +175,18 @@ class Config:
             )
         if self.candidates.max_records < 0:
             raise ValueError("[candidates].max_records darf nicht negativ sein")
+        if self.candidates.max_tokens_per_job < 0:
+            raise ValueError("[candidates].max_tokens_per_job darf nicht negativ sein")
+        if self.candidates.max_jobs_per_session < 0:
+            raise ValueError("[candidates].max_jobs_per_session darf nicht negativ sein")
+        if self.candidates.max_jobs_per_day < 0:
+            raise ValueError("[candidates].max_jobs_per_day darf nicht negativ sein")
+        if self.candidates.lease_seconds <= 0:
+            raise ValueError("[candidates].lease_seconds muss positiv sein")
+        if not self.candidates.extractor_version.strip():
+            raise ValueError("[candidates].extractor_version darf nicht leer sein")
+        if not self.candidates.privacy_class.strip():
+            raise ValueError("[candidates].privacy_class darf nicht leer sein")
         if self.injectors.policy_config.max_entries < 0:
             raise ValueError("[injectors.policy_config].max_entries darf nicht negativ sein")
 
@@ -277,6 +294,20 @@ def _config_from_dict(data: dict) -> Config:
     candidates = CandidatesConfig(
         enabled=_enabled_value(candidates_data.get("enabled", False)),
         max_records=candidates_data.get("max_records", CandidatesConfig.max_records),
+        extractor_version=str(
+            candidates_data.get("extractor_version", CandidatesConfig.extractor_version)
+        ),
+        privacy_class=str(candidates_data.get("privacy_class", CandidatesConfig.privacy_class)),
+        max_tokens_per_job=candidates_data.get(
+            "max_tokens_per_job", CandidatesConfig.max_tokens_per_job
+        ),
+        max_jobs_per_session=candidates_data.get(
+            "max_jobs_per_session", CandidatesConfig.max_jobs_per_session
+        ),
+        max_jobs_per_day=candidates_data.get(
+            "max_jobs_per_day", CandidatesConfig.max_jobs_per_day
+        ),
+        lease_seconds=candidates_data.get("lease_seconds", CandidatesConfig.lease_seconds),
     )
 
     return Config(

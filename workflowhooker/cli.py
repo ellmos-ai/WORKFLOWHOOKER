@@ -24,12 +24,13 @@ Befehle:
   python -m workflowhooker loop-briefing          Briefing fuer lokale Weck-Schleifen
   python -m workflowhooker install-snippet        Provider-Hook-Snippet
                                                     ausgeben
-  python -m workflowhooker candidate-collect      LEICHTER Live-Hook (Stop/
-                                                    SessionEnd): schreibt nur
-                                                    ein redigiertes Signal-
-                                                    Envelope in die
-                                                    Warteschlange, opt-in
-                                                    via [candidates] enabled
+  python -m workflowhooker candidate-collect      LEICHTER Lifecycle-Hook:
+                                                    GoalComplete/SessionEnd
+                                                    planen Jobs; PreCompact
+                                                    checkpointet; SessionStart
+                                                    recovered; Stop prueft nur
+                                                    Eligibility. Opt-in via
+                                                    [candidates] enabled
   python -m workflowhooker candidate-extract      OFFLINE: Warteschlange
                                                     sichten, verweist auf
                                                     skill-extractor/
@@ -47,13 +48,22 @@ bleibt das Modul vollstaendig stumm, wie im README gefordert.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import sys
 import time
 from pathlib import Path
 
 from .boot_context_lint import lint_path
-from .candidates import CandidateEvent, clear as clear_candidates, default_queue_path, enqueue, read_all
+from .candidates import (
+    LIFECYCLE_EVENTS,
+    BudgetSpec,
+    CandidateSpool,
+    CorruptSpoolError,
+    LifecycleController,
+    default_queue_path,
+    read_all,
+)
 from .checks import CHECK_REGISTRY, CheckRunner
 from .config import Config, load_config
 from .injectors import GoalInjector, LocationInjector, LoopInjector, PolicyInjector
@@ -147,12 +157,12 @@ def _build_parser() -> argparse.ArgumentParser:
     p_candidate_collect = sub.add_parser(
         "candidate-collect",
         help=(
-            "LEICHTER Live-Hook: schreibt EIN redigiertes Signal-Envelope "
-            "(Zeiger, keine Transkriptinhalte) in die Kandidaten-Warteschlange. "
+            "LEICHTER Lifecycle-Hook: plant atomare, redigierte Jobs/Checkpoints "
+            "(Zeiger, keine Transkriptinhalte) oder recovered abgelaufene Leases. "
             "Stumm, solange [candidates].enabled nicht gesetzt ist."
         ),
     )
-    p_candidate_collect.add_argument("event", choices=["Stop", "SessionEnd"])
+    p_candidate_collect.add_argument("event", choices=LIFECYCLE_EVENTS)
     p_candidate_collect.add_argument(
         "--provider",
         default="unknown",
@@ -163,7 +173,7 @@ def _build_parser() -> argparse.ArgumentParser:
     p_candidate_extract = sub.add_parser(
         "candidate-extract",
         help=(
-            "OFFLINE: gesammelte Kandidaten-Signale sichten und auf die "
+            "OFFLINE: gesammelte Kandidaten-Jobs/Receipts sichten und auf die "
             "manuellen Skills skill-extractor/workflow-extract verweisen. "
             "Fuehrt selbst KEINE Extraktion aus."
         ),
@@ -172,7 +182,12 @@ def _build_parser() -> argparse.ArgumentParser:
         "--format", dest="output_format", choices=["plain", "json"], default="plain"
     )
     p_candidate_extract.add_argument(
-        "--clear", action="store_true", help="Warteschlange nach der Ausgabe leeren"
+        "--clear",
+        action="store_true",
+        help=(
+            "Veraltete Kompatibilitaetsoption; bleibt read-only und entfernt "
+            "weder v1-JSONL noch v2-Jobs"
+        ),
     )
     p_candidate_extract.set_defaults(func=_cmd_candidate_extract)
 
@@ -414,6 +429,19 @@ def _extract_session_id(payload: dict) -> str | None:
     return sicher or None
 
 
+def _opaque_session_ref(value: str | None) -> str | None:
+    """Map an external session ID to a stable, private contract identity."""
+
+    if not isinstance(value, str) or not value.strip():
+        return None
+    digest = hashlib.sha256(value.strip().encode("utf-8")).hexdigest()
+    return f"sha256:{digest}"
+
+
+def _extract_session_ref(payload: dict) -> str | None:
+    return _opaque_session_ref(payload.get("session_id"))
+
+
 def _read_stdin_json() -> dict:
     # isatty() ist kein verlaesslicher Indikator, ob stdin sicher lesbar ist
     # (z. B. faengt pytest-Capture stdin durch ein Objekt ab, das weder ein
@@ -457,39 +485,49 @@ def _cmd_install_snippet(args) -> int:
     return 0
 
 
+def _candidate_controller(config: Config, state_dir: Path) -> LifecycleController:
+    candidates = config.candidates
+    return LifecycleController(
+        CandidateSpool(state_dir, max_records=candidates.max_records),
+        extractor_version=candidates.extractor_version,
+        privacy_class=candidates.privacy_class,
+        budget=BudgetSpec(
+            max_tokens_per_job=candidates.max_tokens_per_job,
+            max_jobs_per_session=candidates.max_jobs_per_session,
+            max_jobs_per_day=candidates.max_jobs_per_day,
+        ),
+        lease_seconds=candidates.lease_seconds,
+    )
+
+
+def _payload_text(payload: dict, *names: str) -> str | None:
+    for name in names:
+        value = payload.get(name)
+        if isinstance(value, str) and value.strip():
+            return value.strip()
+    return None
+
+
 def _cmd_candidate_collect(args) -> int:
-    """LEICHTER Live-Hook (Stop/SessionEnd): schreibt hoechstens EIN
-    redigiertes Signal-Envelope pro Sitzung in die Kandidaten-
-    Warteschlange -- niemals Transkriptinhalt, nur einen Zeiger
-    (``transcript_path`` aus dem Hook-stdin-JSON, falls vorhanden).
-
-    Die eigentliche Ableitung von Skill-/Workflow-Kandidaten (teuer,
-    semantisch) passiert NICHT hier, sondern offline in
-    ``candidate-extract`` bzw. in den Skills ``skill-extractor``/
-    ``workflow-extract`` -- TODO.md, Punkt 2: "Separate the live hook from
-    expensive extraction/evaluation."
-
-    Stumm per Default: ohne ``[candidates] enabled = true`` in der Config
-    ist dieser Befehl ein No-Op, selbst wenn der Hook versehentlich
-    verdrahtet ist (README-Kernregel: kein Mechanismus ist ohne explizite
-    Zustimmung aktiv). Idempotent: pro Sitzung hoechstens ein Eintrag
-    (``SessionState.candidate_enqueued``) -- ein mehrfach feuernder Hook
-    (mehrere Stop-Ereignisse in derselben Sitzung) darf nicht mehrfach
-    wirken (4-Augen-Hook-Regel). Fail-open: I/O-Fehler beim Schreiben
-    werden in ``candidates.enqueue`` verschluckt, der Hook bricht nie ab.
-    """
+    """Cheap E1 lifecycle hook; never runs a model or copies transcript text."""
     config = load_config(args.config)
     if not config.candidates.enabled:
         return 0
 
     payload = _read_stdin_json()
-    raw_session_id = args.session_id or _extract_session_id(payload)
-    state_path = state_path_for_session(raw_session_id, args.state_dir)
+    explicit_state_id = (
+        _extract_session_id({"session_id": args.session_id})
+        if args.session_id
+        else None
+    )
+    state_session_id = explicit_state_id or _extract_session_id(payload)
+    state_path = state_path_for_session(state_session_id, args.state_dir)
     state = SessionState.load(state_path)
-    session_ref = raw_session_id or "default"
-
-    if state.candidate_enqueued:
-        return 0
+    session_ref = (
+        _opaque_session_ref(args.session_id)
+        or _extract_session_ref(payload)
+        or "default"
+    )
 
     source_anchor = payload.get("transcript_path")
     if not isinstance(source_anchor, str) or not source_anchor:
@@ -500,47 +538,77 @@ def _cmd_candidate_collect(args) -> int:
         "has_transcript_path": source_anchor is not None,
         "has_cwd": isinstance(payload.get("cwd"), str),
     }
-    candidate = CandidateEvent.build(
-        provider=args.provider,
-        event=args.event,
-        session_ref=session_ref,
-        source_anchor=source_anchor,
-        observed=observed,
-    )
-
+    for counter_name in ("message_count", "turn_count"):
+        counter = payload.get(counter_name)
+        if isinstance(counter, int) and not isinstance(counter, bool) and counter >= 0:
+            observed[counter_name] = counter
     state_dir = args.state_dir or default_state_dir()
-    written = enqueue(default_queue_path(state_dir), candidate, config.candidates.max_records)
-    if written:
-        state.candidate_enqueued = True
-        state.save(state_path)
+    controller = _candidate_controller(config, state_dir)
+    try:
+        controller.handle(
+            event=args.event,
+            provider=args.provider,
+            session_ref=session_ref,
+            goal_ref=_payload_text(payload, "goal_id", "goal_ref"),
+            boundary_epoch=_payload_text(payload, "boundary_epoch"),
+            horizon_hash=_payload_text(
+                payload, "horizon_hash", "last_event_hash", "transcript_hash"
+            ),
+            source_anchor=source_anchor,
+            observed=observed,
+        )
+    except (OSError, ValueError, CorruptSpoolError):
+        # Lifecycle hooks stay fail-open; durable corruption is observable via
+        # candidate-extract and is never reset or overwritten here.
+        return 0
     return 0
 
 
 def _cmd_candidate_extract(args) -> int:
-    """OFFLINE, rein lesend: listet gesammelte Kandidaten-Signale auf und
+    """OFFLINE: listet gesammelte Kandidaten-Jobs und Legacy-Signale auf und
     verweist auf die Skills, die die eigentliche (teure) Extraktion
     ausfuehren -- ``skill-extractor`` (Chatverlauf -> wiederverwendbarer
     Skill) bzw. ``workflow-extract`` (Chatverlauf/Automations-Prompt ->
     Cron-/Loop-Automatisierung). Dieser Befehl fuehrt selbst KEINE
-    Extraktion aus -- "teure Extraktion NIE im Hook" gilt sinngemaess auch
-    hier: die Auflistung bleibt billig (nur Lesen + Formatieren).
+    Extraktion aus. Der Befehl ist immer rein lesend; die veraltete
+    Kompatibilitätsoption ``--clear`` ist absichtlich ein No-op.
     """
     state_dir = args.state_dir or default_state_dir()
-    queue_path = default_queue_path(state_dir)
+    spool = CandidateSpool(state_dir)
+    queue_path = default_queue_path(state_dir)  # v1 read-compatibility only
     events = read_all(queue_path)
+    records: list[dict] = []
+    for job in spool.list_jobs():
+        record = job.to_dict()
+        try:
+            record["receipt"] = spool.load_receipt(job.job_key).to_dict()
+        except CorruptSpoolError:
+            record["receipt"] = {"status": "corrupt"}
+        records.append(record)
+    records.extend({**event.to_dict(), "legacy": True} for event in events)
 
     if args.output_format == "json":
-        print(json.dumps([e.to_dict() for e in events], ensure_ascii=False))
+        print(json.dumps(records, ensure_ascii=False))
     else:
-        if not events:
+        if not records:
             print("Keine Kandidaten-Signale in der Warteschlange.")
+        for record in records:
+            if record.get("legacy"):
+                continue
+            receipt = record.get("receipt", {})
+            anchor = record.get("source_anchor") or "(kein Transkript-Zeiger)"
+            print(
+                f"[{record['provider']}] {record['event']} session={record['session_ref']} "
+                f"job={record['job_key']} status={receipt.get('status', 'unknown')} "
+                f"anchor={anchor}"
+            )
         for event in events:
             anchor = event.source_anchor or "(kein Transkript-Zeiger)"
             print(
-                f"[{event.provider}] {event.event} session={event.session_ref} "
+                f"[legacy:{event.provider}] {event.event} session={event.session_ref} "
                 f"anchor={anchor} observed={event.observed}"
             )
-        if events:
+        if records:
             print()
             print(
                 "Hinweis: reine Beobachtung, keine Bewertung. Fuer eine "
@@ -549,8 +617,6 @@ def _cmd_candidate_extract(args) -> int:
                 "Workflow-Ableitung 'workflow-extract'."
             )
 
-    if args.clear:
-        clear_candidates(queue_path)
     return 0
 
 

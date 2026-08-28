@@ -2,9 +2,51 @@
 
 Alle nennenswerten Aenderungen an WorkflowHooker.
 
-## [Unreleased] - 2026-08-26
+## [Unreleased] - 2026-08-28
 
 ### Hinzugefügt
+
+- **Atomarer Lifecycle-Job-/Receipt-Vertrag (S1, 2026-08-28):** Der bisherige
+  JSONL-Live-Writer wurde durch unveränderliche `LifecycleJob`-v2-Envelopes,
+  atomar ersetzte `JobReceipt`s und provider-/sessiongebundene Checkpoints
+  erweitert. Der vollständige Idempotenzschlüssel umfasst Vertragsversion,
+  Provider, Session, Goal/Boundary, Horizont, Extractorversion und
+  Privacyklasse. `GoalComplete` ist Primärtrigger, `SessionEnd` verarbeitet
+  nur neue Horizonte, `PreCompact` checkpointet, `SessionStart` recovered
+  ausschließlich abgelaufene Leases derselben Sitzung und `Stop` führt nur
+  einen billigen Eligibility-Check aus. Receipts unterstützen
+  `pending|leased|noop|candidate|promoted|failed|deferred`, Versuchszahl,
+  Lease-Ende, Lease-Owner, Fehlerklasse, Kandidaten-IDs und atomaren
+  Budget-Reservierungszeitpunkt. Externe Session-IDs werden unabhängig von
+  ihrer Dateinamens-Normalisierung opak gehasht. Lease- und
+  Budget-Transitionen sind prozessübergreifend exklusiv; `candidate` bleibt
+  als Review-Zustand aktiv, während terminale Receipts unveränderlich sind.
+  Freie `observed`-Textfelder und
+  nicht pfadartige Source-Anker werden am Kernvertrag verworfen. Job-, Sitzungs- und Tagesbudgets
+  sind konfigurierbar; aktive Jobs werden nie von der begrenzten Retention
+  verworfen. Retention schützt noch relevante Tages-/Session-Budgetbelege,
+  serialisiert Löschungen mit Budget- und gebänderten Session-/Receipt-Locks
+  und begrenzt beide Lockklassen auf je 256 Stripe-Dateien. Wenn Windows die
+  Joblöschung verweigert, wird ein zuvor entferntes Receipt exakt
+  wiederhergestellt. Receipt-Leser verwenden denselben Stripe-Lock; ein
+  fremder Windows-Readhandle lässt einen gescheiterten Finish-Versuch im
+  unveränderten retry-fähigen Zustand. Same-directory Tempdatei, `fsync` und
+  atomisches Create/Replace härten Crash- und Concurrent-Retry-Fälle. Die
+  Session-End-Evidenz bleibt auch bei einem mit `GoalComplete` überlappenden
+  Horizont als Checkpoint erhalten; danach kann Retention den Sitzungsbeleg
+  sicher bis zum konfigurierten Limit abbauen. Auch die einmalige
+  Lock-Sentinel-Erzeugung ist konkurrenzsicher. Die v1-JSONL bleibt
+  ausschließlich lesbar und wird weder beschrieben noch durch
+  die veraltete read-only Option `--clear` gelöscht. Keine Providerregistrierung und kein
+  Modellaufruf in diesem Slice.
+- **39 neue Vertrags-/CLI-/Config-Tests:** Deduplikation, Goal-/SessionEnd-
+  Überlappung, Delta-Horizont, PreCompact/Stop-Semantik, Lease-Recovery,
+  Orphan-Job-Recovery, Korruptionsschutz, Datenschutz, Budget-Deferred,
+  parallele Budgetreservierung, Session-ID-Kollisionen, erlaubte
+  Receipt-Übergänge, bounded terminal retention und deterministisches Replay;
+  Retention-/Budget-Races, Review-Invarianten und Legacy-Read-only-Verhalten;
+  Gesamtsuite 216/216
+  grün.
 
 - **Opt-in Boot-Context-Lint:** `boot-context-lint PATH... [--format plain|json]`
   prüft explizit benannte Markdown-Bootdateien und Antigravity-Sidecar-JSON rein

@@ -5,7 +5,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Python Version](https://img.shields.io/badge/python-3.10%20|%203.11%20|%203.12%20|%203.13-blue.svg)](pyproject.toml)
 [![CI Status](https://img.shields.io/badge/CI-passing-brightgreen.svg)](.github/workflows/ci.yml)
-[![Tests](https://img.shields.io/badge/tests-177%20passed-brightgreen.svg)](tests)
+[![Tests](https://img.shields.io/badge/tests-216%20passed-brightgreen.svg)](tests)
 [![Platform](https://img.shields.io/badge/platform-Linux%20|%20Windows%20|%20macOS-lightgrey.svg)](pyproject.toml)
 [![Datenschutz](https://img.shields.io/badge/datenschutz-100%25%20Offline%20|%20Zero--Egress-brightgreen.svg)](SECURITY.md)
 [![Sicherheit](https://img.shields.io/badge/sicherheit-Local--First%20|%20Prozess--Isoliert-blue.svg)](SECURITY.md)
@@ -24,7 +24,7 @@
 
 ---
 
-**Status: 0.3.0 — Arbeitsablaufsteuerung & Injektormuster.** (Last-checked: 2026-08-26)
+**Status: 0.3.0 — Arbeitsablaufsteuerung & Injektormuster.** (Last-checked: 2026-08-28)
 
 WorkflowHooker bietet Hooks, die den **Arbeitsablauf** autonomer KI-Agenten steuern — nicht deren Wissen.
 
@@ -193,9 +193,48 @@ gebunden.
 
 ---
 
-## Kandidaten-Sammler fuer Skill-/Workflow-Extraktion (opt-in)
+## Kandidaten-Job- und Receipt-Vertrag (opt-in)
 
-Trennt den LEICHTEN Live-Hook vom TEUREN Extraktionsschritt: `candidate-collect <Stop|SessionEnd> --provider <name>` schreibt hoechstens EIN redigiertes Envelope (Zeiger, keine Transkriptinhalte) pro Sitzung — stumm, idempotent, fail-open, nur bei `[candidates] enabled = true` aktiv. `candidate-extract [--clear]` ist der rein lesende Offline-Schritt und verweist auf `skill-extractor`/`workflow-extract` als eigentliche Ausfuehrende. Aktivierung bleibt manuell und opt-in je Akteur (kein automatisches Eintragen in `settings.json`/`hooks.json`). Details: `README.md`, Abschnitt "Kandidaten-Sammler fuer Skill-/Workflow-Extraktion".
+`candidate-collect` bleibt ein leichter, stummer Lifecycle-Hook und startet
+kein Modell. `GoalComplete` plant den primären Job, `SessionEnd` nur einen noch
+nicht abgedeckten Resthorizont, `PreCompact` schreibt ausschließlich einen
+Checkpoint, `SessionStart` validiert und recovered intakte abgelaufene Leases
+derselben Sitzung, während verwaiste Job-Receipts auf `failed` gehen, und
+`Stop` prüft nur die Eligibility. Unveränderliche Jobs liegen unter
+`<state-dir>/candidates/jobs/`, atomar ersetzte Receipts unter
+`<state-dir>/candidates/receipts/`; die alte `candidates.jsonl` bleibt nur
+lesbar. Der vollständige Idempotenzschlüssel umfasst Provider, Session,
+Goal/Boundary, Horizont, Extractorversion und Privacyklasse.
+
+Receipts unterscheiden `pending`, `leased`, `noop`, `candidate`, `promoted`,
+`failed` und `deferred`, einschließlich Versuchszahl, Lease-Ende, Lease-Owner,
+Fehlerklasse, Kandidaten-IDs und Budget-Reservierungszeitpunkt. Externe
+Session-IDs werden für den Vertrag opak gehasht, unabhängig von der
+Dateinamens-Normalisierung. Budgetprüfung und Reservierung sind gemeinsam
+prozessübergreifend exklusiv. `candidate` benötigt mindestens eine
+Kandidaten-ID; nur die unveränderten geprüften IDs dürfen anschließend nach
+`promoted` wechseln. `candidate` bleibt bis zur Review aktiv; nur `noop`,
+`promoted` und `failed` sind terminal und danach unveränderlich.
+Ein vorhandener beschädigter Zustand wird
+nicht still zurückgesetzt. Im Spool liegt kein Transkriptinhalt; freie
+`observed`-Textfelder werden verworfen, gespeichert werden nur der lokale
+Pfadzeiger, dessen Hash und erlaubte Zähler. `candidate-extract` listet Jobs und Receipts, führt
+aber weiterhin keine Extraktion aus. Die veraltete Option `--clear` bleibt
+read-only und entfernt weder die alte JSONL-Kompatibilitätsdatei noch v2-Jobs.
+Retention wartet auf Budget- sowie gebänderte Session-/Receipt-Locks und
+schützt Tages-/Session-Budgetbelege bis zu einem persistenten Session-End-Marker.
+Dieser Marker wird auch bei einem mit `GoalComplete` überlappenden `SessionEnd`
+geschrieben, das keinen zweiten Job erzeugt. Beide Lockklassen sind auf jeweils
+256 Stripe-Dateien begrenzt und werden konkurrenzsicher initialisiert. Scheitert
+unter Windows die Joblöschung, stellt die
+Retention ein bereits entferntes Receipt wieder her. Receipt-Leser verwenden
+denselben Stripe-Lock; blockiert ein fremder Windows-Leser dennoch den
+atomaren Replace, bleibt der unveränderte Zustand sicher retry-fähig.
+Aktivierung und
+Providerregistrierung bleiben manuell.
+
+Die vollständige Konfiguration mit Job-, Sitzungs-, Tages- und Lease-Budgets
+steht in `README.md`, Abschnitt „Kandidaten-Job- und Receipt-Vertrag“.
 
 ---
 

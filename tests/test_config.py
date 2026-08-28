@@ -71,6 +71,10 @@ def test_candidates_disabled_by_default():
     config = Config()
     assert config.candidates.enabled is False
     assert config.candidates.max_records == 500
+    assert config.candidates.max_tokens_per_job == 12_000
+    assert config.candidates.max_jobs_per_session == 3
+    assert config.candidates.max_jobs_per_day == 20
+    assert config.candidates.lease_seconds == 900
 
 
 def test_load_config_parses_candidates_section(tmp_path: Path):
@@ -80,17 +84,47 @@ def test_load_config_parses_candidates_section(tmp_path: Path):
 [candidates]
 enabled = true
 max_records = 50
+extractor_version = "workflow-extract@test"
+privacy_class = "fixture-private"
+max_tokens_per_job = 4000
+max_jobs_per_session = 2
+max_jobs_per_day = 9
+lease_seconds = 120
 """,
         encoding="utf-8",
     )
     config = load_config(path)
     assert config.candidates.enabled is True
     assert config.candidates.max_records == 50
+    assert config.candidates.extractor_version == "workflow-extract@test"
+    assert config.candidates.privacy_class == "fixture-private"
+    assert config.candidates.max_tokens_per_job == 4000
+    assert config.candidates.max_jobs_per_session == 2
+    assert config.candidates.max_jobs_per_day == 9
+    assert config.candidates.lease_seconds == 120
 
 
 def test_config_validate_rejects_negative_max_records():
     config = Config()
     config.candidates.max_records = -1
+    with pytest.raises(ValueError):
+        config.validate()
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        ("max_tokens_per_job", -1),
+        ("max_jobs_per_session", -1),
+        ("max_jobs_per_day", -1),
+        ("lease_seconds", 0),
+        ("extractor_version", ""),
+        ("privacy_class", ""),
+    ],
+)
+def test_config_validate_rejects_invalid_candidate_contract(field, value):
+    config = Config()
+    setattr(config.candidates, field, value)
     with pytest.raises(ValueError):
         config.validate()
 

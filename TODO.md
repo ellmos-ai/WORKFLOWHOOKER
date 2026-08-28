@@ -6,25 +6,33 @@ and non-authoritative boundary.
 
 - [x] Define a small versioned event envelope with provider, lifecycle event,
   session reference, source anchor, observed counters, redaction status and
-  schema version. Events report observations, not task success.
-  (`workflowhooker/candidates.py`: `CandidateEvent`, `schema_version=1`,
-  `redaction="pointer-only"` -- 2026-08-24, T-20260824-635659187.)
+  schema version. The legacy `CandidateEvent` v1 remains readable; the live
+  writer now emits immutable `LifecycleJob` v2 envelopes plus atomic receipts
+  and checkpoints. Events report observations, not task success.
+  (`workflowhooker/candidates.py`, 2026-08-28, T-20260828-535019565.)
 - [x] Separate the live hook from expensive extraction/evaluation: the hook may
   enqueue a bounded, redacted record; an explicit offline process may derive a
-  candidate workflow or warning later.
-  (`candidate-collect` -- silent, idempotent-per-session, fail-open, opt-in
-  via `[candidates] enabled`; `candidate-extract` -- offline, read-only,
-  lists queued signals and points to `skill-extractor`/`workflow-extract`
-  as the actual extractors, never runs extraction itself. Activation in any
-  given agent's hook config remains a manual, documented, opt-in step --
-  README "Install & Quickstart".)
+  candidate workflow or warning later. The v2 lifecycle contract is hybrid:
+  GoalComplete primary, SessionEnd fallback, PreCompact checkpoint,
+  SessionStart lease recovery and Stop eligibility only. Jobs are keyed by
+  provider/session/goal-or-boundary/horizon/extractor/privacy; budget overflow
+  is `deferred`, reservations are atomic across jobs, candidate review remains
+  non-terminal, terminal history is bounded, and no transcript content enters
+  the spool. External session IDs are opaque contract hashes, separate from
+  legacy state-filename normalization. Retention preserves still-relevant
+  daily/session budget evidence and uses bounded shared session/receipt locks.
+  `candidate-extract` only lists jobs and points to the canonical
+  extractor skills. Provider registration remains a later manual shadow slice.
+- [x] Add a deterministic lifecycle replay fixture covering duplicate events,
+  GoalComplete/SessionEnd overlap, checkpoints and stable idempotency keys.
+  (`replay_lifecycle`, 2026-08-28, T-20260828-535019565.)
 - [x] Add an explicit, read-only boot-context lint for dated Agy run reports,
   positive boot-file log targets, and duplicated Sidecar prompt drift. Keep it
   opt-in and outside SessionStart wiring so it diagnoses policy violations
   without becoming policy authority.
   (`boot-context-lint`, 2026-08-26, T-20260826-153886115.)
-- [ ] Add a deterministic replay fixture for event sequences and prove that
-  cooldown, idle-disable and closing-gate results are stable.
+- [ ] Extend deterministic replay beyond the lifecycle spool and prove that
+  cooldown, idle-disable and closing-gate results are stable as well.
 - [ ] Require immutable candidates, holdout cases, explicit approval and
   rollback before any learned threshold or rule is promoted. Live hooks never
   self-modify.

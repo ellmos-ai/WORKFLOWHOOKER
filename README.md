@@ -5,7 +5,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Python Version](https://img.shields.io/badge/python-3.10%20|%203.11%20|%203.12%20|%203.13-blue.svg)](pyproject.toml)
 [![CI Status](https://img.shields.io/badge/CI-passing-brightgreen.svg)](.github/workflows/ci.yml)
-[![Tests](https://img.shields.io/badge/tests-177%20passed-brightgreen.svg)](tests)
+[![Tests](https://img.shields.io/badge/tests-216%20passed-brightgreen.svg)](tests)
 [![Platform](https://img.shields.io/badge/platform-Linux%20|%20Windows%20|%20macOS-lightgrey.svg)](pyproject.toml)
 [![Privacy](https://img.shields.io/badge/privacy-100%25%20Offline%20|%20Zero--Egress-brightgreen.svg)](SECURITY.md)
 [![Security](https://img.shields.io/badge/security-Local--First%20|%20Process--Isolated-blue.svg)](SECURITY.md)
@@ -24,7 +24,7 @@
 
 ---
 
-**Status: 0.3.0 — Autonomous Workflow Governance & Injector Engine.** (Last-checked: 2026-08-26)
+**Status: 0.3.0 — Autonomous Workflow Governance & Injector Engine.** (Last-checked: 2026-08-28)
 
 Umgesetzt: `StateSource`-Protokoll, Config-Schicht (`workflowhooker.toml`,
 `checks = []` per Default), read-only Adapter `git`, `files` (LOCK*.txt und
@@ -36,7 +36,7 @@ aktive Tasks), drei einzeln zuschaltbare Checks (`closing_gate`,
 Meldungsbudget + Cooldown bleiben die gemeinsame 4-Augen-Bremse. Provider
 `claude`, `codex`, `kimi`, `agy` (Hook-Snippet-Generator ohne `PreToolUse` im
 Default, optionale separate Blocker-Variante) + `manual` (CLI); der
-`git`-Provider bleibt ein dokumentierter Stub. 177 Tests sind grün, darunter
+`git`-Provider bleibt ein dokumentierter Stub. 216 Tests sind grün, darunter
 echte Temp-Git-Repo-Fixtures.
 
 Hooks, die den **Arbeitsablauf** eines Agenten steuern — nicht sein Wissen.
@@ -366,46 +366,79 @@ der Hook-Schicht.
    snippet.json` einen Block für `~/.codex/hooks.json`. Codex muss ihn anschließend
    interaktiv über `/hooks` freigeben.
 
-## Kandidaten-Sammler fuer Skill-/Workflow-Extraktion (opt-in)
+## Kandidaten-Job- und Receipt-Vertrag (opt-in)
 
-Trennt bewusst den LEICHTEN Live-Hook vom TEUREN Extraktionsschritt
-(`TODO.md`, Punkt 2). Zwei getrennte Kommandos:
+Der Live-Pfad trennt weiterhin den **leichten Lifecycle-Hook** von der späteren
+semantischen Extraktion. Seit dem S1-Vertrag schreibt `candidate-collect` keine
+neuen JSONL-Signale mehr, sondern unveränderliche, versionierte Job-Envelopes
+unter `<state-dir>/candidates/jobs/` und atomar ersetzte Receipts unter
+`<state-dir>/candidates/receipts/`. Die frühere `candidates.jsonl` bleibt nur
+lesbar, damit bestehende lokale Signale nicht verloren gehen.
 
-- **`python -m workflowhooker candidate-collect <Stop|SessionEnd> --provider
-  <name>`** — der Live-Hook. Liest dasselbe stdin-JSON wie `hook-run` und
-  schreibt hoechstens EIN redigiertes Envelope pro Sitzung in die
-  Warteschlange (`<state-dir>/candidates.jsonl`): `provider`, `event`,
-  `session_ref`, `source_anchor` (nur der `transcript_path`-ZEIGER aus dem
-  stdin-JSON, falls vorhanden — niemals Transkriptinhalt), ein paar billige
-  `observed`-Zaehler und `redaction = "pointer-only"`. Kein stdout, keine
-  `hookSpecificOutput`-Injektion — der Agent bekommt davon nichts zu sehen.
-  **Stumm per Default:** ohne `[candidates] enabled = true` in der Config
-  ist der Befehl ein No-Op (kein State-Ordner, keine Datei), selbst wenn der
-  Hook versehentlich verdrahtet ist. **Idempotent:** ein mehrfach feuernder
-  Hook (z. B. mehrere Stop-Events in derselben Sitzung) reiht trotzdem nur
-  einmal ein. **Fail-open:** I/O-Fehler beim Schreiben werden verschluckt,
-  der Hook bricht nie ab.
-- **`python -m workflowhooker candidate-extract [--format plain|json]
-  [--clear]`** — der OFFLINE-Schritt. Rein lesend: listet die Warteschlange
-  auf und verweist auf die Skills, die die eigentliche (teure, semantische)
-  Ableitung ausfuehren — **`skill-extractor`** (Chatverlauf →
-  wiederverwendbarer Skill) bzw. **`workflow-extract`** (Chatverlauf/
-  Automations-Prompt → Cron-/Loop-Automatisierung). Dieser Befehl fuehrt
-  selbst KEINE Extraktion aus.
+| Ereignis | Wirkung |
+|---|---|
+| `GoalComplete` | Primärer Trigger; benötigt `goal_id`/`goal_ref` und plant genau einen Job für den belegten Horizont. |
+| `SessionEnd` | Fallback; derselbe bereits durch ein Goal geplante Horizont ist ein idempotenter No-op, ein neuer Horizont beginnt beim vorherigen. |
+| `PreCompact` | Schreibt ausschließlich einen atomaren Checkpoint, keinen Extraktionsjob. |
+| `SessionStart` | Validiert abgelaufene Leases derselben Provider-/Session-Kombination; intakte Jobs gehen auf `pending`, fehlende oder beschädigte Job-Envelopes auf `failed`. |
+| `Stop` | Führt nur einen billigen Eligibility-Check aus und schreibt keinen Job. |
 
-**Aktivierung bleibt manuell und opt-in, pro Akteur:**
+Der Jobschlüssel umfasst Vertragsversion, Provider, Session, Goal bzw.
+Boundary-Epoche, Horizonthash, Extractorversion und Privacyklasse. Jobs sind
+unveränderlich; Receipts tragen `pending|leased|noop|candidate|promoted|failed|deferred`,
+Versuchszahl, Lease-Ende, Lease-Owner, Fehlerklasse, Kandidaten-IDs und den
+Zeitpunkt einer tatsächlich reservierten Budgeteinheit. Externe Session-IDs
+werden für diesen Vertrag opak SHA-256-abgebildet; ihre getrennte
+Dateinamens-Normalisierung kann deshalb keine Sessions im Jobschlüssel
+zusammenfallen lassen. Budgetprüfung und Reservierung sowie die erneute
+Zulassung eines `deferred`-Jobs laufen unter einem gemeinsamen lokalen Lock.
+Receipt-Übergänge sind explizit begrenzt: `candidate` benötigt mindestens eine
+Kandidaten-ID, `promoted` ist ausschließlich danach und ohne Austausch der
+geprüften IDs erlaubt. Bis zur Review bleibt `candidate` aktive Arbeit; nur
+`noop`, `promoted` und `failed` sind terminal und danach ausschließlich
+identisch-idempotent wiederholbar. Ein Crash zwischen
+Job und Receipt wird idempotent nachgeholt, ein beschädigtes vorhandenes
+Receipt wird niemals still zurückgesetzt. Writes verwenden eine gleichlokale
+Temporärdatei, `fsync` und atomisches Create/Replace. Die Retention entfernt
+nur die ältesten terminalen Paare, deren Tages-/Session-Budgetbeleg nicht mehr
+benötigt wird. Pipeline und Retention verwenden dafür einen persistenten Session-End-Marker,
+auch wenn `SessionEnd` denselben Horizont wie das letzte `GoalComplete` meldet
+und deshalb keinen zweiten Job erzeugt. Erst dann wird der Budgetbeleg für eine
+spätere Grenze derselben Session nicht mehr benötigt.
+Sie läuft unter Budget- sowie gebänderten Session-/Receipt-Locks; jede
+Lockklasse besitzt höchstens 256 dauerhafte Stripe-Dateien; ihre einmalige
+Sentinel-Initialisierung ist ebenfalls konkurrenzsicher. Scheitert unter
+Windows die Löschung der unveränderlichen Jobdatei, wird das bereits entfernte
+Receipt aus seinem exakten Payload wiederhergestellt. Veränderliche Receipts
+werden auch beim Lesen über denselben Stripe-Lock serialisiert; verweigert ein
+fremder Windows-Reader trotzdem den atomaren Replace, bleibt der unveränderte
+Receipt-Zustand sicher retry-fähig. Aktive oder
+aufschiebbare Arbeit wird nie für ein Größenlimit verworfen.
+
+Im Spool liegt **kein Transkriptinhalt**. Freie `observed`-Textfelder werden
+am Kernvertrag verworfen. `source_anchor` ist ausschließlich
+der vom Provider übergebene lokale Pfadzeiger; zusätzlich wird sein Hash
+gespeichert. Ein fehlender expliziter Horizonthash wird billig aus Pfad,
+Dateimetadaten und redigierten Zählern gebildet, ohne die Datei zu lesen.
 
 ```toml
 [candidates]
-enabled = true       # Default: false -- stumm, bis explizit zugestimmt
-max_records = 500    # bounded queue -- aeltere Eintraege fallen zuerst raus
+enabled = true
+max_records = 500
+extractor_version = "workflow-extract@1.1.0+skill-extractor@1.0.0"
+privacy_class = "local-private"
+max_tokens_per_job = 12000
+max_jobs_per_session = 3
+max_jobs_per_day = 20
+lease_seconds = 900
 ```
 
-Wie bei `hook-run` gibt es **kein** automatisches Eintragen in eine echte
-`settings.json`/`hooks.json` — jeder Akteur verdrahtet
-`candidate-collect Stop --provider <name>` (bzw. `SessionEnd`, falls der
-Akteur dieses Event kennt) selbst in seinem eigenen Hook-System, analog zu
-den `hook-run`-Beispielen oben.
+`candidate-extract [--format plain|json]` listet v2-Jobs samt Receipt und
+verweist weiterhin auf `skill-extractor`/`workflow-extract`; es startet selbst
+kein Modell. Die veraltete Kompatibilitätsoption `--clear` ist ein read-only
+No-op: Weder die alte JSONL-Datei noch unveränderliche v2-Jobs werden entfernt.
+Provider-Snippets und echte
+Hookregistries werden in diesem Slice nicht automatisch verändert.
 
 ## Target & Wake-Up Injectors
 
