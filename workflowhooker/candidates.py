@@ -29,7 +29,7 @@ import time
 from contextlib import contextmanager
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
-from pathlib import Path
+from pathlib import Path, PurePosixPath, PureWindowsPath
 from typing import Iterable
 
 SCHEMA_VERSION = 1
@@ -206,6 +206,35 @@ def _canonical_hash(parts: Iterable[object]) -> str:
     return hashlib.sha256(encoded.encode("utf-8")).hexdigest()
 
 
+def compute_staged_candidate_id(payload: dict) -> str:
+    """Return the content ID for a staged artifact, excluding its ID field."""
+
+    core = dict(payload)
+    core.pop("candidate_id", None)
+    encoded = json.dumps(core, ensure_ascii=False, separators=(",", ":"), sort_keys=True)
+    return hashlib.sha256(encoded.encode("utf-8")).hexdigest()
+
+
+def compute_source_window_hash(
+    *,
+    source_anchor_hash: str,
+    source_window_start: int,
+    source_window_end: int,
+    horizon_hash: str,
+) -> str:
+    """Bind content-free source offsets to one immutable lifecycle horizon."""
+
+    return _canonical_hash(
+        (
+            "source-window/1",
+            source_anchor_hash,
+            source_window_start,
+            source_window_end,
+            horizon_hash,
+        )
+    )
+
+
 def _safe_identifier(value: str | None, *, fallback: str) -> str:
     if not isinstance(value, str):
         return fallback
@@ -229,7 +258,21 @@ def _safe_source_anchor(value: str | None) -> str | None:
         or stripped.lower().startswith("file:")
         or Path(stripped).suffix.lower() in {".json", ".jsonl", ".ndjson", ".log"}
     )
-    return stripped if path_like else None
+    if not path_like:
+        return None
+    try:
+        candidate = Path(stripped)
+        if candidate.is_file():
+            return str(candidate.resolve(strict=True))
+    except OSError:
+        pass
+    if (
+        not Path(stripped).is_absolute()
+        and not PureWindowsPath(stripped).is_absolute()
+        and not PurePosixPath(stripped).is_absolute()
+    ):
+        return None
+    return stripped
 
 
 def _safe_observed(values: dict | None) -> dict:
@@ -306,6 +349,60 @@ def derive_horizon_hash(
     return _canonical_hash((source_anchor or "", source_stat, safe_observed))
 
 
+def source_size_bytes(source_anchor: str | None) -> int | None:
+    """Return a cheap, content-free byte horizon for an existing local file."""
+
+    if not source_anchor:
+        return None
+    try:
+        path = Path(source_anchor)
+        if not path.is_file():
+            return None
+        return path.stat().st_size
+    except OSError:
+        return None
+
+
+def hash_source_window(
+    source_anchor: str | None,
+    source_window_start: int | None,
+    source_window_end: int | None,
+) -> str | None:
+    """Hash one exact byte window without retaining transcript content."""
+
+    if (
+        not source_anchor
+        or source_window_start is None
+        or source_window_end is None
+        or source_window_start < 0
+        or source_window_end < source_window_start
+    ):
+        return None
+    digest = hashlib.sha256()
+    try:
+        with Path(source_anchor).open("rb") as handle:
+            before = os.fstat(handle.fileno())
+            if before.st_size < source_window_end:
+                return None
+            handle.seek(source_window_start)
+            remaining = source_window_end - source_window_start
+            while remaining:
+                block = handle.read(min(remaining, 1024 * 1024))
+                if not block:
+                    return None
+                digest.update(block)
+                remaining -= len(block)
+            after = os.fstat(handle.fileno())
+            if (
+                after.st_size < source_window_end
+                or after.st_mtime_ns != before.st_mtime_ns
+            ):
+                return None
+    except OSError:
+        return None
+    return digest.hexdigest()
+
+
 @dataclass(frozen=True)
 class LifecycleJob:
     schema_version: int
@@ -326,6 +423,10 @@ class LifecycleJob:
     redaction: str
     budget: BudgetSpec
     created_at: float
+    source_window_start: int | None = None
+    source_window_end: int | None = None
+    source_window_hash: str | None = None
+    source_window_content_hash: str | None = None
 
     def to_dict(self) -> dict:
         return asdict(self)
@@ -351,6 +452,18 @@ class LifecycleJob:
             redaction=str(data.get("redaction", REDACTION_POINTER_ONLY)),
             budget=BudgetSpec.from_dict(data.get("budget")),
             created_at=float(data["created_at"]),
+            source_window_start=(
+                int(data["source_window_start"])
+                if data.get("source_window_start") is not None
+                else None
+            ),
+            source_window_end=(
+                int(data["source_window_end"])
+                if data.get("source_window_end") is not None
+                else None
+            ),
+            source_window_hash=data.get("source_window_hash"),
+            source_window_content_hash=data.get("source_window_content_hash"),
         )
 
     @classmethod
@@ -370,6 +483,8 @@ class LifecycleJob:
         observed: dict | None,
         budget: BudgetSpec,
         now: float,
+        source_window_start: int | None = None,
+        source_window_end: int | None = None,
     ) -> "LifecycleJob":
         if event not in {"GoalComplete", "SessionEnd"}:
             raise ValueError(f"event does not create extraction jobs: {event}")
@@ -380,6 +495,16 @@ class LifecycleJob:
         extractor_version = _safe_identifier(extractor_version, fallback="unknown-extractor")
         privacy_class = _safe_identifier(privacy_class, fallback="local-private")
         source_anchor = _safe_source_anchor(source_anchor)
+        if source_window_start is not None:
+            source_window_start = max(0, int(source_window_start))
+        if source_window_end is not None:
+            source_window_end = max(0, int(source_window_end))
+        if (
+            source_window_start is not None
+            and source_window_end is not None
+            and source_window_start > source_window_end
+        ):
+            raise ValueError("source window start must not exceed end")
         from_horizon_hash = _safe_digest(from_horizon_hash) if from_horizon_hash else None
         horizon_hash = _safe_digest(horizon_hash)
         key = compute_job_key(
@@ -391,6 +516,29 @@ class LifecycleJob:
             extractor_version=extractor_version,
             privacy_class=privacy_class,
         )
+        source_anchor_hash = (
+            hashlib.sha256(source_anchor.encode("utf-8")).hexdigest()
+            if source_anchor
+            else None
+        )
+        source_window_hash = None
+        source_window_content_hash = None
+        if (
+            source_anchor_hash is not None
+            and source_window_start is not None
+            and source_window_end is not None
+        ):
+            source_window_hash = compute_source_window_hash(
+                source_anchor_hash=source_anchor_hash,
+                source_window_start=source_window_start,
+                source_window_end=source_window_end,
+                horizon_hash=horizon_hash,
+            )
+            source_window_content_hash = hash_source_window(
+                source_anchor,
+                source_window_start,
+                source_window_end,
+            )
         return cls(
             schema_version=JOB_SCHEMA_VERSION,
             contract_version=JOB_CONTRACT_VERSION,
@@ -405,11 +553,15 @@ class LifecycleJob:
             extractor_version=extractor_version,
             privacy_class=privacy_class,
             source_anchor=source_anchor,
-            source_anchor_hash=(hashlib.sha256(source_anchor.encode("utf-8")).hexdigest() if source_anchor else None),
+            source_anchor_hash=source_anchor_hash,
             observed=_safe_observed(observed),
             redaction=REDACTION_POINTER_ONLY,
             budget=budget,
             created_at=now,
+            source_window_start=source_window_start,
+            source_window_end=source_window_end,
+            source_window_hash=source_window_hash,
+            source_window_content_hash=source_window_content_hash,
         )
 
 
@@ -477,6 +629,7 @@ class SessionCheckpoint:
     scheduled_through_horizon_hash: str | None = None
     last_job_key: str | None = None
     source_anchor_hash: str | None = None
+    scheduled_through_source_offset: int | None = None
     session_ended_at: float | None = None
     updated_at: float = 0.0
 
@@ -493,6 +646,11 @@ class SessionCheckpoint:
             scheduled_through_horizon_hash=data.get("scheduled_through_horizon_hash"),
             last_job_key=data.get("last_job_key"),
             source_anchor_hash=data.get("source_anchor_hash"),
+            scheduled_through_source_offset=(
+                int(data["scheduled_through_source_offset"])
+                if data.get("scheduled_through_source_offset") is not None
+                else None
+            ),
             session_ended_at=(
                 float(data["session_ended_at"])
                 if data.get("session_ended_at") is not None
@@ -685,6 +843,7 @@ class CandidateSpool:
         self.jobs_dir = self.root / "jobs"
         self.receipts_dir = self.root / "receipts"
         self.checkpoints_dir = self.root / "checkpoints"
+        self.staged_dir = self.root / "staged"
         self.locks_dir = self.root / "locks"
         self.max_records = max_records
 
@@ -697,6 +856,15 @@ class CandidateSpool:
     def checkpoint_path(self, provider: str, session_ref: str) -> Path:
         key = _canonical_hash((provider, session_ref))
         return self.checkpoints_dir / f"{key}.json"
+
+    def staged_candidate_path(self, candidate_id: str) -> Path:
+        if len(candidate_id) != 64:
+            raise ValueError("candidate_id must be a SHA-256 digest")
+        try:
+            int(candidate_id, 16)
+        except ValueError as exc:
+            raise ValueError("candidate_id must be a SHA-256 digest") from exc
+        return self.staged_dir / f"{candidate_id.lower()}.json"
 
     def receipt_lock_path(self, job_key: str) -> Path:
         # Fixed lock striping bounds lock-file growth and avoids deleting a
@@ -736,6 +904,48 @@ class CandidateSpool:
             self.checkpoint_path(checkpoint.provider, checkpoint.session_ref),
             checkpoint.to_dict(),
         )
+
+    def stage_candidate(self, candidate_id: str, payload: dict) -> bool:
+        """Create one immutable local candidate artifact.
+
+        Replaying the exact same candidate is idempotent. A different payload
+        under an existing content-derived ID is treated as corrupt state and
+        never overwrites the first artifact.
+        """
+
+        path = self.staged_candidate_path(candidate_id)
+        if payload.get("candidate_id") != candidate_id:
+            raise ValueError("candidate payload ID does not match path ID")
+        if compute_staged_candidate_id(payload) != candidate_id:
+            raise ValueError("candidate payload does not match its content ID")
+        if path.exists():
+            if _read_json(path) != payload:
+                raise CorruptSpoolError("candidate ID collision")
+            return False
+        if _atomic_create_json(path, payload):
+            return True
+        if _read_json(path) != payload:
+            raise CorruptSpoolError("candidate ID collision")
+        return False
+
+    def load_staged_candidate(self, candidate_id: str) -> dict:
+        payload = _read_json(self.staged_candidate_path(candidate_id))
+        if payload.get("candidate_id") != candidate_id:
+            raise CorruptSpoolError("candidate payload ID does not match path ID")
+        if compute_staged_candidate_id(payload) != candidate_id:
+            raise CorruptSpoolError("candidate content hash mismatch")
+        return payload
+
+    def list_staged_candidates(self) -> list[dict]:
+        if not self.staged_dir.exists():
+            return []
+        staged: list[dict] = []
+        for path in sorted(self.staged_dir.glob("*.json")):
+            try:
+                staged.append(self.load_staged_candidate(path.stem))
+            except (CorruptSpoolError, ValueError):
+                continue
+        return staged
 
     def list_jobs(self) -> list[LifecycleJob]:
         if not self.jobs_dir.exists():
@@ -980,6 +1190,40 @@ class CandidateSpool:
         self.prune(now=now)
         return receipt
 
+    def release_for_retry(
+        self,
+        job_key: str,
+        *,
+        lease_owner: str,
+        error_class: str,
+        now: float | None = None,
+    ) -> JobReceipt:
+        """Return an owned lease to pending after a transient runner fault."""
+
+        if not lease_owner.strip():
+            raise ValueError("lease_owner must not be empty")
+        if not error_class.strip():
+            raise ValueError("error_class must not be empty")
+        now = time.time() if now is None else now
+        with _exclusive_file_lock(self.receipt_lock_path(job_key)):
+            receipt = self._load_receipt_unlocked(job_key)
+            if receipt.status == "pending" and receipt.lease_owner is None:
+                return receipt
+            if receipt.status != "leased":
+                raise ValueError(f"receipt is not leased: {receipt.status}")
+            if receipt.lease_owner != lease_owner:
+                raise PermissionError("receipt is leased by another owner")
+            receipt.status = "pending"
+            receipt.lease_expires_at = None
+            receipt.lease_owner = None
+            receipt.error_class = error_class
+            receipt.updated_at = now
+            try:
+                _atomic_write_json(self.receipt_path(job_key), receipt.to_dict())
+            except OSError:
+                return self._load_receipt_unlocked(job_key)
+            return receipt
+
     def recover_expired(self, *, provider: str, session_ref: str, now: float | None = None) -> list[str]:
         now = time.time() if now is None else now
         recovered: list[str] = []
@@ -1221,6 +1465,7 @@ class LifecycleController:
             if source_anchor
             else None
         )
+        source_window_end = source_size_bytes(source_anchor)
         if event == "PreCompact":
             checkpoint.precompact_horizon_hash = horizon
             checkpoint.source_anchor_hash = anchor_hash
@@ -1256,12 +1501,24 @@ class LifecycleController:
             observed=observed,
             budget=self.budget,
             now=now,
+            source_window_start=(
+                checkpoint.scheduled_through_source_offset
+                if (
+                    checkpoint.source_anchor_hash == anchor_hash
+                    and checkpoint.scheduled_through_source_offset is not None
+                    and source_window_end is not None
+                    and checkpoint.scheduled_through_source_offset <= source_window_end
+                )
+                else (0 if source_window_end is not None else None)
+            ),
+            source_window_end=source_window_end,
         )
         result = self.spool.submit(job, now=now)
         if result.action not in {"corrupt-state"}:
             checkpoint.scheduled_through_horizon_hash = horizon
             checkpoint.last_job_key = job.job_key
             checkpoint.source_anchor_hash = anchor_hash
+            checkpoint.scheduled_through_source_offset = source_window_end
             if event == "SessionEnd":
                 checkpoint.session_ended_at = now
             checkpoint.updated_at = now

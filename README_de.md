@@ -5,7 +5,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Python Version](https://img.shields.io/badge/python-3.10%20|%203.11%20|%203.12%20|%203.13-blue.svg)](pyproject.toml)
 [![CI Status](https://img.shields.io/badge/CI-passing-brightgreen.svg)](.github/workflows/ci.yml)
-[![Tests](https://img.shields.io/badge/tests-216%20passed-brightgreen.svg)](tests)
+[![Tests](https://img.shields.io/badge/tests-240%20passed-brightgreen.svg)](tests)
 [![Platform](https://img.shields.io/badge/platform-Linux%20|%20Windows%20|%20macOS-lightgrey.svg)](pyproject.toml)
 [![Datenschutz](https://img.shields.io/badge/datenschutz-100%25%20Offline%20|%20Zero--Egress-brightgreen.svg)](SECURITY.md)
 [![Sicherheit](https://img.shields.io/badge/sicherheit-Local--First%20|%20Prozess--Isoliert-blue.svg)](SECURITY.md)
@@ -24,7 +24,7 @@
 
 ---
 
-**Status: 0.3.0 — Arbeitsablaufsteuerung & Injektormuster.** (Last-checked: 2026-08-28)
+**Status: 0.3.0 — Arbeitsablaufsteuerung & Injektormuster.** (Last-checked: 2026-08-29)
 
 WorkflowHooker bietet Hooks, die den **Arbeitsablauf** autonomer KI-Agenten steuern — nicht deren Wissen.
 
@@ -218,8 +218,39 @@ Kandidaten-ID; nur die unveränderten geprüften IDs dürfen anschließend nach
 Ein vorhandener beschädigter Zustand wird
 nicht still zurückgesetzt. Im Spool liegt kein Transkriptinhalt; freie
 `observed`-Textfelder werden verworfen, gespeichert werden nur der lokale
-Pfadzeiger, dessen Hash und erlaubte Zähler. `candidate-extract` listet Jobs und Receipts, führt
-aber weiterhin keine Extraktion aus. Die veraltete Option `--clear` bleibt
+Pfadzeiger, dessen Hash, die inhaltsfreien Byte-Grenzen des freigegebenen
+Fensters und erlaubte Zähler. Ein später angehängter Sessionabschnitt wird
+dadurch nicht versehentlich mitgelesen. Ein lokaler Window-Hash bindet
+Pfad-Hash, Start, Ende und Horizont gegen nachträgliche Offset-Änderungen.
+Zusätzlich wird beim Job ein SHA-256-Hash über genau diese Bytes gebildet, ohne
+Inhalt im Spool zu speichern. Dadurch scheitern auch gleich lange
+In-place-Ersetzungen vor dem Runner. Historische S1-Jobs ohne diese Bindung
+müssen für S2 neu eingereiht werden.
+Existierende relative Quellen werden schon beim Enqueue absolut aufgelöst;
+nicht auflösbare relative Anker werden verworfen und können nach einem
+`cwd`-Wechsel nicht auf eine andere Datei zeigen.
+
+`ExtractorConsumer` ist die explizite lokale S2-Bibliotheksoberfläche. Ihr
+injizierter Runner erhält einen Auftrag, der zwingend die kanonischen Skills
+`workflow-extract` und `skill-extractor` lädt; WorkflowHooker dupliziert deren
+semantische Regeln nicht. Vor dem Aufruf werden Fenster-, Token- und
+Privacygrenzen geprüft, Secrets und PII einschließlich strukturierter
+Secret-Felder redigiert und lokale Hash-/Ereignisanker gebildet. Der
+vollständige serialisierte Auftrag wird konservativ gegen das
+Job-Tokenbudget begrenzt; der Runner muss dieselbe Obergrenze mit seinem
+modellspezifischen Tokenizer für Ein- und Ausgabe durchsetzen. Zulässig sind
+nur `noop`, `lesson`, `skill_update_candidate` und `workflow_candidate`.
+Der Runner muss die tatsächlich geladenen Skill-Versionen/-Hashes und seine
+Ein-/Ausgabe-Tokens quittieren; falsche Receipts oder Budgetüberschreitungen
+scheitern geschlossen. Ein Timeout gibt die Lease erst frei, nachdem der
+Runner zurückgekehrt ist oder sich selbst hart beendet hat; es bleibt kein
+weiterarbeitender Consumer-Thread zurück. Kandidaten werden unveränderlich unter
+`<state-dir>/candidates/staged/` abgelegt, bleiben reviewpflichtig und dürfen
+nicht direkt promoviert werden. Es gibt weiterhin keine automatische Providerregistrierung,
+USMC-Promotion oder kanonische Skilländerung.
+
+`candidate-extract` listet Jobs und Receipts weiterhin rein lesend. Die
+veraltete Option `--clear` bleibt
 read-only und entfernt weder die alte JSONL-Kompatibilitätsdatei noch v2-Jobs.
 Retention wartet auf Budget- sowie gebänderte Session-/Receipt-Locks und
 schützt Tages-/Session-Budgetbelege bis zu einem persistenten Session-End-Marker.
@@ -230,8 +261,7 @@ unter Windows die Joblöschung, stellt die
 Retention ein bereits entferntes Receipt wieder her. Receipt-Leser verwenden
 denselben Stripe-Lock; blockiert ein fremder Windows-Leser dennoch den
 atomaren Replace, bleibt der unveränderte Zustand sicher retry-fähig.
-Aktivierung und
-Providerregistrierung bleiben manuell.
+Aktivierung und Providerregistrierung bleiben manuell.
 
 Die vollständige Konfiguration mit Job-, Sitzungs-, Tages- und Lease-Budgets
 steht in `README.md`, Abschnitt „Kandidaten-Job- und Receipt-Vertrag“.

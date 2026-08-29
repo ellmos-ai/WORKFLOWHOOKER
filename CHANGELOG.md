@@ -2,9 +2,40 @@
 
 Alle nennenswerten Aenderungen an WorkflowHooker.
 
-## [Unreleased] - 2026-08-28
+## [Unreleased] - 2026-08-29
 
 ### Hinzugefügt
+
+- **Neutraler Extractor-Consumer (S2, 2026-08-29):**
+  `workflowhooker.extractor_consumer.ExtractorConsumer` konsumiert einen
+  geleasten S1-Job über einen injizierten Runner und verlangt im neutralen
+  Auftrag ausdrücklich die kanonischen Skills `workflow-extract` und
+  `skill-extractor`. Inhaltsfreie Byte-Horizonte binden das tatsächlich
+  freigegebene Sessionfenster; nachträgliche Anhänge und bereits verarbeitete
+  Präfixe bleiben außerhalb. Vor dem Runner gelten Fenster-/Tokenbudget,
+  Privacyklassen, Secret-/PII-Redaction sowie lokale Hash-/Ereignisanker; ein
+  inhaltsfreier Window-Hash schützt die gespeicherten Offsets vor stiller
+  Veränderung; ein zusätzlicher SHA-256-Hash über die freigegebenen Bytes
+  erkennt gleich lange Quellenersetzungen, ohne Transkriptinhalt zu speichern.
+  Existierende relative Quellen werden beim Enqueue absolut kanonisiert;
+  unauflösbare relative Anker werden verworfen.
+  Ergebnisse sind strikt auf `noop|lesson|skill_update_candidate|workflow_candidate`
+  begrenzt; unbekannte Felder, unbelegte Referenzen, falsche versionierte
+  Skill-Load-Receipts oder quittierte Tokenüberschreitungen scheitern
+  geschlossen.
+  Nicht leere Resultate werden atomar und unveränderlich unter
+  `candidates/staged/` abgelegt, immer reviewpflichtig und niemals direkt
+  promoviert. Timeouts geben die Lease erst nach Runner-Rückkehr beziehungsweise
+  runnerseitiger harter Beendigung mit Fehlerklasse für einen idempotenten
+  Retry frei. Keine Providerregistrierung, Publikation,
+  USMC-Promotion oder kanonische Skillmutation.
+- **24 S2-Vertragstests:** No-evidence, verifizierte Korrektur,
+  Delta-/Append-Fenster, Halluzinationsabwehr, striktes Ergebnisschema,
+  Secret-/PII-Redaction, Timeout-Retry, Budget-Deferred,
+  strukturierte/quotierte Secrets, Quellenersetzung, Skill-Load-Receipt,
+  Token-Usage, Windows-Receipt-Fallback, Altjob-Requeue und unveränderte
+  relative CWD-Drift und unveränderte kanonische Skills; Gesamtsuite 240/240
+  grün.
 
 - **Atomarer Lifecycle-Job-/Receipt-Vertrag (S1, 2026-08-28):** Der bisherige
   JSONL-Live-Writer wurde durch unveränderliche `LifecycleJob`-v2-Envelopes,

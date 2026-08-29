@@ -17,6 +17,7 @@ from .injectors import (
     build_goal_message,
     build_loop_briefing,
 )
+from .extractor_consumer import ConsumerResult, ExtractorConsumer, ExtractorRunner
 from .protocol import ProjectState, StateSource
 
 __version__ = "0.3.0"
@@ -32,5 +33,8 @@ __all__ = [
     "PolicyInjector",
     "build_goal_message",
     "build_loop_briefing",
+    "ConsumerResult",
+    "ExtractorConsumer",
+    "ExtractorRunner",
     "__version__",
 ]

@@ -102,7 +102,7 @@ def test_security_policy_consistency():
     assert security_file.exists()
     content = security_file.read_text(encoding="utf-8")
     assert "Execution Safety" in content
-    assert "0.2.x" in content
+    assert "0.3.x" in content
 
 
 def test_roadmap_consistency():
@@ -146,7 +146,7 @@ def test_timestamp_currency():
     readme_de = (root / "README_de.md").read_text(encoding="utf-8")
     llms = (root / "llms.txt").read_text(encoding="utf-8")
 
-    assert "2026-08-28" in readme_en
-    assert "2026-08-28" in readme_de
-    assert "2026-08-28" in llms
+    assert "2026-08-29" in readme_en
+    assert "2026-08-29" in readme_de
+    assert "2026-08-29" in llms
 

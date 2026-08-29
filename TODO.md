@@ -21,8 +21,13 @@ and non-authoritative boundary.
   the spool. External session IDs are opaque contract hashes, separate from
   legacy state-filename normalization. Retention preserves still-relevant
   daily/session budget evidence and uses bounded shared session/receipt locks.
-  `candidate-extract` only lists jobs and points to the canonical
-  extractor skills. Provider registration remains a later manual shadow slice.
+  S2 now consumes those bounded byte horizons through an injected runner that
+  must load the canonical `workflow-extract` and `skill-extractor` skills. It
+  validates typed results and evidence anchors, redacts secrets/PII, and writes
+  only immutable review candidates. `candidate-extract` remains read-only;
+  provider registration remains a later manual shadow slice.
+  (`workflowhooker/extractor_consumer.py`, 2026-08-29,
+  T-20260828-882094856.)
 - [x] Add a deterministic lifecycle replay fixture covering duplicate events,
   GoalComplete/SessionEnd overlap, checkpoints and stable idempotency keys.
   (`replay_lifecycle`, 2026-08-28, T-20260828-535019565.)
@@ -33,9 +38,12 @@ and non-authoritative boundary.
   (`boot-context-lint`, 2026-08-26, T-20260826-153886115.)
 - [ ] Extend deterministic replay beyond the lifecycle spool and prove that
   cooldown, idle-disable and closing-gate results are stable as well.
-- [ ] Require immutable candidates, holdout cases, explicit approval and
-  rollback before any learned threshold or rule is promoted. Live hooks never
-  self-modify.
+- [x] Require immutable candidates and explicit approval before promotion.
+  S2 stages only `lesson`, `skill_update_candidate`, or `workflow_candidate`
+  artifacts with `review_required=true` and `promotion_allowed=false`; live
+  hooks never self-modify. Holdout evaluation and rollout/rollback remain S5.
+  (`workflowhooker/extractor_consumer.py`, 2026-08-29,
+  T-20260828-882094856.)
 - [ ] Extend closing evidence with explicit `observed`, `unknown`, `blocked` and
   `not_applicable` dispositions so missing evidence cannot look like a pass.
 

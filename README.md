@@ -5,7 +5,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Python Version](https://img.shields.io/badge/python-3.10%20|%203.11%20|%203.12%20|%203.13-blue.svg)](pyproject.toml)
 [![CI Status](https://img.shields.io/badge/CI-passing-brightgreen.svg)](.github/workflows/ci.yml)
-[![Tests](https://img.shields.io/badge/tests-216%20passed-brightgreen.svg)](tests)
+[![Tests](https://img.shields.io/badge/tests-240%20passed-brightgreen.svg)](tests)
 [![Platform](https://img.shields.io/badge/platform-Linux%20|%20Windows%20|%20macOS-lightgrey.svg)](pyproject.toml)
 [![Privacy](https://img.shields.io/badge/privacy-100%25%20Offline%20|%20Zero--Egress-brightgreen.svg)](SECURITY.md)
 [![Security](https://img.shields.io/badge/security-Local--First%20|%20Process--Isolated-blue.svg)](SECURITY.md)
@@ -24,7 +24,7 @@
 
 ---
 
-**Status: 0.3.0 — Autonomous Workflow Governance & Injector Engine.** (Last-checked: 2026-08-28)
+**Status: 0.3.0 — Autonomous Workflow Governance & Injector Engine.** (Last-checked: 2026-08-29)
 
 Umgesetzt: `StateSource`-Protokoll, Config-Schicht (`workflowhooker.toml`,
 `checks = []` per Default), read-only Adapter `git`, `files` (LOCK*.txt und
@@ -36,7 +36,7 @@ aktive Tasks), drei einzeln zuschaltbare Checks (`closing_gate`,
 Meldungsbudget + Cooldown bleiben die gemeinsame 4-Augen-Bremse. Provider
 `claude`, `codex`, `kimi`, `agy` (Hook-Snippet-Generator ohne `PreToolUse` im
 Default, optionale separate Blocker-Variante) + `manual` (CLI); der
-`git`-Provider bleibt ein dokumentierter Stub. 216 Tests sind grün, darunter
+`git`-Provider bleibt ein dokumentierter Stub. 240 Tests sind grün, darunter
 echte Temp-Git-Repo-Fixtures.
 
 Hooks, die den **Arbeitsablauf** eines Agenten steuern — nicht sein Wissen.
@@ -418,8 +418,55 @@ aufschiebbare Arbeit wird nie für ein Größenlimit verworfen.
 Im Spool liegt **kein Transkriptinhalt**. Freie `observed`-Textfelder werden
 am Kernvertrag verworfen. `source_anchor` ist ausschließlich
 der vom Provider übergebene lokale Pfadzeiger; zusätzlich wird sein Hash
-gespeichert. Ein fehlender expliziter Horizonthash wird billig aus Pfad,
+gespeichert. Der Hook erfasst außerdem nur die inhaltsfreien Byte-Grenzen des
+zu diesem Job freigegebenen Fensters. Dadurch liest ein späterer Consumer
+weder bereits verarbeitete Präfixe noch nach dem Job angehängte Ereignisse.
+Pfad-Hash, Start, Ende und Horizont sind zusätzlich durch einen lokalen
+Window-Hash gebunden, sodass eine nachträgliche Offset-Änderung geschlossen
+scheitert. Der Hook bildet außerdem einen SHA-256-Hash über genau diese Bytes,
+ohne den Inhalt im Spool abzulegen; gleich lange In-place-Ersetzungen werden
+damit vor dem Runner erkannt. Altjobs ohne diese Bindung bleiben lesbar, sind
+für S2 jedoch nicht beweiskräftig und müssen neu eingereiht werden.
+Existierende relative Quellen werden bereits beim Enqueue absolut aufgelöst;
+nicht auflösbare relative Anker werden verworfen und können deshalb nach einem
+`cwd`-Wechsel nicht auf eine andere Datei zeigen.
+Ein fehlender expliziter Horizonthash wird billig aus Pfad,
 Dateimetadaten und redigierten Zählern gebildet, ohne die Datei zu lesen.
+
+Der S2-Consumer `ExtractorConsumer` ist eine explizit aufzurufende, lokale
+Bibliotheksoberfläche. Ein Provideradapter injiziert einen Runner, der die im
+Request zwingend genannten kanonischen Skills `workflow-extract` und
+`skill-extractor` lädt. WorkflowHooker selbst enthält keine zweite semantische
+Extractorlogik. Vor dem Runner werden das Byte-/Ereignisfenster begrenzt,
+Secret- und PII-Muster einschließlich strukturierter Secret-Felder redigiert
+sowie lokale Hash- und Ereignisanker gebildet.
+Der vollständige serialisierte Auftrag wird zusätzlich konservativ gegen das
+Job-Tokenbudget gekappt; der Runner erhält dieselbe Obergrenze und muss sie mit
+seinem modellspezifischen Tokenizer für Ein- und Ausgabe durchsetzen.
+Der Runner darf exakt `noop`, `lesson`, `skill_update_candidate` oder
+`workflow_candidate` liefern und muss die geladenen Skill-Versionen/-Hashes
+sowie tatsächliche Ein-/Ausgabe-Tokens quittieren. Unbekannte Felder,
+nicht vorhandene Evidenzanker, falsche Skill-Receipts, Tokenüberschreitungen
+und nicht akzeptierte Privacyklassen scheitern geschlossen. Ein Timeout wird
+erst nach Rückkehr oder eigener harter Beendigung des Runners verbucht; dadurch
+läuft kein zweiter Retry parallel zu einem weiterarbeitenden Consumer-Thread.
+Session-/Tagesbudgets bleiben durch den S1-Receipt-Vertrag erzwungen.
+
+Alle nicht leeren Ergebnisse landen unveränderlich unter
+`<state-dir>/candidates/staged/`. Sie tragen `review_required=true` und
+`promotion_allowed=false`; weder Lessons noch Skills oder Workflows werden in
+diesem Slice direkt geschrieben. Providerregistrierung, USMC-Promotion und
+Shadow-Rollout bleiben getrennte Folgeslices. Beispiel für einen Adapter:
+
+```python
+from workflowhooker import ExtractorConsumer
+
+result = ExtractorConsumer(spool).consume(
+    job_key,
+    runner=my_local_runner,
+    owner_id="provider-worker-1",
+)
+```
 
 ```toml
 [candidates]
@@ -433,9 +480,9 @@ max_jobs_per_day = 20
 lease_seconds = 900
 ```
 
-`candidate-extract [--format plain|json]` listet v2-Jobs samt Receipt und
-verweist weiterhin auf `skill-extractor`/`workflow-extract`; es startet selbst
-kein Modell. Die veraltete Kompatibilitätsoption `--clear` ist ein read-only
+`candidate-extract [--format plain|json]` bleibt eine rein lesende Diagnose,
+listet v2-Jobs samt Receipt und startet selbst kein Modell. Die veraltete
+Kompatibilitätsoption `--clear` ist ein read-only
 No-op: Weder die alte JSONL-Datei noch unveränderliche v2-Jobs werden entfernt.
 Provider-Snippets und echte
 Hookregistries werden in diesem Slice nicht automatisch verändert.
