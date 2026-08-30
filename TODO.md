@@ -46,6 +46,10 @@ and non-authoritative boundary.
   T-20260828-882094856.)
 - [ ] Extend closing evidence with explicit `observed`, `unknown`, `blocked` and
   `not_applicable` dispositions so missing evidence cannot look like a pass.
+- [ ] Diagnose the live Codex `hook-run Stop` output contract: on ASUS-GEI the
+  command exited 0 but emitted no `hookSpecificOutput` on 2026-08-29 and again
+  on 2026-08-30. Treat this as unproven runtime effect until a deterministic
+  provider/event fixture yields non-empty closing evidence.
 
 Non-goal: task orchestration, policy authority, automatic skill installation or
 unredacted transcript storage.
