@@ -36,5 +36,8 @@
     "path": ".",
     "repository": "https://github.com/ellmos-ai/workflowhooker.git"
   },
-  "adapters": []
+  "adapters": [],
+  "repo_aliases": [
+    "ellmos-ai/workflowhooker-provenance"
+  ]
 }
