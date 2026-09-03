@@ -15,7 +15,36 @@ from ..protocol import ProjectState
 from .goals import GoalStateSource
 
 
-def find_conflict_copies(project_dir: Path, host: str | None = None) -> tuple[str, ...]:
+# Kanonische Namen, deren ``<name>-<HOST>.<ext>``-Geschwister KEINE
+# Konfliktkopien sind, sondern Absicht: genau ein Schreiber je Datei, damit
+# OneDrive nichts mergen muss.
+#
+# Diese Menge wird NICHT fortgeschrieben, sondern am Fundort BELEGT -- jeder
+# Eintrag braucht eine Stelle, die die Pro-Host-Ablage ausdruecklich erklaert:
+#
+#   CONFLICT_REVIEW_LOG  -- .SYNC/CONFLICT_REVIEW_LOG.md: "Aktiv ist jetzt eine
+#                           Datei pro Host: CONFLICT_REVIEW_LOG-<HOST>.md --
+#                           genau ein Schreiber je Datei"; .SYNC/SYNC_PROTOCOL.md
+#                           fuehrt sie als Gate (1x/Tag/Host).
+#
+# Bewusst NICHT aufgenommen, obwohl mehrfach als "by design" vorgeschlagen
+# (T-20260903-670099674): ``STICHWORTLISTE``. Die Aktenlage sagt das Gegenteil --
+# SYNC_PROTOCOL.md nennt ``STICHWORTLISTE-WORKSTATION-LG-2/-3.json`` beispielhaft
+# als sichtbare KONFLIKTKOPIEN, CONFLICT_MERGE_LOG.md zaehlt "13x
+# STICHWORTLISTE-*.json" unter den bereinigten. Eine Ausnahme fuer sie haette den
+# Waechter genau dort blind gemacht, wo er treffen soll.
+#
+# Ebenfalls nicht noetig: ``SYNC_CHECK_<HOST>_<datum>_<akteur>.md`` traegt den
+# Hostnamen in der MITTE, nicht als Endsuffix, und die Slot-Ordner ``laptop/``
+# und ``workstation/`` sind Verzeichnisse -- beide erreichen die Pruefung nie.
+_PER_HOST_BY_DESIGN = frozenset({"CONFLICT_REVIEW_LOG"})
+
+
+def find_conflict_copies(
+    project_dir: Path,
+    host: str | None = None,
+    by_design: frozenset[str] | set[str] | None = None,
+) -> tuple[str, ...]:
     """A7-Gegenmassnahme (~/OneDrive/CLAUDE.md "KEIN BAU MEHR IN ONEDRIVE", Punkt 6;
     Anlass T-20260903-323755354/T-20260903-592302105).
 
@@ -37,6 +66,7 @@ def find_conflict_copies(project_dir: Path, host: str | None = None) -> tuple[st
     host = host or platform.node()
     if not host or not project_dir.is_dir():
         return ()
+    exempt = _PER_HOST_BY_DESIGN if by_design is None else by_design
     suffix_re = re.compile(re.escape(f"-{host}") + r"(-\d+)?$")
     hits = []
     for path in project_dir.iterdir():
@@ -46,6 +76,8 @@ def find_conflict_copies(project_dir: Path, host: str | None = None) -> tuple[st
         canonical_stem = suffix_re.sub("", stem)
         if canonical_stem == stem:
             continue  # kein Host-Suffix am Ende des Dateinamens
+        if canonical_stem in exempt:
+            continue  # Pro-Host-Ablage ist hier Absicht, siehe _PER_HOST_BY_DESIGN
         if (project_dir / f"{canonical_stem}{path.suffix}").exists():
             hits.append(path.name)
     return tuple(sorted(hits))
