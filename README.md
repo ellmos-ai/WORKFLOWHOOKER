@@ -5,7 +5,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Python Version](https://img.shields.io/badge/python-3.10%20|%203.11%20|%203.12%20|%203.13-blue.svg)](pyproject.toml)
 [![CI Status](https://img.shields.io/badge/CI-passing-brightgreen.svg)](.github/workflows/ci.yml)
-[![Tests](https://img.shields.io/badge/tests-117%20passed-brightgreen.svg)](tests)
+[![Tests](https://img.shields.io/badge/tests-240%20passed-brightgreen.svg)](tests)
 [![Platform](https://img.shields.io/badge/platform-Linux%20|%20Windows%20|%20macOS-lightgrey.svg)](pyproject.toml)
 [![Privacy](https://img.shields.io/badge/privacy-100%25%20Offline%20|%20Zero--Egress-brightgreen.svg)](SECURITY.md)
 [![Security](https://img.shields.io/badge/security-Local--First%20|%20Process--Isolated-blue.svg)](SECURITY.md)
@@ -20,22 +20,24 @@
 > Deutsche Dokumentation: [`README_de.md`](README_de.md) • Sicherheitsrichtlinie: [`SECURITY.md`](SECURITY.md).
 
 **Quick Navigation:**
-[Quickstart](#install--quickstart) • [Architecture](#system-architecture) • [Workflow Lifecycle](#agent-workflow--closing-gate-lifecycle) • [Key Capabilities](#key-capabilities--safety-invariants) • [State Sources](#state-sources) • [Injectors](#target--wake-up-injectors) • [Security Policy](SECURITY.md) • [Sibling Tools](#ecosystem--sibling-tools) • [LLM Context](llms.txt)
+[Quickstart](#install--quickstart) • [Architecture](#system-architecture) • [Workflow Lifecycle](#agent-workflow--closing-gate-lifecycle) • [Key Capabilities](#key-capabilities--safety-invariants) • [State Sources](#state-sources) • [Injectors](#target--wake-up-injectors) • [Session-Start-Hooker](#session-start-hooker-seit-030) • [Security Policy](SECURITY.md) • [Sibling Tools](#ecosystem--sibling-tools) • [LLM Context](llms.txt)
 
 ---
 
-**Status: 0.2.3 — Autonomous Workflow Governance & Injector Engine.** (Last-checked: 2026-08-24)
+**Status: 0.3.0 — Autonomous Workflow Governance & Injector Engine.** (Last-checked: 2026-08-29)
 
 Umgesetzt: `StateSource`-Protokoll, Config-Schicht (`workflowhooker.toml`,
 `checks = []` per Default), read-only Adapter `git`, `files` (LOCK*.txt und
 `AUFGABEN.txt`/`GOAL.md`) und optionales `taskplan` (projektbezogene offene und
 aktive Tasks), drei einzeln zuschaltbare Checks (`closing_gate`,
-`drift_warning`, `scope_guard`) sowie die opt-in Injektoren `goal` (PreCompact)
-und `loop-briefing` (lokale Weck-Runtimes). Meldungsbudget + Cooldown bleiben
-die gemeinsame 4-Augen-Bremse. Provider `claude`, `codex`, `kimi`, `agy`
-(Hook-Snippet-Generator ohne `PreToolUse` im Default, optionale separate
-Blocker-Variante) + `manual` (CLI); der `git`-Provider bleibt ein
-dokumentierter Stub. 141 Tests sind gruen, darunter echte Temp-Git-Repo-Fixtures.
+`drift_warning`, `scope_guard`) sowie die opt-in Injektoren `goal` (PreCompact),
+`loop-briefing` (lokale Weck-Runtimes) und seit 0.3.0 `policy`/`location`
+(`SessionStart`, siehe [Session-Start-Hooker](#session-start-hooker-seit-030)).
+Meldungsbudget + Cooldown bleiben die gemeinsame 4-Augen-Bremse. Provider
+`claude`, `codex`, `kimi`, `agy` (Hook-Snippet-Generator ohne `PreToolUse` im
+Default, optionale separate Blocker-Variante) + `manual` (CLI); der
+`git`-Provider bleibt ein dokumentierter Stub. 240 Tests sind grün, darunter
+echte Temp-Git-Repo-Fixtures.
 
 Hooks, die den **Arbeitsablauf** eines Agenten steuern — nicht sein Wissen.
 
@@ -150,7 +152,9 @@ sequenceDiagram
 | **Budgeting & Anti-Spam Guard** | Maximum 3 messages/session | Configurable message budget and cooldown intervals prevent runaway prompt flooding and context window inflation. |
 | **Fail-Closed Closing Gate** | Clean work verification | Prevents premature session exits when uncommitted git diffs, dangling `LOCK*.txt` files, or unfulfilled task items remain. |
 | **Target & Loop Injectors** | PreCompact & wake-up briefings | Enriches context with project goals from `AUFGABEN.txt`/`GOAL.md` and active TASKPLAN items during pre-compact and scheduled wake-up cycles. |
-| **Universal Multi-Runtime Support** | Provider decoupling | Pluggable provider architecture supporting Claude Code (`Stop`, `UserPromptSubmit`, `PreCompact`), Codex CLI, Kimi Code, Antigravity (agy), and manual CLI. |
+| **Session-Start Policy/Location Injectors** (0.3.0) | Scope-aware SessionStart context | Reads `policy-registry` scoped rules directly (no CLI subprocess) and resolves a small `source-resolver` role set (no `policy.registry` role -- see [Session-Start-Hooker](#session-start-hooker-seit-030)); both combined into ONE message so SessionStart never spends two budget slots. |
+| **Boot-Context-Lint** | Opt-in contamination and sidecar drift diagnosis | Read-only scan of explicitly named Markdown/JSON files; detects dated Agy run reports, positive `GPT.md`/`CLAUDE.md`/`GEMINI.md` log targets, and `args[3]`/`prompt` drift without installing a hook. |
+| **Universal Multi-Runtime Support** | Provider decoupling | Pluggable provider architecture supporting Claude Code (`Stop`, `UserPromptSubmit`, `PreCompact`, `SessionStart`), Codex CLI, Kimi Code, Antigravity (agy), and manual CLI. |
 | **Zero Runtime Dependencies** | Extreme portability | Zero external Python package requirements for runtime execution (standard library only; `pytest` and `ruff` for development). |
 
 ---
@@ -175,6 +179,25 @@ Zwischenchecks und Kurskorrekturen, die heute niemand stellt:
 - **Verifikations-Erinnerung:** „Du erklärst gerade etwas für fertig — hast du es ausgeführt?"
 - **Drift-Warnung:** Der Agent arbeitet seit N Schritten an etwas anderem als der Aufgabe.
 - **Kosten-/Umfangswächter:** Ein Lauf wächst über sein Budget hinaus.
+
+## Boot-Context-Lint (opt-in, read-only)
+
+Der Diagnosebefehl prüft ausschließlich die explizit übergebenen Dateien und
+ändert nichts:
+
+```powershell
+python -m workflowhooker boot-context-lint --format json `
+  C:\Users\User\CLAUDE.md `
+  C:\Users\User\.gemini\GEMINI.md `
+  C:\Users\User\.gemini\config\sidecars\task-name\sidecar.json
+```
+
+Exit `0` bedeutet keine Befunde; Exit `1` bedeutet mindestens einen Befund.
+Sidecar-JSON wird in beiden belegten Formen (`args[3]` oder
+`schedule.args[3]`) geprüft. Explizite Verbote wie „Schreibe niemals
+Laufberichte in CLAUDE.md“ sind kein positiver Writer und bleiben sauber. Der
+Befehl ist kein Policy-Register, wird nicht automatisch in `SessionStart`
+verdrahtet und führt keine Bereinigung aus.
 - **Abschluss-Gate:** Vor dem Beenden — Steuerdateien nachgezogen? Lock entfernt? Committet?
 - **Regelerinnerung:** Projektspezifische Konventionen zum richtigen Zeitpunkt statt als
   Dauer-Präambel, die im Kontext untergeht.
@@ -343,46 +366,126 @@ der Hook-Schicht.
    snippet.json` einen Block für `~/.codex/hooks.json`. Codex muss ihn anschließend
    interaktiv über `/hooks` freigeben.
 
-## Kandidaten-Sammler fuer Skill-/Workflow-Extraktion (opt-in)
+## Kandidaten-Job- und Receipt-Vertrag (opt-in)
 
-Trennt bewusst den LEICHTEN Live-Hook vom TEUREN Extraktionsschritt
-(`TODO.md`, Punkt 2). Zwei getrennte Kommandos:
+Der Live-Pfad trennt weiterhin den **leichten Lifecycle-Hook** von der späteren
+semantischen Extraktion. Seit dem S1-Vertrag schreibt `candidate-collect` keine
+neuen JSONL-Signale mehr, sondern unveränderliche, versionierte Job-Envelopes
+unter `<state-dir>/candidates/jobs/` und atomar ersetzte Receipts unter
+`<state-dir>/candidates/receipts/`. Die frühere `candidates.jsonl` bleibt nur
+lesbar, damit bestehende lokale Signale nicht verloren gehen.
 
-- **`python -m workflowhooker candidate-collect <Stop|SessionEnd> --provider
-  <name>`** — der Live-Hook. Liest dasselbe stdin-JSON wie `hook-run` und
-  schreibt hoechstens EIN redigiertes Envelope pro Sitzung in die
-  Warteschlange (`<state-dir>/candidates.jsonl`): `provider`, `event`,
-  `session_ref`, `source_anchor` (nur der `transcript_path`-ZEIGER aus dem
-  stdin-JSON, falls vorhanden — niemals Transkriptinhalt), ein paar billige
-  `observed`-Zaehler und `redaction = "pointer-only"`. Kein stdout, keine
-  `hookSpecificOutput`-Injektion — der Agent bekommt davon nichts zu sehen.
-  **Stumm per Default:** ohne `[candidates] enabled = true` in der Config
-  ist der Befehl ein No-Op (kein State-Ordner, keine Datei), selbst wenn der
-  Hook versehentlich verdrahtet ist. **Idempotent:** ein mehrfach feuernder
-  Hook (z. B. mehrere Stop-Events in derselben Sitzung) reiht trotzdem nur
-  einmal ein. **Fail-open:** I/O-Fehler beim Schreiben werden verschluckt,
-  der Hook bricht nie ab.
-- **`python -m workflowhooker candidate-extract [--format plain|json]
-  [--clear]`** — der OFFLINE-Schritt. Rein lesend: listet die Warteschlange
-  auf und verweist auf die Skills, die die eigentliche (teure, semantische)
-  Ableitung ausfuehren — **`skill-extractor`** (Chatverlauf →
-  wiederverwendbarer Skill) bzw. **`workflow-extract`** (Chatverlauf/
-  Automations-Prompt → Cron-/Loop-Automatisierung). Dieser Befehl fuehrt
-  selbst KEINE Extraktion aus.
+| Ereignis | Wirkung |
+|---|---|
+| `GoalComplete` | Primärer Trigger; benötigt `goal_id`/`goal_ref` und plant genau einen Job für den belegten Horizont. |
+| `SessionEnd` | Fallback; derselbe bereits durch ein Goal geplante Horizont ist ein idempotenter No-op, ein neuer Horizont beginnt beim vorherigen. |
+| `PreCompact` | Schreibt ausschließlich einen atomaren Checkpoint, keinen Extraktionsjob. |
+| `SessionStart` | Validiert abgelaufene Leases derselben Provider-/Session-Kombination; intakte Jobs gehen auf `pending`, fehlende oder beschädigte Job-Envelopes auf `failed`. |
+| `Stop` | Führt nur einen billigen Eligibility-Check aus und schreibt keinen Job. |
 
-**Aktivierung bleibt manuell und opt-in, pro Akteur:**
+Der Jobschlüssel umfasst Vertragsversion, Provider, Session, Goal bzw.
+Boundary-Epoche, Horizonthash, Extractorversion und Privacyklasse. Jobs sind
+unveränderlich; Receipts tragen `pending|leased|noop|candidate|promoted|failed|deferred`,
+Versuchszahl, Lease-Ende, Lease-Owner, Fehlerklasse, Kandidaten-IDs und den
+Zeitpunkt einer tatsächlich reservierten Budgeteinheit. Externe Session-IDs
+werden für diesen Vertrag opak SHA-256-abgebildet; ihre getrennte
+Dateinamens-Normalisierung kann deshalb keine Sessions im Jobschlüssel
+zusammenfallen lassen. Budgetprüfung und Reservierung sowie die erneute
+Zulassung eines `deferred`-Jobs laufen unter einem gemeinsamen lokalen Lock.
+Receipt-Übergänge sind explizit begrenzt: `candidate` benötigt mindestens eine
+Kandidaten-ID, `promoted` ist ausschließlich danach und ohne Austausch der
+geprüften IDs erlaubt. Bis zur Review bleibt `candidate` aktive Arbeit; nur
+`noop`, `promoted` und `failed` sind terminal und danach ausschließlich
+identisch-idempotent wiederholbar. Ein Crash zwischen
+Job und Receipt wird idempotent nachgeholt, ein beschädigtes vorhandenes
+Receipt wird niemals still zurückgesetzt. Writes verwenden eine gleichlokale
+Temporärdatei, `fsync` und atomisches Create/Replace. Die Retention entfernt
+nur die ältesten terminalen Paare, deren Tages-/Session-Budgetbeleg nicht mehr
+benötigt wird. Pipeline und Retention verwenden dafür einen persistenten Session-End-Marker,
+auch wenn `SessionEnd` denselben Horizont wie das letzte `GoalComplete` meldet
+und deshalb keinen zweiten Job erzeugt. Erst dann wird der Budgetbeleg für eine
+spätere Grenze derselben Session nicht mehr benötigt.
+Sie läuft unter Budget- sowie gebänderten Session-/Receipt-Locks; jede
+Lockklasse besitzt höchstens 256 dauerhafte Stripe-Dateien; ihre einmalige
+Sentinel-Initialisierung ist ebenfalls konkurrenzsicher. Scheitert unter
+Windows die Löschung der unveränderlichen Jobdatei, wird das bereits entfernte
+Receipt aus seinem exakten Payload wiederhergestellt. Veränderliche Receipts
+werden auch beim Lesen über denselben Stripe-Lock serialisiert; verweigert ein
+fremder Windows-Reader trotzdem den atomaren Replace, bleibt der unveränderte
+Receipt-Zustand sicher retry-fähig. Aktive oder
+aufschiebbare Arbeit wird nie für ein Größenlimit verworfen.
+
+Im Spool liegt **kein Transkriptinhalt**. Freie `observed`-Textfelder werden
+am Kernvertrag verworfen. `source_anchor` ist ausschließlich
+der vom Provider übergebene lokale Pfadzeiger; zusätzlich wird sein Hash
+gespeichert. Der Hook erfasst außerdem nur die inhaltsfreien Byte-Grenzen des
+zu diesem Job freigegebenen Fensters. Dadurch liest ein späterer Consumer
+weder bereits verarbeitete Präfixe noch nach dem Job angehängte Ereignisse.
+Pfad-Hash, Start, Ende und Horizont sind zusätzlich durch einen lokalen
+Window-Hash gebunden, sodass eine nachträgliche Offset-Änderung geschlossen
+scheitert. Der Hook bildet außerdem einen SHA-256-Hash über genau diese Bytes,
+ohne den Inhalt im Spool abzulegen; gleich lange In-place-Ersetzungen werden
+damit vor dem Runner erkannt. Altjobs ohne diese Bindung bleiben lesbar, sind
+für S2 jedoch nicht beweiskräftig und müssen neu eingereiht werden.
+Existierende relative Quellen werden bereits beim Enqueue absolut aufgelöst;
+nicht auflösbare relative Anker werden verworfen und können deshalb nach einem
+`cwd`-Wechsel nicht auf eine andere Datei zeigen.
+Ein fehlender expliziter Horizonthash wird billig aus Pfad,
+Dateimetadaten und redigierten Zählern gebildet, ohne die Datei zu lesen.
+
+Der S2-Consumer `ExtractorConsumer` ist eine explizit aufzurufende, lokale
+Bibliotheksoberfläche. Ein Provideradapter injiziert einen Runner, der die im
+Request zwingend genannten kanonischen Skills `workflow-extract` und
+`skill-extractor` lädt. WorkflowHooker selbst enthält keine zweite semantische
+Extractorlogik. Vor dem Runner werden das Byte-/Ereignisfenster begrenzt,
+Secret- und PII-Muster einschließlich strukturierter Secret-Felder redigiert
+sowie lokale Hash- und Ereignisanker gebildet.
+Der vollständige serialisierte Auftrag wird zusätzlich konservativ gegen das
+Job-Tokenbudget gekappt; der Runner erhält dieselbe Obergrenze und muss sie mit
+seinem modellspezifischen Tokenizer für Ein- und Ausgabe durchsetzen.
+Der Runner darf exakt `noop`, `lesson`, `skill_update_candidate` oder
+`workflow_candidate` liefern und muss die geladenen Skill-Versionen/-Hashes
+sowie tatsächliche Ein-/Ausgabe-Tokens quittieren. Unbekannte Felder,
+nicht vorhandene Evidenzanker, falsche Skill-Receipts, Tokenüberschreitungen
+und nicht akzeptierte Privacyklassen scheitern geschlossen. Ein Timeout wird
+erst nach Rückkehr oder eigener harter Beendigung des Runners verbucht; dadurch
+läuft kein zweiter Retry parallel zu einem weiterarbeitenden Consumer-Thread.
+Session-/Tagesbudgets bleiben durch den S1-Receipt-Vertrag erzwungen.
+
+Alle nicht leeren Ergebnisse landen unveränderlich unter
+`<state-dir>/candidates/staged/`. Sie tragen `review_required=true` und
+`promotion_allowed=false`; weder Lessons noch Skills oder Workflows werden in
+diesem Slice direkt geschrieben. Providerregistrierung, USMC-Promotion und
+Shadow-Rollout bleiben getrennte Folgeslices. Beispiel für einen Adapter:
+
+```python
+from workflowhooker import ExtractorConsumer
+
+result = ExtractorConsumer(spool).consume(
+    job_key,
+    runner=my_local_runner,
+    owner_id="provider-worker-1",
+)
+```
 
 ```toml
 [candidates]
-enabled = true       # Default: false -- stumm, bis explizit zugestimmt
-max_records = 500    # bounded queue -- aeltere Eintraege fallen zuerst raus
+enabled = true
+max_records = 500
+extractor_version = "workflow-extract@1.1.0+skill-extractor@1.0.0"
+privacy_class = "local-private"
+max_tokens_per_job = 12000
+max_jobs_per_session = 3
+max_jobs_per_day = 20
+lease_seconds = 900
 ```
 
-Wie bei `hook-run` gibt es **kein** automatisches Eintragen in eine echte
-`settings.json`/`hooks.json` — jeder Akteur verdrahtet
-`candidate-collect Stop --provider <name>` (bzw. `SessionEnd`, falls der
-Akteur dieses Event kennt) selbst in seinem eigenen Hook-System, analog zu
-den `hook-run`-Beispielen oben.
+`candidate-extract [--format plain|json]` bleibt eine rein lesende Diagnose,
+listet v2-Jobs samt Receipt und startet selbst kein Modell. Die veraltete
+Kompatibilitätsoption `--clear` ist ein read-only
+No-op: Weder die alte JSONL-Datei noch unveränderliche v2-Jobs werden entfernt.
+Provider-Snippets und echte
+Hookregistries werden in diesem Slice nicht automatisch verändert.
 
 ## Target & Wake-Up Injectors
 
@@ -402,6 +505,70 @@ Taskplan-Ausfall bleibt still. Für lokale Modelle liefert
 Briefing aus Ziel, offenen Tasks, Locks und uncommitteter Arbeit; der Taktgeber
 (Cron, Scheduled Task oder Runtime-Loop) bleibt außerhalb von WorkflowHooker.
 Mit `--format json` ist die Ausgabe maschinenlesbar.
+
+## Session-Start-Hooker (seit 0.3.0)
+
+`SessionStart` ist seit 0.3.0 ein vollwertiges `hook-run`-Event
+(zuvor nur als Zielbild in diesem README beschrieben, siehe Ticket
+`T-20260825-185089693`). Zwei weitere Injektoren sind ausdrücklich
+opt-in, wie alle anderen:
+
+```toml
+[injectors]
+policy = true     # Projektbezogene policy-registry-Regeln beim SessionStart
+location = true   # Bekannte Orte per source-resolver-Rolle beim SessionStart
+
+[injectors.policy_config]
+registry_path = ""   # leer = Default ~/.policy-registry/registry.json
+max_entries = 5       # Obergrenze pro Nachricht -- kein zweites CLAUDE.md
+
+[injectors.location_config]
+roles = ["resources.inventory", "decisions.ledger", "user.model", "memory.curated"]
+```
+
+- **`PolicyInjector`** liest `~/.policy-registry/registry.json` direkt
+  (kein `import policy_registry`, kein CLI-Subprozess -- siehe
+  `workflowhooker/scope_match.py` Moduldocstring: das Paket ist nicht
+  pip-installiert, und dessen CLI-Adapter braucht bis zu 15s pro Aufruf,
+  unzumutbar fuer SessionStart). Die Session-Projektzugehoerigkeit wird
+  aus dem Pfad abgeleitet (`.TOPICS\<pipeline>\...`-Segmente bzw. der
+  Plan-D-Repo-Name unter `...\repos\<name>`, siehe
+  `candidate_scopes_from_path`) -- kein Katalog-I/O, eine bewusste
+  Vereinfachung. Nur projekt-/pipeline-spezifische Regeln werden gezeigt
+  (`exact`/`wildcard`/`parent`-Relation); global-scope-Regeln (`system-wide`)
+  werden **nicht** wiederholt, weil sie bereits im redundant-statischen
+  Kern von CLAUDE.md stehen (siehe Abschnitt "Sicherheits-/
+  Faktentreue-Kernsätze bleiben statisch" unten).
+- **`LocationInjector`** löst eine kleine, konfigurierbare Rollenliste über
+  `source_resolver.resolve(rolle)` auf (lazy import, fail-open wie
+  `sources/taskplan.py`) -- statt Pfade in Prosa hart zu kodieren, die
+  bei einem Modulumzug sofort veraltet wären. Die Rolle `policy.registry`
+  ist im Default-Set bewusst ausgeschlossen: ihr `source-resolver`-Adapter
+  ruft dieselbe langsame CLI auf, die `PolicyInjector` gerade umgeht.
+- **Ein kombiniertes Budget:** Policy- und Ortsinjektor werden bei
+  SessionStart zu **einer** Nachricht zusammengefasst
+  (`_build_session_start_message` in `cli.py`) -- zwei separate Injektoren
+  würden sonst zwei von `mode.max_messages_per_session` verbrauchen und
+  den Rest der Sitzung stumm schalten.
+
+### Sicherheits-/Faktentreue-Kernsätze bleiben statisch (Entscheidung H3=A)
+
+Wenn Regelinhalt aus `CLAUDE.md` in dynamische Träger wandert (wie oben),
+bleiben sicherheits- und integritätsnahe Kernsätze (z. B. "keine
+Zugangsdaten in USMC/Gardener", der Faktentreue-Kernsatz, harte
+Sprachregeln) **zusätzlich wortwörtlich redundant in CLAUDE.md** stehen --
+sie werden nicht durch `PolicyInjector` ersetzt. Begründung: ein
+Registry-/Resolver-Ausfall darf bei einer Sicherheitsregel niemals
+stillschweigend "Regel fehlt in dieser Session" bedeuten -- dasselbe
+Fail-closed-Prinzip, das dieses System durchgängig für Register-Ausfälle
+anwendet (`unknown` statt `clear`/leer). Die Kosten sind minimal (wenige,
+kurze Sätze). Entschieden 2026-08-25 (`D-20260825-009`, Option A);
+verankert zusätzlich in Ticket `T-20260825-860165488`, das die bestehende
+Wiederherstellungs-Kette der Agenten-Regeldateien (`agents-bridge`,
+`T-20260822-901323804`) referenziert -- diese Kette transportiert die
+statischen Kernsätze byte-treu und hash-verifiziert zwischen Hosts;
+`PolicyInjector`/`LocationInjector` sind eine ergänzende, dynamische
+Schicht darüber, kein Ersatz.
 
 ## Was noch nicht umgesetzt ist
 

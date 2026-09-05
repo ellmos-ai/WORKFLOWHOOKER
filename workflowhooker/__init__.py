@@ -3,15 +3,24 @@
 
 Siehe README.md und ROADMAP.md.
 
-Status: v0.2.1 -- Abschluss-Gate + Drift-/Umfangswaechter implementiert
-(keiner per Default aktiv).
+Status: v0.3.0 -- Abschluss-Gate + Drift-/Umfangswaechter implementiert
+(keiner per Default aktiv). Session-Start-Hooker (Policy-/Ortsinjektor,
+seit 0.3.0) ebenfalls opt-in.
 """
 
 from .config import Config, load_config
-from .injectors import GoalInjector, LoopInjector, build_goal_message, build_loop_briefing
+from .injectors import (
+    GoalInjector,
+    LocationInjector,
+    LoopInjector,
+    PolicyInjector,
+    build_goal_message,
+    build_loop_briefing,
+)
+from .extractor_consumer import ConsumerResult, ExtractorConsumer, ExtractorRunner
 from .protocol import ProjectState, StateSource
 
-__version__ = "0.2.3"
+__version__ = "0.3.0"
 
 __all__ = [
     "ProjectState",
@@ -19,8 +28,13 @@ __all__ = [
     "Config",
     "load_config",
     "GoalInjector",
+    "LocationInjector",
     "LoopInjector",
+    "PolicyInjector",
     "build_goal_message",
     "build_loop_briefing",
+    "ConsumerResult",
+    "ExtractorConsumer",
+    "ExtractorRunner",
     "__version__",
 ]

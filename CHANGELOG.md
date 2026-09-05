@@ -2,6 +2,103 @@
 
 Alle nennenswerten Aenderungen an WorkflowHooker.
 
+## [Unreleased] - 2026-08-29
+
+### Hinzugefügt
+
+- **Neutraler Extractor-Consumer (S2, 2026-08-29):**
+  `workflowhooker.extractor_consumer.ExtractorConsumer` konsumiert einen
+  geleasten S1-Job über einen injizierten Runner und verlangt im neutralen
+  Auftrag ausdrücklich die kanonischen Skills `workflow-extract` und
+  `skill-extractor`. Inhaltsfreie Byte-Horizonte binden das tatsächlich
+  freigegebene Sessionfenster; nachträgliche Anhänge und bereits verarbeitete
+  Präfixe bleiben außerhalb. Vor dem Runner gelten Fenster-/Tokenbudget,
+  Privacyklassen, Secret-/PII-Redaction sowie lokale Hash-/Ereignisanker; ein
+  inhaltsfreier Window-Hash schützt die gespeicherten Offsets vor stiller
+  Veränderung; ein zusätzlicher SHA-256-Hash über die freigegebenen Bytes
+  erkennt gleich lange Quellenersetzungen, ohne Transkriptinhalt zu speichern.
+  Existierende relative Quellen werden beim Enqueue absolut kanonisiert;
+  unauflösbare relative Anker werden verworfen.
+  Ergebnisse sind strikt auf `noop|lesson|skill_update_candidate|workflow_candidate`
+  begrenzt; unbekannte Felder, unbelegte Referenzen, falsche versionierte
+  Skill-Load-Receipts oder quittierte Tokenüberschreitungen scheitern
+  geschlossen.
+  Nicht leere Resultate werden atomar und unveränderlich unter
+  `candidates/staged/` abgelegt, immer reviewpflichtig und niemals direkt
+  promoviert. Timeouts geben die Lease erst nach Runner-Rückkehr beziehungsweise
+  runnerseitiger harter Beendigung mit Fehlerklasse für einen idempotenten
+  Retry frei. Keine Providerregistrierung, Publikation,
+  USMC-Promotion oder kanonische Skillmutation.
+- **24 S2-Vertragstests:** No-evidence, verifizierte Korrektur,
+  Delta-/Append-Fenster, Halluzinationsabwehr, striktes Ergebnisschema,
+  Secret-/PII-Redaction, Timeout-Retry, Budget-Deferred,
+  strukturierte/quotierte Secrets, Quellenersetzung, Skill-Load-Receipt,
+  Token-Usage, Windows-Receipt-Fallback, Altjob-Requeue und unveränderte
+  relative CWD-Drift und unveränderte kanonische Skills; Gesamtsuite 240/240
+  grün.
+
+- **Atomarer Lifecycle-Job-/Receipt-Vertrag (S1, 2026-08-28):** Der bisherige
+  JSONL-Live-Writer wurde durch unveränderliche `LifecycleJob`-v2-Envelopes,
+  atomar ersetzte `JobReceipt`s und provider-/sessiongebundene Checkpoints
+  erweitert. Der vollständige Idempotenzschlüssel umfasst Vertragsversion,
+  Provider, Session, Goal/Boundary, Horizont, Extractorversion und
+  Privacyklasse. `GoalComplete` ist Primärtrigger, `SessionEnd` verarbeitet
+  nur neue Horizonte, `PreCompact` checkpointet, `SessionStart` recovered
+  ausschließlich abgelaufene Leases derselben Sitzung und `Stop` führt nur
+  einen billigen Eligibility-Check aus. Receipts unterstützen
+  `pending|leased|noop|candidate|promoted|failed|deferred`, Versuchszahl,
+  Lease-Ende, Lease-Owner, Fehlerklasse, Kandidaten-IDs und atomaren
+  Budget-Reservierungszeitpunkt. Externe Session-IDs werden unabhängig von
+  ihrer Dateinamens-Normalisierung opak gehasht. Lease- und
+  Budget-Transitionen sind prozessübergreifend exklusiv; `candidate` bleibt
+  als Review-Zustand aktiv, während terminale Receipts unveränderlich sind.
+  Freie `observed`-Textfelder und
+  nicht pfadartige Source-Anker werden am Kernvertrag verworfen. Job-, Sitzungs- und Tagesbudgets
+  sind konfigurierbar; aktive Jobs werden nie von der begrenzten Retention
+  verworfen. Retention schützt noch relevante Tages-/Session-Budgetbelege,
+  serialisiert Löschungen mit Budget- und gebänderten Session-/Receipt-Locks
+  und begrenzt beide Lockklassen auf je 256 Stripe-Dateien. Wenn Windows die
+  Joblöschung verweigert, wird ein zuvor entferntes Receipt exakt
+  wiederhergestellt. Receipt-Leser verwenden denselben Stripe-Lock; ein
+  fremder Windows-Readhandle lässt einen gescheiterten Finish-Versuch im
+  unveränderten retry-fähigen Zustand. Same-directory Tempdatei, `fsync` und
+  atomisches Create/Replace härten Crash- und Concurrent-Retry-Fälle. Die
+  Session-End-Evidenz bleibt auch bei einem mit `GoalComplete` überlappenden
+  Horizont als Checkpoint erhalten; danach kann Retention den Sitzungsbeleg
+  sicher bis zum konfigurierten Limit abbauen. Auch die einmalige
+  Lock-Sentinel-Erzeugung ist konkurrenzsicher. Die v1-JSONL bleibt
+  ausschließlich lesbar und wird weder beschrieben noch durch
+  die veraltete read-only Option `--clear` gelöscht. Keine Providerregistrierung und kein
+  Modellaufruf in diesem Slice.
+- **39 neue Vertrags-/CLI-/Config-Tests:** Deduplikation, Goal-/SessionEnd-
+  Überlappung, Delta-Horizont, PreCompact/Stop-Semantik, Lease-Recovery,
+  Orphan-Job-Recovery, Korruptionsschutz, Datenschutz, Budget-Deferred,
+  parallele Budgetreservierung, Session-ID-Kollisionen, erlaubte
+  Receipt-Übergänge, bounded terminal retention und deterministisches Replay;
+  Retention-/Budget-Races, Review-Invarianten und Legacy-Read-only-Verhalten;
+  Gesamtsuite 216/216
+  grün.
+
+- **Opt-in Boot-Context-Lint:** `boot-context-lint PATH... [--format plain|json]`
+  prüft explizit benannte Markdown-Bootdateien und Antigravity-Sidecar-JSON rein
+  lesend. Er erkennt datierte Agy-Lauf-/Statusberichte, positive
+  Laufprotokollziele in `GPT.md`, `CLAUDE.md` oder `GEMINI.md` sowie Drift zwischen den belegten
+  Promptfeldern (`args[3]`/`schedule.args[3]` und `prompt`). Klare
+  Verbotsformulierungen und bestätigte Regel-/Promptreparaturen werden nicht als
+  Writer gewertet. Keine automatische
+  Hook- oder SessionStart-Verdrahtung, keine neue Regelautorität.
+- **9 Regressionstests:** Markdown-Laufbericht, dauerhafte Regeln/Pfadupdates,
+  beide Sidecar-Schemata, Anti-Log-Negation, erlaubte Regel-/Promptreparatur,
+  Prompt-Parität und CLI-Exit-/JSON-Vertrag; Gesamtsuite 177/177 grün.
+
+## [0.3.0] - 2026-08-25
+
+### Hinzugefuegt (2026-08-25)
+
+- **Session-Start-Hooker (H1/H2, D-20260825-007/-008):** `SessionStart` ist jetzt ein vollwertiges `hook-run`-Event (`choices` in `cli.py`, zuvor nur `Stop`/`PreCompact`/`UserPromptSubmit`; das README nannte SessionStart bereits als Zielbild -- jetzt umgesetzt). Zwei neue opt-in Injektoren, beide per Default aus: `PolicyInjector` (`workflowhooker/injectors.py`) liest `~/.policy-registry/registry.json` **direkt** statt `policy_registry` zu importieren oder dessen CLI aufzurufen -- das Paket ist nicht pip-installiert, und der `source-resolver`-Adapter fuer `policy.registry` ruft die CLI per Subprozess mit 15s-Timeout auf, was fuer SessionStart zu langsam waere (siehe neues Modul `workflowhooker/scope_match.py`, dokumentiert warum). Die Projekt-/Pipeline-Zugehoerigkeit (H2-Selektivitaet) wird ohne Katalog-I/O aus dem Pfad abgeleitet (`candidate_scopes_from_path`: `.TOPICS\<pipeline>\...`-Segmente ODER Plan-D-Repo-Name unter `...\repos\<name>`, bewusste Vereinfachung, dokumentiert). Nur nicht-globale Scope-Relationen (`exact`/`wildcard`/`parent`, portierte Semantik aus `policy-registry/src/policy_registry/scope.py`) werden gezeigt -- global-scope-Regeln bleiben aussen vor, weil sie bereits im redundant-statischen CLAUDE.md-Kern stehen (H3=A). `LocationInjector` loest eine kleine, konfigurierbare `source-resolver`-Rollenliste auf (lazy import, fail-open wie `sources/taskplan.py`), schliesst die Rolle `policy.registry` aus ihrem Default-Set aus (derselbe Subprozess-Grund). Beide Injektoren werden bei SessionStart zu **einer** kombinierten Nachricht zusammengefasst (`_build_session_start_message` in `cli.py`), damit zwei Injektoren nicht zwei von `mode.max_messages_per_session` verbrauchen. `providers/claude.py` und `providers/codex.py` (generischer `events`-Loop) emittieren `SessionStart` jetzt im Default-Snippet; Codex' SessionStart-Zweig ist dokumentiert als nicht eigens live-verifiziert (Analogieschluss, siehe Modul-Docstring). Config: `[injectors] policy/location` (bool, Default `false`) + `[injectors.policy_config]` (`registry_path`, `max_entries`) + `[injectors.location_config]` (`roles`).
+- **H3=A dokumentiert (D-20260825-009):** Sicherheits-/Faktentreue-Kernsaetze in CLAUDE.md/GEMINI.md/GPT.md bleiben bewusst redundant-statisch, auch wenn `PolicyInjector` verwandte, projekt-spezifische Regeln dynamisch ergaenzt -- fail-closed-Begruendung (Registry-Ausfall darf nie stillschweigend "Regel fehlt" heissen) in README.md/README_de.md ausformuliert. Verankert mit Querverweis auf Ticket `T-20260825-860165488`, das die bestehende, bereits implementierte Wiederherstellungs-Kette der Agenten-Regeldateien (`agents-bridge`, `T-20260822-901323804`, SOLVED) referenziert statt sie zu duplizieren.
+- **27 neue Tests:** `tests/test_scope_match.py` (11, neue Datei), Erweiterungen in `tests/test_injectors.py` (+10), `tests/test_config.py` (+4), `tests/test_cli.py` (+3, inkl. Kombi-Nachricht-Budget-Test). Pytest-Gesamtsuite von 141 auf 168 Tests erweitert, 100% gruen, `ruff check .` clean.
+
 ## [0.2.3] - 2026-08-24
 
 ### Hinzugefuegt (2026-08-24)
