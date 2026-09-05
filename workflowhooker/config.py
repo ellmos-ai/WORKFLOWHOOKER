@@ -78,6 +78,17 @@ class LocationInjectorConfig:
 
 
 @dataclass
+class CapabilityInjectorConfig:
+    """See ``capability_injectors``. ``roots`` overrides where to look for
+    installed skills or commands; empty keeps the built-in defaults.
+    ``max_entries`` bounds one message -- a routing model needs the two or
+    three that fit, not a catalogue."""
+
+    roots: list[str] = field(default_factory=list)
+    max_entries: int = 3
+
+
+@dataclass
 class InjectorsConfig:
     """Opt-in context injectors.
 
@@ -94,8 +105,14 @@ class InjectorsConfig:
     loop: bool = False
     policy: bool = False
     location: bool = False
+    # Both are for ``UserPromptSubmit``: a routing generalist has to know
+    # which of its installed capabilities fit the task it was just handed.
+    skill: bool = False
+    plugin: bool = False
     policy_config: PolicyInjectorConfig = field(default_factory=PolicyInjectorConfig)
     location_config: LocationInjectorConfig = field(default_factory=LocationInjectorConfig)
+    skill_config: CapabilityInjectorConfig = field(default_factory=CapabilityInjectorConfig)
+    plugin_config: CapabilityInjectorConfig = field(default_factory=CapabilityInjectorConfig)
 
 
 @dataclass

@@ -367,6 +367,14 @@ def _cmd_hook_run(args) -> int:
             message = GoalInjector(_build_state_source(config, project_dir)).generate()
             if message:
                 _record_message(state, now)
+    if message is None and args.event == "UserPromptSubmit" and (
+        config.injectors.skill or config.injectors.plugin
+    ):
+        now = time.time()
+        if _message_slot_available(config, state, now):
+            message = _build_capability_message(config, payload)
+            if message:
+                _record_message(state, now)
     if message is None and args.event == "SessionStart" and (
         config.injectors.policy or config.injectors.location
     ):
@@ -411,6 +419,58 @@ def _message_slot_available(config: Config, state: SessionState, now: float) -> 
 def _record_message(state: SessionState, now: float) -> None:
     state.messages_sent += 1
     state.last_message_ts = now
+
+
+def _extract_prompt(payload: dict) -> str:
+    """Den Prompt aus dem stdin-JSON holen.
+
+    Die Anbieter benennen das Feld verschieden; Content-Block-Listen kommen
+    ebenfalls vor (Kimi). Ein unbekanntes Format heisst "kein Prompt", nie
+    ein Fehler -- der Hook darf den Aufruf nicht scheitern lassen.
+    """
+    if not isinstance(payload, dict):
+        return ""
+    for key in ("prompt", "user_prompt", "message", "text", "content"):
+        wert = payload.get(key)
+        if isinstance(wert, str) and wert.strip():
+            return wert
+        if isinstance(wert, list):
+            teile = [
+                b.get("text", "")
+                for b in wert
+                if isinstance(b, dict) and isinstance(b.get("text"), str)
+            ]
+            if any(teile):
+                return " ".join(teile)
+    return ""
+
+
+def _build_capability_message(config, payload: dict) -> str | None:
+    """Passende Skills und Commands zum gerade gestellten Prompt.
+
+    Beide Injektoren teilen sich einen Nachrichten-Slot, damit sie nicht
+    zwei Budgets verbrauchen -- dieselbe Regel wie bei policy/location.
+    """
+    from .capability_injectors import PluginInjector, SkillInjector
+
+    prompt = _extract_prompt(payload)
+    if not prompt:
+        return None
+
+    teile = []
+    if config.injectors.skill:
+        cfg = config.injectors.skill_config
+        roots = [Path(r) for r in cfg.roots] or None
+        treffer = SkillInjector(roots, max_entries=cfg.max_entries).generate(prompt)
+        if treffer:
+            teile.append(treffer)
+    if config.injectors.plugin:
+        cfg = config.injectors.plugin_config
+        roots = [Path(r) for r in cfg.roots] or None
+        treffer = PluginInjector(roots, max_entries=cfg.max_entries).generate(prompt)
+        if treffer:
+            teile.append(treffer)
+    return "\n\n".join(teile) or None
 
 
 def _extract_session_id(payload: dict) -> str | None:
