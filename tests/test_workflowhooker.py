@@ -29,6 +29,25 @@ def test_manifest_validity():
     assert data.get("id") == "workflowhooker"
     assert data.get("category") == "control"
     assert data.get("kind") == "workflow"
-    assert data.get("status") == "release-candidate"
+    # `status` wird gegen den Katalog-Enum geprueft, nicht gegen einen fest
+    # verdrahteten Wert: "release-candidate" stand hier, ist aber in
+    # _scripts/build_catalog.py (VALID_STATUSES) gar nicht zulaessig -- ein
+    # Manifest mit diesem Wert faellt aus modules.catalog.json heraus und
+    # reisst seine registry:modules-Bindings. Dasselbe war 2026-08-16 schon
+    # bei memoryhooker passiert (dortiger Fix-Commit 252243f).
+    assert data.get("status") in {
+        "active", "released", "development", "alpha",
+        "experimental", "staging", "planned", "deprecated",
+    }
     assert data.get("visibility") == "public"
-    assert "repository" not in data.get("source_of_truth", {})
+
+    # Das Modul IST gesplittet (siehe CONTRIBUTING.md): oeffentliche
+    # Distribution + privater provenance-Zwilling. Der Kanon ist das
+    # oeffentliche Repo, der Zwilling laeuft ueber repo_aliases.
+    # Die fruehere Zusicherung "repository nicht gesetzt" hat genau das
+    # verhindert und den Katalog das Modul als privat fuehren lassen
+    # (Ticket T-20260830-168423367, Entscheid D-20260906-005/E02).
+    source = data.get("source_of_truth", {})
+    assert source.get("type") == "git-repository"
+    assert source.get("repository") == "https://github.com/ellmos-ai/workflowhooker"
+    assert data.get("repo_aliases") == ["ellmos-ai/workflowhooker-provenance"]
