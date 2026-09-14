@@ -20,7 +20,7 @@ class CodexProvider:
         self, python_executable: str = "python", module: str = "workflowhooker"
     ) -> dict:
         def command(event: str) -> dict:
-            value = f"{python_executable} -m {module} hook-run {event}"
+            value = f"{python_executable} -m {module} hook-run {event} --provider codex"
             return {
                 "hooks": [
                     {
@@ -33,11 +33,31 @@ class CodexProvider:
                 ]
             }
 
-        snippet = {
-            "hooks": {
-                event: [command(event)]
-                for event in self.events
-            }
-        }
+        snippet = {"hooks": {event: [command(event)] for event in self.events}}
         assert FORBIDDEN_DEFAULT_EVENT not in snippet["hooks"]
         return snippet
+
+    def pretooluse_blocker_snippet(
+        self, python_executable: str = "python", module: str = "workflowhooker"
+    ) -> dict:
+        """Opt-in-Guard nur fuer den tatsaechlich ausgewerteten Patch-Kanal."""
+
+        value = f"{python_executable} -m {module} hook-run PreToolUse --provider codex"
+        return {
+            "hooks": {
+                "PreToolUse": [
+                    {
+                        "matcher": "^apply_patch$",
+                        "hooks": [
+                            {
+                                "type": "command",
+                                "command": value,
+                                "commandWindows": value,
+                                "timeout": 10,
+                                "statusMessage": "WorkflowHooker: action guard",
+                            }
+                        ],
+                    }
+                ]
+            }
+        }

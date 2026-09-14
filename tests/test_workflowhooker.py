@@ -1,13 +1,9 @@
 # -*- coding: utf-8 -*-
 """Tests for workflowhooker package version and module manifest integrity."""
 
-json_import = True
-try:
-    import json
-except ImportError:
-    json_import = False
-
+import json
 from pathlib import Path
+
 import workflowhooker
 
 
@@ -36,8 +32,14 @@ def test_manifest_validity():
     # reisst seine registry:modules-Bindings. Dasselbe war 2026-08-16 schon
     # bei memoryhooker passiert (dortiger Fix-Commit 252243f).
     assert data.get("status") in {
-        "active", "released", "development", "alpha",
-        "experimental", "staging", "planned", "deprecated",
+        "active",
+        "released",
+        "development",
+        "alpha",
+        "experimental",
+        "staging",
+        "planned",
+        "deprecated",
     }
     assert data.get("visibility") == "public"
 

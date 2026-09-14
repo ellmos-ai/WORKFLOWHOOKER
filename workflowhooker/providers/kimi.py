@@ -36,8 +36,8 @@ class KimiProvider:
         self, python_executable: str = "python", module: str = "workflowhooker"
     ) -> dict:
         commands = {
-            "Stop": f"{python_executable} -m {module} hook-run --block Stop",
-            "UserPromptSubmit": f"{python_executable} -m {module} hook-run --format plain UserPromptSubmit",
+            "Stop": f"{python_executable} -m {module} hook-run --block Stop --provider kimi",
+            "UserPromptSubmit": f"{python_executable} -m {module} hook-run --format plain UserPromptSubmit --provider kimi",
         }
         snippet = {
             "hooks": [
@@ -53,3 +53,19 @@ class KimiProvider:
             "Der Default-Snippet darf niemals PreToolUse enthalten (README-Kernregel)."
         )
         return snippet
+
+    def pretooluse_blocker_snippet(
+        self, python_executable: str = "python", module: str = "workflowhooker"
+    ) -> dict:
+        """Opt-in-Guard fuer Kimi-Werkzeuge mit explizitem Dateipfad."""
+
+        return {
+            "hooks": [
+                {
+                    "event": "PreToolUse",
+                    "matcher": "WriteFile|StrReplaceFile|DeleteFile|MoveFile",
+                    "command": f"{python_executable} -m {module} hook-run PreToolUse --provider kimi",
+                    "timeout": 15,
+                }
+            ]
+        }
