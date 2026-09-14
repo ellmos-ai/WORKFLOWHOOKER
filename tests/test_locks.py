@@ -44,6 +44,38 @@ def test_scoped_lock_only_applies_to_its_component(tmp_path: Path):
     )
 
 
+def test_named_reserved_and_ticket_locks_apply_project_wide(tmp_path: Path):
+    target = tmp_path / "workflowhooker" / "gates.py"
+    target.parent.mkdir()
+    lock_names = (
+        "LOCK.user.buildweek-no-push.txt",
+        "LOCK.condition.release.txt",
+        "LOCK.team.release.txt",
+        "LOCK.until.release.txt",
+        "LOCK.T-20260902-469197627.txt",
+    )
+    for name in lock_names:
+        lock = tmp_path / name
+        lock.write_text(
+            "OWNER: worker\nSCOPE: E01/E02\nNOT_BEFORE: 2099-01-01T00:00:00Z\n",
+            encoding="utf-8",
+        )
+        snapshot = inspect_locks(tmp_path, target, now=NOW)
+        assert snapshot.evidence is EvidenceState.FINDING, name
+        assert snapshot.records[0].file_scope == "project", name
+        lock.unlink()
+
+
+def test_active_until_lock_is_protected(tmp_path: Path):
+    (tmp_path / "LOCK.until.release.txt").write_text(
+        "NOT_BEFORE: 2099-01-01T00:00:00Z\n", encoding="utf-8"
+    )
+    snapshot = inspect_locks(
+        tmp_path, tmp_path / "workflowhooker" / "gates.py", now=NOW
+    )
+    assert snapshot.records[0].protected is True
+
+
 def test_lock_operations_are_parsed_and_normalized(tmp_path: Path):
     (tmp_path / "LOCK.release.txt").write_text(
         "OWNER: worker\nOPERATIONS: File-Write, ZENODO-UPLOAD\n",

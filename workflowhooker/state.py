@@ -138,8 +138,54 @@ class SessionState:
     def runtime_for(self, check_name: str) -> CheckRuntime:
         return self.checks.setdefault(check_name, CheckRuntime())
 
-    def stop_runtime_for(self, target_key: str) -> StopGateRuntime:
+    def stop_runtime_for(
+        self,
+        target_key: str,
+        *,
+        owner: str = "",
+        scope: str = "",
+        host: str = "",
+        session: str = "",
+    ) -> StopGateRuntime:
         # Lokale Pfade bleiben aus dem JSON-Schlüssel heraus; der kanonische
-        # Zielwert liegt separat im Runtime-Beleg.
-        key = hashlib.sha256(target_key.encode("utf-8")).hexdigest()
-        return self.stop_gates.setdefault(key, StopGateRuntime(target=target_key))
+        # Zielwert und die vollstaendige Identitaet liegen separat im Beleg.
+        identity = (target_key, owner, scope, host, session)
+        encoded = json.dumps(identity, ensure_ascii=False, separators=(",", ":"))
+        key = hashlib.sha256(encoded.encode("utf-8")).hexdigest()
+        runtime = self.stop_gates.get(key)
+        if (
+            runtime is not None
+            and (
+                runtime.target,
+                runtime.owner,
+                runtime.scope,
+                runtime.host,
+                runtime.session,
+            )
+            == identity
+        ):
+            return runtime
+
+        # Migriert den kurzzeitig verwendeten, nur zielgebundenen Key ohne
+        # eine belegte Runde zu verlieren. Ausschliesslich ein exakt passender
+        # gespeicherter Identitaetsbeleg darf uebernommen werden.
+        for old_key, candidate in tuple(self.stop_gates.items()):
+            if (
+                candidate.target,
+                candidate.owner,
+                candidate.scope,
+                candidate.host,
+                candidate.session,
+            ) == identity:
+                self.stop_gates[key] = self.stop_gates.pop(old_key)
+                return candidate
+
+        runtime = StopGateRuntime(
+            target=target_key,
+            owner=owner,
+            scope=scope,
+            host=host,
+            session=session,
+        )
+        self.stop_gates[key] = runtime
+        return runtime

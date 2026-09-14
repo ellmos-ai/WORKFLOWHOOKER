@@ -20,6 +20,14 @@ All notable public changes are documented in this file.
 - Added provider-specific opt-in snippets for only the path channels this
   release can evaluate. No Bash, PowerShell, unified-exec, or arbitrary MCP
   target-coverage claim is made.
+- Treat named user, team, condition, until, and ticket locks as project-wide;
+  active until locks are protected, while ticket authority is correlated from
+  lock metadata instead of a filename-derived directory.
+- Validate both source and destination for `MoveFile` and `apply_patch` moves;
+  unresolved move targets fail closed.
+- Bind the persisted one-round completion state to the full owner, scope,
+  host, session, and canonical-target identity, including stored-value
+  validation and migration of an exactly matching earlier target-only key.
 
 - The working directory is taken from the hook's stdin payload instead of the
   process working directory. A hook's process cwd is where the SESSION was

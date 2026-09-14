@@ -11,6 +11,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
+import re
 
 from .decisions import EvidenceState
 
@@ -34,7 +35,7 @@ class LockRecord:
 
     @property
     def protected(self) -> bool:
-        return self.kind in {"user", "condition", "ambiguous"}
+        return self.kind in {"user", "condition", "until", "ambiguous"}
 
 
 @dataclass(frozen=True)
@@ -64,15 +65,18 @@ def _lock_kind(name: str) -> str:
         return "until"
     if lowered == "lock.txt":
         return "root"
+    if stem_parts and re.fullmatch(r"t-\d{8}-\d+", stem_parts[0]):
+        return "ticket"
     return "scoped"
 
 
 def _file_scope(name: str, kind: str) -> str:
-    parts = name.removesuffix(".txt").split(".")[1:]
-    if kind == "ambiguous":
+    # Reservierte Lockarten und Ticket-Claims gelten fuer das Projekt. Ihre
+    # Suffixe benennen den Lock, nicht ein gleichnamiges Unterverzeichnis.
+    # Ticket-Scope wird aus den Metadaten korreliert, nicht aus dem Dateinamen.
+    if kind in {"user", "team", "condition", "until", "ambiguous", "ticket"}:
         return "project"
-    if parts and parts[0].lower() in {"user", "team", "condition", "until"}:
-        parts = parts[1:]
+    parts = name.removesuffix(".txt").split(".")[1:]
     return ".".join(parts) or "project"
 
 

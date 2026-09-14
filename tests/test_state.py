@@ -15,9 +15,10 @@ def test_save_and_load_roundtrip(tmp_path: Path):
     state = SessionState(messages_sent=2, last_message_ts=99.0)
     state.runtime_for("closing_gate").usage_count = 3
     state.runtime_for("closing_gate").disabled = True
-    stop_runtime = state.stop_runtime_for("C:/repo")
+    stop_runtime = state.stop_runtime_for(
+        "C:/repo", owner="worker", scope="ticket", host="ASUS-GEI", session="S"
+    )
     stop_runtime.rounds_requested = 1
-    stop_runtime.owner = "worker"
     state.save(path)
 
     loaded = SessionState.load(path)
@@ -25,8 +26,11 @@ def test_save_and_load_roundtrip(tmp_path: Path):
     assert loaded.last_message_ts == 99.0
     assert loaded.checks["closing_gate"].usage_count == 3
     assert loaded.checks["closing_gate"].disabled is True
-    assert loaded.stop_runtime_for("C:/repo").rounds_requested == 1
-    assert loaded.stop_runtime_for("C:/repo").owner == "worker"
+    loaded_runtime = loaded.stop_runtime_for(
+        "C:/repo", owner="worker", scope="ticket", host="ASUS-GEI", session="S"
+    )
+    assert loaded_runtime.rounds_requested == 1
+    assert loaded_runtime.owner == "worker"
     assert not list(tmp_path.glob("*.tmp"))
 
 
@@ -51,6 +55,52 @@ def test_runtime_for_creates_new_entry():
     assert isinstance(runtime, CheckRuntime)
     assert "scope_guard" in state.checks
     assert state.runtime_for("scope_guard") is runtime
+
+
+def test_stop_runtime_key_includes_full_identity():
+    state = SessionState()
+    a = state.stop_runtime_for(
+        "C:/repo", owner="worker-a", scope="ticket", host="ASUS-GEI", session="S"
+    )
+    b = state.stop_runtime_for(
+        "C:/repo", owner="worker-b", scope="ticket", host="ASUS-GEI", session="S"
+    )
+    assert a is not b
+    assert len(state.stop_gates) == 2
+
+
+def test_stop_runtime_migrates_matching_legacy_target_key():
+    state = SessionState()
+    legacy = state.stop_runtime_for("C:/repo")
+    legacy.rounds_requested = 1
+    legacy.owner = "worker"
+    legacy.scope = "ticket"
+    legacy.host = "ASUS-GEI"
+    legacy.session = "S"
+
+    migrated = state.stop_runtime_for(
+        "C:/repo", owner="worker", scope="ticket", host="ASUS-GEI", session="S"
+    )
+
+    assert migrated is legacy
+    assert migrated.rounds_requested == 1
+    assert len(state.stop_gates) == 1
+
+
+def test_stop_runtime_does_not_reuse_mismatched_stored_identity():
+    state = SessionState()
+    runtime = state.stop_runtime_for(
+        "C:/repo", owner="worker-a", scope="ticket", host="ASUS-GEI", session="S"
+    )
+    runtime.rounds_requested = 1
+    runtime.owner = "worker-b"
+
+    replacement = state.stop_runtime_for(
+        "C:/repo", owner="worker-a", scope="ticket", host="ASUS-GEI", session="S"
+    )
+
+    assert replacement is not runtime
+    assert replacement.rounds_requested == 0
 
 
 def test_state_path_for_session_differs_by_session_id(tmp_path: Path):

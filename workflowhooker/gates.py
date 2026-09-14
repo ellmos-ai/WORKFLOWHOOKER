@@ -15,14 +15,14 @@ from .state import SessionState
 
 
 _EXPLICIT_PATH_FIELDS = {
-    "Edit": "file_path",
-    "Write": "file_path",
-    "MultiEdit": "file_path",
-    "NotebookEdit": "notebook_path",
-    "WriteFile": "file_path",
-    "StrReplaceFile": "path",
-    "DeleteFile": "path",
-    "MoveFile": "source",
+    "Edit": ("file_path",),
+    "Write": ("file_path",),
+    "MultiEdit": ("file_path",),
+    "NotebookEdit": ("notebook_path",),
+    "WriteFile": ("file_path",),
+    "StrReplaceFile": ("path",),
+    "DeleteFile": ("path",),
+    "MoveFile": ("source", "destination"),
 }
 
 
@@ -33,16 +33,29 @@ class ActionTargets:
     malformed: bool = False
 
 
-def _patch_paths(command: str) -> tuple[str, ...]:
+def _patch_paths(command: str) -> tuple[tuple[str, ...], bool]:
     paths = []
     prefixes = ("*** Add File: ", "*** Update File: ", "*** Delete File: ")
+    update_source_seen = False
+    malformed = False
     for line in command.splitlines():
         for prefix in prefixes:
             if line.startswith(prefix):
                 value = line[len(prefix) :].strip()
                 if value:
                     paths.append(value)
-    return tuple(dict.fromkeys(paths))
+                    if prefix == "*** Update File: ":
+                        update_source_seen = True
+                else:
+                    malformed = True
+                break
+        if line.startswith("*** Move to:"):
+            value = line[len("*** Move to:") :].strip()
+            if value and update_source_seen:
+                paths.append(value)
+            else:
+                malformed = True
+    return tuple(dict.fromkeys(paths)), malformed
 
 
 def extract_action_targets(payload: dict[str, Any], cwd: Path) -> ActionTargets:
@@ -63,10 +76,17 @@ def extract_action_targets(payload: dict[str, Any], cwd: Path) -> ActionTargets:
         command = tool_input.get("command")
         if not isinstance(command, str):
             return ActionTargets(True, malformed=True)
-        raw_paths = _patch_paths(command)
+        raw_paths, malformed = _patch_paths(command)
+        if malformed:
+            return ActionTargets(True, malformed=True)
     elif tool_name in _EXPLICIT_PATH_FIELDS:
-        raw = tool_input.get(_EXPLICIT_PATH_FIELDS[tool_name])
-        raw_paths = (raw,) if isinstance(raw, str) and raw.strip() else ()
+        raw_paths = tuple(
+            tool_input.get(field)
+            for field in _EXPLICIT_PATH_FIELDS[tool_name]
+            if isinstance(tool_input.get(field), str) and tool_input.get(field).strip()
+        )
+        if len(raw_paths) != len(_EXPLICIT_PATH_FIELDS[tool_name]):
+            return ActionTargets(True, malformed=True)
     else:
         return ActionTargets(False)
 
@@ -330,7 +350,13 @@ def evaluate_stop_gate(
     # Ein beschädigter State oder ein bereits aktiver Stop-Nachstoß darf keine
     # neue Schleife erzeugen. Befunde werden wahrheitsgemäß zurückgegeben.
     already_active = bool(payload.get("stop_hook_active"))
-    runtime = state.stop_runtime_for(target_key)
+    runtime = state.stop_runtime_for(
+        target_key,
+        owner=config.identity.owner,
+        scope=config.identity.scope,
+        host=config.identity.host,
+        session=session_id,
+    )
     if not state_reliable or already_active:
         # Fail-safe gegen Schleifen: Ein verlorener Rundenbeleg oder der
         # Host-Nachweis einer bereits laufenden Fortsetzung gilt fuer dieses

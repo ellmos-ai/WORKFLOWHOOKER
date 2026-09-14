@@ -13,9 +13,11 @@ from workflowhooker.protocol import ProjectState
 from workflowhooker.state import SessionState
 
 
-def _config(*, action=False, stop=False, owner="worker", host="ASUS-GEI") -> Config:
+def _config(
+    *, action=False, stop=False, owner="worker", scope="ticket", host="ASUS-GEI"
+) -> Config:
     return Config(
-        identity=IdentityConfig(owner=owner, scope="ticket", host=host, target="repo"),
+        identity=IdentityConfig(owner=owner, scope=scope, host=host, target="repo"),
         action_guard=ActionGuardConfig(enabled=action),
         stop_gate=StopGateConfig(enabled=stop),
     )
@@ -143,6 +145,25 @@ def test_owner_match_does_not_override_scope_host_session_or_target(tmp_path: Pa
         assert result.decision is Decision.DENY
 
 
+def test_ticket_lock_uses_metadata_scope_not_filename_as_directory(tmp_path: Path):
+    target = tmp_path / "workflowhooker" / "gates.py"
+    target.parent.mkdir()
+    (tmp_path / "LOCK.T-20260902-469197627.txt").write_text(
+        "OWNER: worker\nSCOPE: E01/E02\n", encoding="utf-8"
+    )
+    payload = _payload(tmp_path, tool_input={"file_path": str(target)})
+
+    matching = evaluate_action_guard(
+        payload, _config(action=True, scope="E01/E02"), tmp_path
+    )
+    mismatching = evaluate_action_guard(
+        payload, _config(action=True, scope="other"), tmp_path
+    )
+
+    assert matching.decision is Decision.ALLOW
+    assert mismatching.decision is Decision.DENY
+
+
 def test_soft_or_other_operation_lock_does_not_block_file_action(tmp_path: Path):
     records = (
         LockRecord(tmp_path / "LOCK.txt", "root", owner="other", mode="soft"),
@@ -190,6 +211,62 @@ def test_patch_with_one_out_of_scope_target_requires_ask(tmp_path: Path):
     assert result.decision is Decision.ASK
 
 
+def test_movefile_checks_source_and_out_of_scope_destination(tmp_path: Path):
+    outside = tmp_path.parent / "outside.py"
+    result = evaluate_action_guard(
+        _payload(
+            tmp_path,
+            tool="MoveFile",
+            tool_input={"source": "a.py", "destination": str(outside)},
+        ),
+        _config(action=True),
+        tmp_path,
+        lock_inspector=lambda *_: LockSnapshot(EvidenceState.CLEAN),
+    )
+    assert result.decision is Decision.ASK
+
+
+def test_movefile_missing_destination_is_unknown_and_denied(tmp_path: Path):
+    result = evaluate_action_guard(
+        _payload(tmp_path, tool="MoveFile", tool_input={"source": "a.py"}),
+        _config(action=True),
+        tmp_path,
+    )
+    assert (result.decision, result.evidence) == (
+        Decision.DENY,
+        EvidenceState.UNKNOWN,
+    )
+
+
+def test_apply_patch_move_checks_old_and_out_of_scope_new_path(tmp_path: Path):
+    command = (
+        "*** Begin Patch\n"
+        "*** Update File: a.py\n"
+        "*** Move to: ../outside.py\n"
+        "*** End Patch"
+    )
+    result = evaluate_action_guard(
+        _payload(tmp_path, tool="apply_patch", tool_input={"command": command}),
+        _config(action=True),
+        tmp_path,
+        lock_inspector=lambda *_: LockSnapshot(EvidenceState.CLEAN),
+    )
+    assert result.decision is Decision.ASK
+
+
+def test_apply_patch_unresolved_move_destination_is_unknown_and_denied(tmp_path: Path):
+    command = "*** Begin Patch\n*** Update File: a.py\n*** Move to:\n*** End Patch"
+    result = evaluate_action_guard(
+        _payload(tmp_path, tool="apply_patch", tool_input={"command": command}),
+        _config(action=True),
+        tmp_path,
+    )
+    assert (result.decision, result.evidence) == (
+        Decision.DENY,
+        EvidenceState.UNKNOWN,
+    )
+
+
 def test_stop_gate_requests_exactly_one_owned_rework_round(tmp_path: Path):
     own = LockRecord(tmp_path / "LOCK.ticket.txt", "scoped", owner="worker")
 
@@ -222,7 +299,13 @@ def test_stop_gate_requests_exactly_one_owned_rework_round(tmp_path: Path):
     )
     assert first.decision is Decision.DENY
     assert second.decision is Decision.ALLOW
-    runtime = state.stop_runtime_for(str(tmp_path.resolve(strict=False)))
+    runtime = state.stop_runtime_for(
+        str(tmp_path.resolve(strict=False)),
+        owner="worker",
+        scope="ticket",
+        host="ASUS-GEI",
+        session="S",
+    )
     assert runtime.rounds_requested == 1
     assert len(runtime.evidence_fingerprint) == 64
     assert "Verbleibende Befunde" in second.message
@@ -309,6 +392,61 @@ def test_stop_round_is_bound_to_each_canonical_target(tmp_path: Path):
     assert len(state.stop_gates) == 2
 
 
+def test_stop_round_is_bound_to_full_identity(tmp_path: Path):
+    state = SessionState()
+    project_state = ProjectState(git_available=True)
+
+    def inspector(_project_dir, _target):
+        owner = current_config.identity.owner
+        return LockSnapshot(
+            EvidenceState.FINDING,
+            (
+                LockRecord(
+                    tmp_path / f"LOCK.{owner}.txt",
+                    "scoped",
+                    owner=owner,
+                    scope="ticket",
+                    host="ASUS-GEI",
+                ),
+            ),
+        )
+
+    current_config = _config(stop=True, owner="worker-a")
+    first_a = evaluate_stop_gate(
+        {"session_id": "S"},
+        current_config,
+        tmp_path,
+        project_state,
+        state,
+        state_reliable=True,
+        lock_inspector=inspector,
+    )
+    second_a = evaluate_stop_gate(
+        {"session_id": "S"},
+        current_config,
+        tmp_path,
+        project_state,
+        state,
+        state_reliable=True,
+        lock_inspector=inspector,
+    )
+    current_config = _config(stop=True, owner="worker-b")
+    first_b = evaluate_stop_gate(
+        {"session_id": "S"},
+        current_config,
+        tmp_path,
+        project_state,
+        state,
+        state_reliable=True,
+        lock_inspector=inspector,
+    )
+
+    assert first_a.decision is Decision.DENY
+    assert second_a.decision is Decision.ALLOW
+    assert first_b.decision is Decision.DENY
+    assert len(state.stop_gates) == 2
+
+
 def test_foreign_lock_and_unowned_diff_are_reported_without_cleanup_loop(
     tmp_path: Path,
 ):
@@ -325,7 +463,13 @@ def test_foreign_lock_and_unowned_diff_are_reported_without_cleanup_loop(
     )
     assert result.decision is Decision.ALLOW
     assert (
-        state.stop_runtime_for(str(tmp_path.resolve(strict=False))).rounds_requested
+        state.stop_runtime_for(
+            str(tmp_path.resolve(strict=False)),
+            owner="worker",
+            scope="ticket",
+            host="ASUS-GEI",
+            session="S",
+        ).rounds_requested
         == 0
     )
     assert "unangetastet" in result.message

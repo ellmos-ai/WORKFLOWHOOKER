@@ -98,8 +98,9 @@ betroffene Aktion. Fehler eines Hinweises oder Kontextchecks sperren normale,
 bereits autorisierte Arbeit nicht global.
 
 Das optionale Abschluss-Gate korreliert Eigentümer, Scope, Host, Sitzung,
-kanonisches Ziel, Lockart und Git-Worktree. Bei einem Worktree prüft es auch den
-Hauptklon. Nur ein passend zugeordneter eigener Befund kann genau eine
+kanonisches Ziel, Lockart und Git-Worktree. Sein Einmalrunden-State ist an die
+vollständige Identität und das kanonische Ziel gebunden. Bei einem Worktree
+prüft es auch den Hauptklon. Nur ein passend zugeordneter eigener Befund kann genau eine
 Nacharbeitsrunde anfordern. Beim zweiten Stop, bei `stop_hook_active`, fremdem
 Zustand oder beschädigtem State folgt nur eine wahrheitsgemäße Restmeldung ohne
 erneuten Block. WorkflowHooker löscht keine Locks, setzt keine Diffs zurück und
