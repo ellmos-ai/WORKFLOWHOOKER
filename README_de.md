@@ -98,13 +98,15 @@ betroffene Aktion. Fehler eines Hinweises oder Kontextchecks sperren normale,
 bereits autorisierte Arbeit nicht global.
 
 Das optionale Abschluss-Gate korreliert Eigentümer, Scope, Host, Sitzung,
-kanonisches Ziel, Lockart und Git-Worktree. Sein Einmalrunden-State ist an die
-vollständige Identität und das kanonische Ziel gebunden. Bei einem Worktree
-prüft es auch den Hauptklon. Nur ein passend zugeordneter eigener Befund kann genau eine
-Nacharbeitsrunde anfordern. Beim zweiten Stop, bei `stop_hook_active`, fremdem
-Zustand oder beschädigtem State folgt nur eine wahrheitsgemäße Restmeldung ohne
-erneuten Block. WorkflowHooker löscht keine Locks, setzt keine Diffs zurück und
-räumt fremde Arbeit niemals automatisch auf.
+konfiguriertes Identitätsziel, kanonisches Projektziel, Lockart und
+Git-Worktree. Sein Einmalrunden-State ist an diese vollständige Identität
+gebunden. Ein Widerspruch zwischen State-Hash und Runtime-Identität wird als
+unbelastbarer Reststatus gemeldet und kann keine neue Runde beginnen. Bei einem
+Worktree prüft es auch den Hauptklon. Nur ein passend zugeordneter eigener
+Befund kann genau eine Nacharbeitsrunde anfordern. Beim zweiten Stop, bei
+`stop_hook_active`, fremdem Zustand oder beschädigtem State folgt nur eine
+wahrheitsgemäße Restmeldung ohne erneuten Block. WorkflowHooker löscht keine
+Locks, setzt keine Diffs zurück und räumt fremde Arbeit niemals automatisch auf.
 
 ## Datenschutz und Lizenz
 

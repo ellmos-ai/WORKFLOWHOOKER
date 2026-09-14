@@ -154,7 +154,9 @@ def test_stop_blocks_once_then_returns_residual_without_second_block(
     project.mkdir()
     subprocess.run(["git", "init"], cwd=project, check=True, capture_output=True)
     (project / "LOCK.ticket.txt").write_text(
-        "OWNER: worker\nSESSION: S\nHOST: ASUS-GEI\nMODE: hard\n", encoding="utf-8"
+        "OWNER: worker\nSCOPE: ticket\nSESSION: S\nHOST: ASUS-GEI\n"
+        "TARGET: repo\nMODE: hard\n",
+        encoding="utf-8",
     )
     (project / "dirty.txt").write_text("x", encoding="utf-8")
     config = _config(tmp_path, budget=0)

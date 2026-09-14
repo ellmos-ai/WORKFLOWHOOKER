@@ -36,7 +36,7 @@ from .sources import (
     GitStateSource,
     TaskplanStateSource,
 )
-from .state import SessionState, state_path_for_session
+from .state import SessionState, StopRuntimeIntegrityError, state_path_for_session
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -271,7 +271,7 @@ def _cmd_hook_run(args) -> int:
         )
         try:
             state.save(state_path)
-        except OSError:
+        except (OSError, StopRuntimeIntegrityError):
             # Ohne dauerhaft gespeicherten Rundenbeleg darf der Hook nicht
             # blockieren: Sonst koennte jeder Stop erneut "Runde 1" sein.
             result = GateResult(

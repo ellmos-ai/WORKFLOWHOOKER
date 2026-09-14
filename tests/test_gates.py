@@ -35,6 +35,18 @@ def _payload(tmp_path: Path, *, tool="Write", tool_input=None, session="S"):
     }
 
 
+def _owned_lock(path: Path, *, owner="worker", target="repo") -> LockRecord:
+    return LockRecord(
+        path,
+        "ticket",
+        owner=owner,
+        scope="ticket",
+        host="ASUS-GEI",
+        session="S",
+        target=target,
+    )
+
+
 def test_authorized_file_action_with_clean_guard_is_allowed(tmp_path: Path):
     result = evaluate_action_guard(
         _payload(tmp_path),
@@ -106,7 +118,7 @@ def test_missing_authority_is_ask_not_allow(tmp_path: Path):
 def test_foreign_and_protected_locks_deny_but_own_lock_allows(tmp_path: Path):
     foreign = LockRecord(tmp_path / "LOCK.txt", "root", owner="other")
     protected = LockRecord(tmp_path / "LOCK.user.txt", "user", owner="worker")
-    own = LockRecord(tmp_path / "LOCK.ticket.txt", "scoped", owner="worker")
+    own = _owned_lock(tmp_path / "LOCK.ticket.txt")
     for record in (foreign, protected):
         result = evaluate_action_guard(
             _payload(tmp_path),
@@ -124,6 +136,17 @@ def test_foreign_and_protected_locks_deny_but_own_lock_allows(tmp_path: Path):
         lock_inspector=lambda *_: LockSnapshot(EvidenceState.FINDING, (own,)),
     )
     assert result.decision is Decision.ALLOW
+
+
+def test_owner_only_lock_does_not_authorize_action_guard(tmp_path: Path):
+    owner_only = LockRecord(tmp_path / "LOCK.ticket.txt", "ticket", owner="worker")
+    result = evaluate_action_guard(
+        _payload(tmp_path),
+        _config(action=True),
+        tmp_path,
+        lock_inspector=lambda *_: LockSnapshot(EvidenceState.FINDING, (owner_only,)),
+    )
+    assert result.decision is Decision.DENY
 
 
 def test_owner_match_does_not_override_scope_host_session_or_target(tmp_path: Path):
@@ -149,7 +172,8 @@ def test_ticket_lock_uses_metadata_scope_not_filename_as_directory(tmp_path: Pat
     target = tmp_path / "workflowhooker" / "gates.py"
     target.parent.mkdir()
     (tmp_path / "LOCK.T-20260902-469197627.txt").write_text(
-        "OWNER: worker\nSCOPE: E01/E02\n", encoding="utf-8"
+        "OWNER: worker\nSCOPE: E01/E02\nHOST: ASUS-GEI\nSESSION: S\nTARGET: repo\n",
+        encoding="utf-8",
     )
     payload = _payload(tmp_path, tool_input={"file_path": str(target)})
 
@@ -267,8 +291,24 @@ def test_apply_patch_unresolved_move_destination_is_unknown_and_denied(tmp_path:
     )
 
 
+def test_apply_patch_indented_move_marker_checks_destination(tmp_path: Path):
+    command = (
+        "*** Begin Patch\n"
+        "*** Update File: a.py\n"
+        " *** Move to: ../outside.py\n"
+        "*** End Patch"
+    )
+    result = evaluate_action_guard(
+        _payload(tmp_path, tool="apply_patch", tool_input={"command": command}),
+        _config(action=True),
+        tmp_path,
+        lock_inspector=lambda *_: LockSnapshot(EvidenceState.CLEAN),
+    )
+    assert result.decision is Decision.ASK
+
+
 def test_stop_gate_requests_exactly_one_owned_rework_round(tmp_path: Path):
-    own = LockRecord(tmp_path / "LOCK.ticket.txt", "scoped", owner="worker")
+    own = _owned_lock(tmp_path / "LOCK.ticket.txt")
 
     def inspector(*_):
         return LockSnapshot(EvidenceState.FINDING, (own,))
@@ -305,6 +345,7 @@ def test_stop_gate_requests_exactly_one_owned_rework_round(tmp_path: Path):
         scope="ticket",
         host="ASUS-GEI",
         session="S",
+        identity_target="repo",
     )
     assert runtime.rounds_requested == 1
     assert len(runtime.evidence_fingerprint) == 64
@@ -312,7 +353,7 @@ def test_stop_gate_requests_exactly_one_owned_rework_round(tmp_path: Path):
 
 
 def test_stop_hook_active_or_corrupt_state_never_starts_another_loop(tmp_path: Path):
-    own = LockRecord(tmp_path / "LOCK.ticket.txt", "scoped", owner="worker")
+    own = _owned_lock(tmp_path / "LOCK.ticket.txt")
 
     def inspector(*_):
         return LockSnapshot(EvidenceState.FINDING, (own,))
@@ -362,7 +403,7 @@ def test_stop_round_is_bound_to_each_canonical_target(tmp_path: Path):
     project_state = ProjectState(git_available=True)
 
     def inspector(project_dir, _target):
-        own = LockRecord(project_dir / "LOCK.ticket.txt", "scoped", owner="worker")
+        own = _owned_lock(project_dir / "LOCK.ticket.txt")
         return LockSnapshot(EvidenceState.FINDING, (own,))
 
     roots = (tmp_path / "a", tmp_path / "b")
@@ -407,6 +448,8 @@ def test_stop_round_is_bound_to_full_identity(tmp_path: Path):
                     owner=owner,
                     scope="ticket",
                     host="ASUS-GEI",
+                    session="S",
+                    target="repo",
                 ),
             ),
         )
@@ -447,10 +490,128 @@ def test_stop_round_is_bound_to_full_identity(tmp_path: Path):
     assert len(state.stop_gates) == 2
 
 
+def test_stop_round_is_bound_to_identity_target(tmp_path: Path):
+    state = SessionState()
+    project_state = ProjectState(git_available=True)
+
+    def inspector(_project_dir, _target):
+        return LockSnapshot(
+            EvidenceState.FINDING,
+            (
+                LockRecord(
+                    tmp_path / "LOCK.ticket.txt",
+                    "ticket",
+                    owner="worker",
+                    scope="ticket",
+                    host="ASUS-GEI",
+                    session="S",
+                    target=current_config.identity.target,
+                ),
+            ),
+        )
+
+    current_config = _config(stop=True)
+    first_a = evaluate_stop_gate(
+        {"session_id": "S"},
+        current_config,
+        tmp_path,
+        project_state,
+        state,
+        state_reliable=True,
+        lock_inspector=inspector,
+    )
+    current_config = Config(
+        identity=IdentityConfig(
+            owner="worker", scope="ticket", host="ASUS-GEI", target="repo-b"
+        ),
+        stop_gate=StopGateConfig(enabled=True),
+    )
+    first_b = evaluate_stop_gate(
+        {"session_id": "S"},
+        current_config,
+        tmp_path,
+        project_state,
+        state,
+        state_reliable=True,
+        lock_inspector=inspector,
+    )
+
+    assert first_a.decision is Decision.DENY
+    assert first_b.decision is Decision.DENY
+    assert len(state.stop_gates) == 2
+
+
+def test_tampered_runtime_returns_residual_without_second_round(tmp_path: Path):
+    own = LockRecord(
+        tmp_path / "LOCK.ticket.txt",
+        "ticket",
+        owner="worker",
+        scope="ticket",
+        host="ASUS-GEI",
+        session="S",
+        target="repo",
+    )
+    state = SessionState()
+    config = _config(stop=True)
+
+    def inspector(*_):
+        return LockSnapshot(EvidenceState.FINDING, (own,))
+
+    first = evaluate_stop_gate(
+        {"session_id": "S"},
+        config,
+        tmp_path,
+        ProjectState(git_available=True),
+        state,
+        state_reliable=True,
+        lock_inspector=inspector,
+    )
+    runtime = next(iter(state.stop_gates.values()))
+    runtime.owner = "tampered"
+    second = evaluate_stop_gate(
+        {"session_id": "S"},
+        config,
+        tmp_path,
+        ProjectState(git_available=True),
+        state,
+        state_reliable=True,
+        lock_inspector=inspector,
+    )
+
+    assert first.decision is Decision.DENY
+    assert second.decision is Decision.ALLOW
+    assert second.evidence is EvidenceState.UNKNOWN
+    assert "Verbleibende Befunde" in second.message
+
+
+def test_incomplete_owned_lock_cannot_authorize_stop_rework(tmp_path: Path):
+    owner_only = LockRecord(tmp_path / "LOCK.ticket.txt", "ticket", owner="worker")
+    result = evaluate_stop_gate(
+        {"session_id": "S"},
+        _config(stop=True),
+        tmp_path,
+        ProjectState(git_available=True),
+        SessionState(),
+        state_reliable=True,
+        lock_inspector=lambda *_: LockSnapshot(EvidenceState.FINDING, (owner_only,)),
+    )
+    assert result.decision is Decision.ALLOW
+    assert result.evidence is EvidenceState.UNKNOWN
+    assert "Verbleibende Befunde" in result.message
+
+
 def test_foreign_lock_and_unowned_diff_are_reported_without_cleanup_loop(
     tmp_path: Path,
 ):
-    foreign = LockRecord(tmp_path / "LOCK.other.txt", "scoped", owner="other")
+    foreign = LockRecord(
+        tmp_path / "LOCK.other.txt",
+        "scoped",
+        owner="other",
+        scope="ticket",
+        host="ASUS-GEI",
+        session="S",
+        target="repo",
+    )
     state = SessionState()
     result = evaluate_stop_gate(
         {"session_id": "S"},
@@ -469,6 +630,7 @@ def test_foreign_lock_and_unowned_diff_are_reported_without_cleanup_loop(
             scope="ticket",
             host="ASUS-GEI",
             session="S",
+            identity_target="repo",
         ).rounds_requested
         == 0
     )

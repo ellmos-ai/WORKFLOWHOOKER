@@ -47,6 +47,30 @@ class StopGateRuntime:
     host: str = ""
     session: str = ""
     target: str = ""
+    identity_target: str = ""
+
+
+class StopRuntimeIntegrityError(ValueError):
+    """Persistierter Stop-State passt nicht zu seinem Identitaets-Hash."""
+
+
+def _stop_gate_key(runtime: StopGateRuntime) -> str:
+    identity = (
+        runtime.target,
+        runtime.owner,
+        runtime.scope,
+        runtime.host,
+        runtime.session,
+        runtime.identity_target,
+    )
+    encoded = json.dumps(identity, ensure_ascii=False, separators=(",", ":"))
+    return hashlib.sha256(encoded.encode("utf-8")).hexdigest()
+
+
+def _validate_stop_gates(stop_gates: dict[str, StopGateRuntime]) -> None:
+    for key, runtime in stop_gates.items():
+        if key != _stop_gate_key(runtime):
+            raise StopRuntimeIntegrityError("stop-runtime-identity-mismatch")
 
 
 @dataclass
@@ -96,6 +120,7 @@ class SessionState:
                 key: StopGateRuntime(**runtime_data)
                 for key, runtime_data in stop_data.items()
             }
+            _validate_stop_gates(stop_gates)
             state = cls(
                 messages_sent=data.get("messages_sent", 0),
                 last_message_ts=data.get("last_message_ts"),
@@ -107,6 +132,7 @@ class SessionState:
         return state, True
 
     def save(self, path: Path) -> None:
+        _validate_stop_gates(self.stop_gates)
         path.parent.mkdir(parents=True, exist_ok=True)
         data = {
             "messages_sent": self.messages_sent,
@@ -146,46 +172,22 @@ class SessionState:
         scope: str = "",
         host: str = "",
         session: str = "",
+        identity_target: str = "",
     ) -> StopGateRuntime:
         # Lokale Pfade bleiben aus dem JSON-Schlüssel heraus; der kanonische
         # Zielwert und die vollstaendige Identitaet liegen separat im Beleg.
-        identity = (target_key, owner, scope, host, session)
-        encoded = json.dumps(identity, ensure_ascii=False, separators=(",", ":"))
-        key = hashlib.sha256(encoded.encode("utf-8")).hexdigest()
-        runtime = self.stop_gates.get(key)
-        if (
-            runtime is not None
-            and (
-                runtime.target,
-                runtime.owner,
-                runtime.scope,
-                runtime.host,
-                runtime.session,
-            )
-            == identity
-        ):
-            return runtime
-
-        # Migriert den kurzzeitig verwendeten, nur zielgebundenen Key ohne
-        # eine belegte Runde zu verlieren. Ausschliesslich ein exakt passender
-        # gespeicherter Identitaetsbeleg darf uebernommen werden.
-        for old_key, candidate in tuple(self.stop_gates.items()):
-            if (
-                candidate.target,
-                candidate.owner,
-                candidate.scope,
-                candidate.host,
-                candidate.session,
-            ) == identity:
-                self.stop_gates[key] = self.stop_gates.pop(old_key)
-                return candidate
-
-        runtime = StopGateRuntime(
+        _validate_stop_gates(self.stop_gates)
+        candidate = StopGateRuntime(
             target=target_key,
             owner=owner,
             scope=scope,
             host=host,
             session=session,
+            identity_target=identity_target,
         )
-        self.stop_gates[key] = runtime
-        return runtime
+        key = _stop_gate_key(candidate)
+        runtime = self.stop_gates.get(key)
+        if runtime is not None:
+            return runtime
+        self.stop_gates[key] = candidate
+        return candidate

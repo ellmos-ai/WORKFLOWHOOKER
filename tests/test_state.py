@@ -1,6 +1,14 @@
+import json
 from pathlib import Path
 
-from workflowhooker.state import CheckRuntime, SessionState, state_path_for_session
+import pytest
+
+from workflowhooker.state import (
+    CheckRuntime,
+    SessionState,
+    StopRuntimeIntegrityError,
+    state_path_for_session,
+)
 
 
 def test_load_missing_returns_defaults(tmp_path: Path):
@@ -69,7 +77,29 @@ def test_stop_runtime_key_includes_full_identity():
     assert len(state.stop_gates) == 2
 
 
-def test_stop_runtime_migrates_matching_legacy_target_key():
+def test_stop_runtime_key_includes_identity_target():
+    state = SessionState()
+    a = state.stop_runtime_for(
+        "C:/repo",
+        owner="worker",
+        scope="ticket",
+        host="ASUS-GEI",
+        session="S",
+        identity_target="repo-a",
+    )
+    b = state.stop_runtime_for(
+        "C:/repo",
+        owner="worker",
+        scope="ticket",
+        host="ASUS-GEI",
+        session="S",
+        identity_target="repo-b",
+    )
+    assert a is not b
+    assert len(state.stop_gates) == 2
+
+
+def test_stop_runtime_rejects_mutated_legacy_identity():
     state = SessionState()
     legacy = state.stop_runtime_for("C:/repo")
     legacy.rounds_requested = 1
@@ -78,13 +108,10 @@ def test_stop_runtime_migrates_matching_legacy_target_key():
     legacy.host = "ASUS-GEI"
     legacy.session = "S"
 
-    migrated = state.stop_runtime_for(
-        "C:/repo", owner="worker", scope="ticket", host="ASUS-GEI", session="S"
-    )
-
-    assert migrated is legacy
-    assert migrated.rounds_requested == 1
-    assert len(state.stop_gates) == 1
+    with pytest.raises(StopRuntimeIntegrityError):
+        state.stop_runtime_for(
+            "C:/repo", owner="worker", scope="ticket", host="ASUS-GEI", session="S"
+        )
 
 
 def test_stop_runtime_does_not_reuse_mismatched_stored_identity():
@@ -95,12 +122,48 @@ def test_stop_runtime_does_not_reuse_mismatched_stored_identity():
     runtime.rounds_requested = 1
     runtime.owner = "worker-b"
 
-    replacement = state.stop_runtime_for(
-        "C:/repo", owner="worker-a", scope="ticket", host="ASUS-GEI", session="S"
-    )
+    with pytest.raises(StopRuntimeIntegrityError):
+        state.stop_runtime_for(
+            "C:/repo", owner="worker-a", scope="ticket", host="ASUS-GEI", session="S"
+        )
 
-    assert replacement is not runtime
-    assert replacement.rounds_requested == 0
+
+def test_load_marks_runtime_hash_identity_mismatch_unreliable(tmp_path: Path):
+    path = tmp_path / "state.json"
+    state = SessionState()
+    runtime = state.stop_runtime_for(
+        "C:/repo",
+        owner="worker",
+        scope="ticket",
+        host="ASUS-GEI",
+        session="S",
+        identity_target="repo-a",
+    )
+    runtime.rounds_requested = 1
+    state.save(path)
+    data = json.loads(path.read_text(encoding="utf-8"))
+    next(iter(data["stop_gates"].values()))["owner"] = "tampered"
+    path.write_text(json.dumps(data), encoding="utf-8")
+
+    loaded, reliable = SessionState.load_checked(path)
+    assert loaded == SessionState()
+    assert reliable is False
+
+
+def test_save_rejects_runtime_hash_identity_mismatch(tmp_path: Path):
+    state = SessionState()
+    runtime = state.stop_runtime_for(
+        "C:/repo",
+        owner="worker",
+        scope="ticket",
+        host="ASUS-GEI",
+        session="S",
+        identity_target="repo",
+    )
+    runtime.owner = "tampered"
+
+    with pytest.raises(StopRuntimeIntegrityError):
+        state.save(tmp_path / "state.json")
 
 
 def test_state_path_for_session_differs_by_session_id(tmp_path: Path):

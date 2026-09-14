@@ -25,9 +25,14 @@ All notable public changes are documented in this file.
   lock metadata instead of a filename-derived directory.
 - Validate both source and destination for `MoveFile` and `apply_patch` moves;
   unresolved move targets fail closed.
-- Bind the persisted one-round completion state to the full owner, scope,
-  host, session, and canonical-target identity, including stored-value
-  validation and migration of an exactly matching earlier target-only key.
+- Bind the persisted one-round completion state to owner, scope, host, session,
+  configured identity target, and canonical project target. Hash/runtime
+  mismatches are unreliable residual state and never start a fresh round.
+- Require a complete matching lock identity before E02 can request rework;
+  incomplete evidence stays non-blocking and unknown. E01 likewise refuses to
+  treat an incomplete matching-owner lock as its own authority.
+- Accept host-valid leading whitespace on `apply_patch` move markers so an
+  indented destination cannot escape target evaluation.
 
 - The working directory is taken from the hook's stdin payload instead of the
   process working directory. A hook's process cwd is where the SESSION was

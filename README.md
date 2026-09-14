@@ -126,9 +126,11 @@ applicable decisions combine as `deny > ask > allow`. A technical failure on
 an enabled hard guard is `unknown + deny` for that one matched action. An
 advisory/context failure does not globally stop otherwise authorized work.
 
-The optional stop gate correlates owner, scope, host, session, canonical
-target, lock kind, and Git worktree state. Its one-round state is keyed by the
-full identity and canonical target. It checks the main clone when the
+The optional stop gate correlates owner, scope, host, session, configured
+identity target, canonical project target, lock kind, and Git worktree state.
+Its one-round state is keyed by that full identity. A mismatched state hash or
+runtime identity is reported as unreliable residual state and cannot start a
+fresh round. It checks the main clone when the
 event comes from an isolated worktree. Only an owned, correlated finding can
 request the one rework round. A second Stop, a host-provided
 `stop_hook_active`, foreign state, or damaged state returns a residual warning

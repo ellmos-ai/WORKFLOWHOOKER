@@ -11,7 +11,7 @@ from .config import Config
 from .decisions import Decision, EvidenceState, GateResult, HookSurface, combine_results
 from .locks import LockRecord, LockSnapshot, inspect_locks
 from .protocol import ProjectState
-from .state import SessionState
+from .state import SessionState, StopRuntimeIntegrityError
 
 
 _EXPLICIT_PATH_FIELDS = {
@@ -39,9 +39,10 @@ def _patch_paths(command: str) -> tuple[tuple[str, ...], bool]:
     update_source_seen = False
     malformed = False
     for line in command.splitlines():
+        marker_line = line.lstrip()
         for prefix in prefixes:
-            if line.startswith(prefix):
-                value = line[len(prefix) :].strip()
+            if marker_line.startswith(prefix):
+                value = marker_line[len(prefix) :].strip()
                 if value:
                     paths.append(value)
                     if prefix == "*** Update File: ":
@@ -49,8 +50,8 @@ def _patch_paths(command: str) -> tuple[tuple[str, ...], bool]:
                 else:
                     malformed = True
                 break
-        if line.startswith("*** Move to:"):
-            value = line[len("*** Move to:") :].strip()
+        if marker_line.startswith("*** Move to:"):
+            value = marker_line[len("*** Move to:") :].strip()
             if value and update_source_seen:
                 paths.append(value)
             else:
@@ -103,17 +104,15 @@ def extract_action_targets(payload: dict[str, Any], cwd: Path) -> ActionTargets:
 
 def _same_identity(record: LockRecord, config: Config, session_id: str) -> bool:
     identity = config.identity
-    if not identity.owner or not record.owner or identity.owner != record.owner:
-        return False
-    if record.host and identity.host != record.host:
-        return False
-    if record.session and session_id != record.session:
-        return False
-    if record.scope and identity.scope != record.scope:
-        return False
-    if record.target and identity.target != record.target:
-        return False
-    return True
+    configured = (
+        identity.owner,
+        identity.scope,
+        identity.host,
+        session_id,
+        identity.target,
+    )
+    recorded = (record.owner, record.scope, record.host, record.session, record.target)
+    return all(configured) and all(recorded) and configured == recorded
 
 
 def _inside(path: Path, root: Path) -> bool:
@@ -266,8 +265,25 @@ def _completion_facts(
         if record.operations:
             foreign.append(f"aktionsspezifischer Lock ({record.kind})")
             continue
-        if record.protected or not _same_identity(record, config, session_id):
+        if record.protected:
             foreign.append(f"fremder/geschützter Lock ({record.kind})")
+        elif not all(
+            (
+                record.owner,
+                record.scope,
+                record.host,
+                record.session,
+                record.target,
+                config.identity.owner,
+                config.identity.scope,
+                config.identity.host,
+                session_id,
+                config.identity.target,
+            )
+        ):
+            unknown.append(f"unvollständige Lockidentität ({record.kind})")
+        elif not _same_identity(record, config, session_id):
+            foreign.append(f"fremder Lock ({record.kind})")
         else:
             own.append(f"eigener Lock ({record.kind})")
 
@@ -350,13 +366,25 @@ def evaluate_stop_gate(
     # Ein beschädigter State oder ein bereits aktiver Stop-Nachstoß darf keine
     # neue Schleife erzeugen. Befunde werden wahrheitsgemäß zurückgegeben.
     already_active = bool(payload.get("stop_hook_active"))
-    runtime = state.stop_runtime_for(
-        target_key,
-        owner=config.identity.owner,
-        scope=config.identity.scope,
-        host=config.identity.host,
-        session=session_id,
-    )
+    try:
+        runtime = state.stop_runtime_for(
+            target_key,
+            owner=config.identity.owner,
+            scope=config.identity.scope,
+            host=config.identity.host,
+            session=session_id,
+            identity_target=config.identity.target,
+        )
+    except StopRuntimeIntegrityError:
+        unknown = (*unknown, "Abschluss-Rundenbeleg nicht belastbar")
+        return GateResult(
+            HookSurface.STOP,
+            Decision.ALLOW,
+            EvidenceState.UNKNOWN,
+            "stop-state-identity-invalid",
+            _completion_message(own, foreign, unknown, residual=True),
+            target_key,
+        )
     if not state_reliable or already_active:
         # Fail-safe gegen Schleifen: Ein verlorener Rundenbeleg oder der
         # Host-Nachweis einer bereits laufenden Fortsetzung gilt fuer dieses
@@ -367,6 +395,7 @@ def evaluate_stop_gate(
         runtime.host = config.identity.host
         runtime.session = session_id
         runtime.target = target_key
+        runtime.identity_target = config.identity.target
     can_request = (
         state_reliable
         and not already_active
@@ -380,6 +409,7 @@ def evaluate_stop_gate(
                 config.identity.scope,
                 config.identity.host,
                 session_id,
+                config.identity.target,
                 target_key,
                 *own,
             )
@@ -393,6 +423,7 @@ def evaluate_stop_gate(
         runtime.host = config.identity.host
         runtime.session = session_id
         runtime.target = target_key
+        runtime.identity_target = config.identity.target
         return GateResult(
             HookSurface.STOP,
             Decision.DENY,
