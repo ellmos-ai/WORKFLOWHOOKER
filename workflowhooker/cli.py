@@ -36,7 +36,13 @@ from .sources import (
     GitStateSource,
     TaskplanStateSource,
 )
-from .state import SessionState, StopRuntimeIntegrityError, state_path_for_session
+from .state import (
+    SessionState,
+    StateTransactionTimeout,
+    StopRuntimeIntegrityError,
+    state_path_for_session,
+    state_transaction,
+)
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -174,12 +180,13 @@ def _run_active_checks(
 def _cmd_check(args) -> int:
     config = load_config(args.config)
     state_path = _state_path(args)
-    state = SessionState.load(state_path)
+    state, state_reliable = SessionState.load_checked(state_path)
     project_dir = args.project_dir or Path.cwd()
 
     message = _run_active_checks(config, project_dir, state)
 
-    state.save(state_path)
+    if state_reliable:
+        state.save(state_path)
     if message:
         print(message)
     return 0
@@ -248,7 +255,6 @@ def _cmd_hook_run(args) -> int:
     state_path = state_path_for_session(
         args.session_id or _extract_session_id(payload), args.state_dir
     )
-    state, state_reliable = SessionState.load_checked(state_path)
 
     # Dieselbe Lektion wie eine Zeile hoeher, zweites Feld: Der Arbeitsordner
     # steht ebenfalls nur im stdin-JSON. Das Prozess-cwd eines Hooks ist der
@@ -261,25 +267,38 @@ def _cmd_hook_run(args) -> int:
     if args.event == "Stop" and config.stop_gate.enabled:
         source = _build_state_source(config, project_dir)
         project_state = source.snapshot()
-        result = evaluate_stop_gate(
-            payload,
-            config,
-            project_dir,
-            project_state,
-            state,
-            state_reliable=state_reliable,
-        )
         try:
-            state.save(state_path)
-        except (OSError, StopRuntimeIntegrityError):
-            # Ohne dauerhaft gespeicherten Rundenbeleg darf der Hook nicht
-            # blockieren: Sonst koennte jeder Stop erneut "Runde 1" sein.
+            with state_transaction(state_path):
+                state, state_reliable = SessionState.load_checked(state_path)
+                result = evaluate_stop_gate(
+                    payload,
+                    config,
+                    project_dir,
+                    project_state,
+                    state,
+                    state_reliable=state_reliable,
+                )
+                try:
+                    state.save(state_path)
+                except (OSError, StopRuntimeIntegrityError):
+                    # Ohne dauerhaft gespeicherten Rundenbeleg darf der Hook
+                    # nicht blockieren: Sonst koennte jeder Stop erneut
+                    # "Runde 1" sein.
+                    result = GateResult(
+                        HookSurface.STOP,
+                        Decision.ALLOW,
+                        EvidenceState.UNKNOWN,
+                        "stop-state-save-failed",
+                        "[WorkflowHooker] Abschlusszustand unbekannt: Rundenbeleg konnte nicht gespeichert werden; keine weitere Hookschleife.",
+                        str(project_dir.resolve(strict=False)),
+                    )
+        except (OSError, StateTransactionTimeout):
             result = GateResult(
                 HookSurface.STOP,
                 Decision.ALLOW,
                 EvidenceState.UNKNOWN,
-                "stop-state-save-failed",
-                "[WorkflowHooker] Abschlusszustand unbekannt: Rundenbeleg konnte nicht gespeichert werden; keine weitere Hookschleife.",
+                "stop-state-transaction-failed",
+                "[WorkflowHooker] Abschlusszustand unbekannt: State-Transaktion nicht verfügbar; keine weitere Hookschleife.",
                 str(project_dir.resolve(strict=False)),
             )
         return _emit_stop_result(
@@ -289,8 +308,10 @@ def _cmd_hook_run(args) -> int:
             output_format=args.output_format,
         )
 
+    state, state_reliable = SessionState.load_checked(state_path)
     message = _run_active_checks(config, project_dir, state)
-    state.save(state_path)
+    if state_reliable:
+        state.save(state_path)
 
     if message:
         output = {

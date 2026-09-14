@@ -9,10 +9,12 @@ ROADMAP ("ein Check, der nichts mehr findet, schaltet sich selbst ab").
 
 from __future__ import annotations
 
+from contextlib import contextmanager
+import hashlib
 import json
 import os
 import tempfile
-import hashlib
+import time
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
@@ -48,6 +50,7 @@ class StopGateRuntime:
     session: str = ""
     target: str = ""
     identity_target: str = ""
+    integrity_digest: str = ""
 
 
 class StopRuntimeIntegrityError(ValueError):
@@ -67,10 +70,92 @@ def _stop_gate_key(runtime: StopGateRuntime) -> str:
     return hashlib.sha256(encoded.encode("utf-8")).hexdigest()
 
 
+def _stop_runtime_digest(runtime: StopGateRuntime) -> str:
+    evidence = (
+        runtime.target,
+        runtime.owner,
+        runtime.scope,
+        runtime.host,
+        runtime.session,
+        runtime.identity_target,
+        runtime.rounds_requested,
+        runtime.evidence_fingerprint,
+    )
+    encoded = json.dumps(evidence, ensure_ascii=False, separators=(",", ":"))
+    return hashlib.sha256(encoded.encode("utf-8")).hexdigest()
+
+
 def _validate_stop_gates(stop_gates: dict[str, StopGateRuntime]) -> None:
     for key, runtime in stop_gates.items():
-        if key != _stop_gate_key(runtime):
+        if key != _stop_gate_key(
+            runtime
+        ) or runtime.integrity_digest != _stop_runtime_digest(runtime):
             raise StopRuntimeIntegrityError("stop-runtime-identity-mismatch")
+
+
+class StateTransactionTimeout(TimeoutError):
+    """Der State konnte nicht innerhalb des Hook-Budgets serialisiert werden."""
+
+
+def _try_file_lock(stream) -> None:
+    stream.seek(0)
+    if os.name == "nt":
+        import msvcrt
+
+        msvcrt.locking(stream.fileno(), msvcrt.LK_NBLCK, 1)
+    else:
+        import fcntl
+
+        fcntl.flock(stream.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+
+
+def _unlock_file(stream) -> None:
+    stream.seek(0)
+    if os.name == "nt":
+        import msvcrt
+
+        msvcrt.locking(stream.fileno(), msvcrt.LK_UNLCK, 1)
+    else:
+        import fcntl
+
+        fcntl.flock(stream.fileno(), fcntl.LOCK_UN)
+
+
+@contextmanager
+def state_transaction(path: Path, timeout_seconds: float | None = None):
+    """Serialisiert Load/Evaluate/Save fuer genau eine State-Datei."""
+
+    if timeout_seconds is None:
+        try:
+            timeout_seconds = float(
+                os.environ.get("WORKFLOWHOOKER_STATE_LOCK_TIMEOUT", "2.0")
+            )
+        except ValueError:
+            timeout_seconds = 2.0
+    timeout_seconds = max(0.0, timeout_seconds)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    lock_path = path.with_name(f"{path.name}.lock")
+    stream = lock_path.open("a+b")
+    if stream.seek(0, os.SEEK_END) == 0:
+        stream.write(b"\0")
+        stream.flush()
+    deadline = time.monotonic() + timeout_seconds
+    acquired = False
+    try:
+        while True:
+            try:
+                _try_file_lock(stream)
+                acquired = True
+                break
+            except OSError as exc:
+                if time.monotonic() >= deadline:
+                    raise StateTransactionTimeout("state-lock-timeout") from exc
+                time.sleep(0.02)
+        yield
+    finally:
+        if acquired:
+            _unlock_file(stream)
+        stream.close()
 
 
 @dataclass
@@ -189,5 +274,9 @@ class SessionState:
         runtime = self.stop_gates.get(key)
         if runtime is not None:
             return runtime
+        candidate.integrity_digest = _stop_runtime_digest(candidate)
         self.stop_gates[key] = candidate
         return candidate
+
+    def seal_stop_runtime(self, runtime: StopGateRuntime) -> None:
+        runtime.integrity_digest = _stop_runtime_digest(runtime)

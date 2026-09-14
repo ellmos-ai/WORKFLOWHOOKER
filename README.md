@@ -130,7 +130,9 @@ The optional stop gate correlates owner, scope, host, session, configured
 identity target, canonical project target, lock kind, and Git worktree state.
 Its one-round state is keyed by that full identity. A mismatched state hash or
 runtime identity is reported as unreliable residual state and cannot start a
-fresh round. It checks the main clone when the
+fresh round. The complete Stop load/evaluate/save transaction is serialized by
+a per-state-file process lock; lock failures or timeouts use the same
+non-blocking unknown residual. It checks the main clone when the
 event comes from an isolated worktree. Only an owned, correlated finding can
 request the one rework round. A second Stop, a host-provided
 `stop_hook_active`, foreign state, or damaged state returns a residual warning
@@ -144,7 +146,9 @@ session. It does not transmit project data. Generated snippets may contain
 paths supplied by the caller; inspect them before sharing logs or reports.
 Guard diagnostics use fixed reason text and never echo hook inputs, lock-file
 contents, or exception strings. Stop state is written through an atomic file
-replacement so an interrupted write cannot silently reset the one-round gate.
+replacement and guarded by a small sibling `.lock` file so interrupted or
+concurrent writes cannot silently reset the one-round gate. The round count and
+evidence fingerprint are included in the runtime integrity digest.
 
 See [SECURITY.md](SECURITY.md) for private vulnerability reporting and
 [PROVENANCE.md](PROVENANCE.md) for source-history and BACH lineage notes.

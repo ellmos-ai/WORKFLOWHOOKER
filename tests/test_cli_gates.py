@@ -224,6 +224,88 @@ def test_corrupt_stop_state_returns_truthful_residual_without_loop(
     assert "decision" not in output
     assert "Verbleibende Befunde" in output["systemMessage"]
 
+
+def test_tampered_round_count_returns_residual_without_second_block(
+    tmp_path, monkeypatch, capsys
+):
+    project = tmp_path / "project"
+    project.mkdir()
+    subprocess.run(["git", "init"], cwd=project, check=True, capture_output=True)
+    (project / "LOCK.ticket.txt").write_text(
+        "OWNER: worker\nSCOPE: ticket\nSESSION: S\nHOST: ASUS-GEI\n"
+        "TARGET: repo\nMODE: hard\n",
+        encoding="utf-8",
+    )
+    config = _config(tmp_path)
+    state_dir = tmp_path / "state"
+    argv = [
+        "--config",
+        str(config),
+        "--state-dir",
+        str(state_dir),
+        "--project-dir",
+        str(project),
+        "hook-run",
+        "Stop",
+        "--provider",
+        "codex",
+    ]
+    payload = {"session_id": "S", "cwd": str(project)}
+
+    assert _run_main(monkeypatch, argv, payload) == 0
+    assert json.loads(capsys.readouterr().out)["decision"] == "block"
+    state_path = state_dir / "session-S.json"
+    data = json.loads(state_path.read_text(encoding="utf-8"))
+    next(iter(data["stop_gates"].values()))["rounds_requested"] = 0
+    state_path.write_text(json.dumps(data), encoding="utf-8")
+
+    assert _run_main(monkeypatch, argv, payload) == 0
+    residual = json.loads(capsys.readouterr().out)
+    assert "decision" not in residual
+    assert "Verbleibende Befunde" in residual["systemMessage"]
+
+
+def test_advisory_event_does_not_overwrite_tampered_stop_state(
+    tmp_path, monkeypatch, capsys
+):
+    project = tmp_path / "project"
+    project.mkdir()
+    subprocess.run(["git", "init"], cwd=project, check=True, capture_output=True)
+    (project / "LOCK.ticket.txt").write_text(
+        "OWNER: worker\nSCOPE: ticket\nSESSION: S\nHOST: ASUS-GEI\n"
+        "TARGET: repo\nMODE: hard\n",
+        encoding="utf-8",
+    )
+    config = _config(tmp_path)
+    state_dir = tmp_path / "state"
+    common = [
+        "--config",
+        str(config),
+        "--state-dir",
+        str(state_dir),
+        "--project-dir",
+        str(project),
+        "hook-run",
+    ]
+    payload = {"session_id": "S", "cwd": str(project)}
+
+    assert _run_main(monkeypatch, common + ["Stop"], payload) == 0
+    capsys.readouterr()
+    state_path = state_dir / "session-S.json"
+    data = json.loads(state_path.read_text(encoding="utf-8"))
+    next(iter(data["stop_gates"].values()))["rounds_requested"] = 0
+    state_path.write_text(json.dumps(data), encoding="utf-8")
+    tampered = state_path.read_bytes()
+
+    assert _run_main(monkeypatch, common + ["UserPromptSubmit"], payload) == 0
+    capsys.readouterr()
+    assert state_path.read_bytes() == tampered
+
+    assert _run_main(monkeypatch, common + ["Stop"], payload) == 0
+    residual = json.loads(capsys.readouterr().out)
+    assert "decision" not in residual
+    assert "Verbleibende Befunde" in residual["systemMessage"]
+
     # Der reparierte State traegt die verbrauchte Einmalrunde weiter. Auch ein
     # spaeterer Stop darf daher nicht erneut blockieren.
     code = _run_main(

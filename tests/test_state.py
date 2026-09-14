@@ -27,6 +27,7 @@ def test_save_and_load_roundtrip(tmp_path: Path):
         "C:/repo", owner="worker", scope="ticket", host="ASUS-GEI", session="S"
     )
     stop_runtime.rounds_requested = 1
+    state.seal_stop_runtime(stop_runtime)
     state.save(path)
 
     loaded = SessionState.load(path)
@@ -140,6 +141,7 @@ def test_load_marks_runtime_hash_identity_mismatch_unreliable(tmp_path: Path):
         identity_target="repo-a",
     )
     runtime.rounds_requested = 1
+    state.seal_stop_runtime(runtime)
     state.save(path)
     data = json.loads(path.read_text(encoding="utf-8"))
     next(iter(data["stop_gates"].values()))["owner"] = "tampered"
@@ -164,6 +166,30 @@ def test_save_rejects_runtime_hash_identity_mismatch(tmp_path: Path):
 
     with pytest.raises(StopRuntimeIntegrityError):
         state.save(tmp_path / "state.json")
+
+
+def test_load_marks_tampered_round_count_unreliable(tmp_path: Path):
+    path = tmp_path / "state.json"
+    state = SessionState()
+    runtime = state.stop_runtime_for(
+        "C:/repo",
+        owner="worker",
+        scope="ticket",
+        host="ASUS-GEI",
+        session="S",
+        identity_target="repo",
+    )
+    runtime.rounds_requested = 1
+    runtime.evidence_fingerprint = "evidence"
+    state.seal_stop_runtime(runtime)
+    state.save(path)
+    data = json.loads(path.read_text(encoding="utf-8"))
+    next(iter(data["stop_gates"].values()))["rounds_requested"] = 0
+    path.write_text(json.dumps(data), encoding="utf-8")
+
+    loaded, reliable = SessionState.load_checked(path)
+    assert loaded == SessionState()
+    assert reliable is False
 
 
 def test_state_path_for_session_differs_by_session_id(tmp_path: Path):

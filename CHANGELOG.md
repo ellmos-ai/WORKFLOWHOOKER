@@ -33,6 +33,12 @@ All notable public changes are documented in this file.
   treat an incomplete matching-owner lock as its own authority.
 - Accept host-valid leading whitespace on `apply_patch` move markers so an
   indented destination cannot escape target evaluation.
+- Treat invalid path values, including JSON NUL characters, as unresolved
+  action targets (`unknown + deny`) instead of allowing path APIs to crash.
+- Seal the persisted round count and evidence fingerprint, and serialize the
+  full Stop load/evaluate/save transaction with a per-state-file process lock.
+  Integrity, lock, or timeout failures produce residual state without a new
+  rework request.
 
 - The working directory is taken from the hook's stdin payload instead of the
   process working directory. A hook's process cwd is where the SESSION was

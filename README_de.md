@@ -101,8 +101,11 @@ Das optionale Abschluss-Gate korreliert Eigentümer, Scope, Host, Sitzung,
 konfiguriertes Identitätsziel, kanonisches Projektziel, Lockart und
 Git-Worktree. Sein Einmalrunden-State ist an diese vollständige Identität
 gebunden. Ein Widerspruch zwischen State-Hash und Runtime-Identität wird als
-unbelastbarer Reststatus gemeldet und kann keine neue Runde beginnen. Bei einem
-Worktree prüft es auch den Hauptklon. Nur ein passend zugeordneter eigener
+unbelastbarer Reststatus gemeldet und kann keine neue Runde beginnen. Mit einem
+pro State-Datei gesetzten Prozess-Lock wird außerdem die gesamte
+Stop-Transaktion aus Laden, Auswerten und Speichern serialisiert. Lockfehler
+oder Timeouts liefern denselben nichtblockierenden unbekannten Reststatus. Bei
+einem Worktree prüft es auch den Hauptklon. Nur ein passend zugeordneter eigener
 Befund kann genau eine Nacharbeitsrunde anfordern. Beim zweiten Stop, bei
 `stop_hook_active`, fremdem Zustand oder beschädigtem State folgt nur eine
 wahrheitsgemäße Restmeldung ohne erneuten Block. WorkflowHooker löscht keine
@@ -116,6 +119,8 @@ beschreibt [SECURITY.md](SECURITY.md), die Herkunft
 [PROVENANCE.md](PROVENANCE.md). Lizenz: MIT, siehe [LICENSE](LICENSE).
 
 Guard-Fehlertexte sind fest formuliert und spiegeln weder Hook-Eingaben noch
-Lock-Inhalte oder Exception-Texte. Der Abschlusszustand wird atomar ersetzt,
-damit ein unterbrochener Schreibvorgang die belegte Einmalrunde nicht unbemerkt
-zurücksetzt.
+Lock-Inhalte oder Exception-Texte. Der Abschlusszustand wird atomar ersetzt und
+über eine kleine benachbarte `.lock`-Datei serialisiert. Rundenzahl und
+Beleg-Fingerprint gehören zum Integritätsdigest, damit unterbrochene,
+gleichzeitige oder nachträglich veränderte Zustände keine neue Einmalrunde
+erzeugen.

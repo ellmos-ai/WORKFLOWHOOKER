@@ -95,10 +95,13 @@ def extract_action_targets(payload: dict[str, Any], cwd: Path) -> ActionTargets:
         return ActionTargets(True, malformed=True)
     targets = []
     for raw in raw_paths:
-        path = Path(raw)
-        if not path.is_absolute():
-            path = cwd / path
-        targets.append(path.resolve(strict=False))
+        try:
+            path = Path(raw)
+            if not path.is_absolute():
+                path = cwd / path
+            targets.append(path.resolve(strict=False))
+        except (OSError, ValueError):
+            return ActionTargets(True, malformed=True)
     return ActionTargets(True, tuple(targets))
 
 
@@ -396,6 +399,7 @@ def evaluate_stop_gate(
         runtime.session = session_id
         runtime.target = target_key
         runtime.identity_target = config.identity.target
+        state.seal_stop_runtime(runtime)
     can_request = (
         state_reliable
         and not already_active
@@ -424,6 +428,7 @@ def evaluate_stop_gate(
         runtime.session = session_id
         runtime.target = target_key
         runtime.identity_target = config.identity.target
+        state.seal_stop_runtime(runtime)
         return GateResult(
             HookSurface.STOP,
             Decision.DENY,
