@@ -18,3 +18,10 @@ Local-first workflow checks for coding-agent lifecycle hooks.
 - The package performs no network requests.
 - Installation snippets are printed, never merged automatically.
 - Project state and session state remain local.
+- Action guards, context, Stop, and side effects are separate result surfaces.
+- An enabled hard guard fails closed only for a matched, target-resolved file
+  action; advisory errors remain non-blocking.
+- The completion gate requests at most one persisted rework round and never
+  cleans locks or diffs.
+- No target-level Bash, PowerShell, unified-exec, or arbitrary MCP coverage is
+  claimed.

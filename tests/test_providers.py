@@ -1,9 +1,14 @@
+from pathlib import Path
+
+import pytest
+
 from workflowhooker.config import ProvidersConfig
 from workflowhooker.providers import PROVIDER_REGISTRY, resolve_provider
 from workflowhooker.providers.claude import ClaudeProvider
 from workflowhooker.providers.codex import CodexProvider
 from workflowhooker.providers.git import GitProvider
 from workflowhooker.providers.manual import ManualProvider
+from workflowhooker.providers.kimi import KimiProvider
 
 
 def test_default_hook_snippet_never_contains_pretooluse():
@@ -19,6 +24,10 @@ def test_pretooluse_blocker_variant_exists_separately_and_is_not_default():
 
     assert "PreToolUse" not in default_snippet["hooks"]
     assert "PreToolUse" in blocker_snippet["hooks"]
+    assert (
+        blocker_snippet["hooks"]["PreToolUse"][0]["matcher"]
+        == "Edit|Write|MultiEdit|NotebookEdit"
+    )
 
 
 def test_codex_provider_emits_verified_codex_hook_shape():
@@ -30,6 +39,13 @@ def test_codex_provider_emits_verified_codex_hook_shape():
     command = snippet["hooks"]["Stop"][0]["hooks"][0]
     assert command["commandWindows"] == command["command"]
     assert command["timeout"] == 10
+
+
+def test_codex_action_guard_variant_only_matches_apply_patch():
+    snippet = CodexProvider().pretooluse_blocker_snippet()
+    group = snippet["hooks"]["PreToolUse"][0]
+    assert group["matcher"] == "^apply_patch$"
+    assert "--provider codex" in group["hooks"][0]["command"]
 
 
 def test_git_remains_stub():
@@ -54,13 +70,6 @@ def test_registry_has_all_five():
     assert set(PROVIDER_REGISTRY) == {"claude", "codex", "kimi", "git", "manual"}
 
 
-from pathlib import Path
-
-import pytest
-
-from workflowhooker.providers.kimi import KimiProvider
-
-
 def test_kimi_provider_emits_stop_and_userpromptsubmit_in_plain_format():
     """Kimi-Vertrag (Probe 2026-07-28, CLI 0.29.2): Stop- und UserPromptSubmit-
     stdout werden eingespeist; PreCompact ist Beobachtungs-Event und wird
@@ -73,6 +82,14 @@ def test_kimi_provider_emits_stop_and_userpromptsubmit_in_plain_format():
     commands = {h["event"]: h["command"] for h in snippet["hooks"]}
     assert "--format plain" in commands["UserPromptSubmit"]
     assert "--block" in commands["Stop"]
+
+
+def test_kimi_action_guard_variant_only_matches_explicit_path_tools():
+    snippet = KimiProvider().pretooluse_blocker_snippet()
+    assert len(snippet["hooks"]) == 1
+    assert snippet["hooks"][0]["event"] == "PreToolUse"
+    assert "WriteFile" in snippet["hooks"][0]["matcher"]
+    assert "Bash" not in snippet["hooks"][0]["matcher"]
 
 
 def test_kimi_provider_availability_mirrors_config_existence():

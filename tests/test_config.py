@@ -42,6 +42,19 @@ max_touched_dirs = 2
 
 [checks.scope_guard]
 max_changed_files = 5
+
+[identity]
+owner = "worker"
+scope = "ticket"
+host = "ASUS-GEI"
+target = "repo"
+
+[action_guard]
+enabled = true
+
+[stop_gate]
+enabled = true
+max_rework_rounds = 1
 """,
         encoding="utf-8",
     )
@@ -51,6 +64,11 @@ max_changed_files = 5
     assert config.mode.cooldown_minutes == 10
     assert config.checks.drift_warning.max_touched_dirs == 2
     assert config.checks.scope_guard.max_changed_files == 5
+    assert config.identity.owner == "worker"
+    assert config.identity.host == "ASUS-GEI"
+    assert config.action_guard.enabled is True
+    assert config.stop_gate.enabled is True
+    assert config.stop_gate.max_rework_rounds == 1
 
 
 def test_load_config_rejects_unknown_check(tmp_path: Path):
@@ -64,4 +82,11 @@ def test_config_validate_rejects_negative_budget():
     config = Config()
     config.mode.max_messages_per_session = -1
     with pytest.raises(ValueError):
+        config.validate()
+
+
+def test_stop_gate_rejects_more_than_exactly_one_rework_round():
+    config = Config()
+    config.stop_gate.max_rework_rounds = 2
+    with pytest.raises(ValueError, match="genau 1"):
         config.validate()

@@ -9,13 +9,19 @@ from workflowhooker.cli import main
 
 
 def _git(args: list[str], cwd: Path) -> None:
-    subprocess.run(["git"] + args, cwd=str(cwd), check=True, capture_output=True, text=True)
+    subprocess.run(
+        ["git"] + args, cwd=str(cwd), check=True, capture_output=True, text=True
+    )
 
 
-needs_git = pytest.mark.skipif(shutil.which("git") is None, reason="git nicht installiert")
+needs_git = pytest.mark.skipif(
+    shutil.which("git") is None, reason="git nicht installiert"
+)
 
 
-def _write_config(tmp_path: Path, *, checks: list[str], max_messages=3, cooldown_minutes=0) -> Path:
+def _write_config(
+    tmp_path: Path, *, checks: list[str], max_messages=3, cooldown_minutes=0
+) -> Path:
     checks_toml = json.dumps(checks)
     path = tmp_path / "workflowhooker.toml"
     path.write_text(
@@ -38,7 +44,15 @@ def test_no_active_checks_by_default_is_silent(tmp_path, capsys):
     state_dir = tmp_path / "state"
 
     exit_code = main(
-        ["--config", str(config_path), "--state-dir", str(state_dir), "--project-dir", str(tmp_path), "check"]
+        [
+            "--config",
+            str(config_path),
+            "--state-dir",
+            str(state_dir),
+            "--project-dir",
+            str(tmp_path),
+            "check",
+        ]
     )
     assert exit_code == 0
     assert capsys.readouterr().out == ""
@@ -50,7 +64,15 @@ def test_closing_gate_fires_on_lock_file(tmp_path, capsys):
     state_dir = tmp_path / "state"
 
     exit_code = main(
-        ["--config", str(config_path), "--state-dir", str(state_dir), "--project-dir", str(tmp_path), "check"]
+        [
+            "--config",
+            str(config_path),
+            "--state-dir",
+            str(state_dir),
+            "--project-dir",
+            str(tmp_path),
+            "check",
+        ]
     )
     assert exit_code == 0
     out = capsys.readouterr().out
@@ -60,9 +82,18 @@ def test_closing_gate_fires_on_lock_file(tmp_path, capsys):
 
 def test_message_budget_enforced(tmp_path, capsys):
     (tmp_path / "LOCK.txt").write_text("owner: test\n", encoding="utf-8")
-    config_path = _write_config(tmp_path, checks=["closing_gate"], max_messages=1, cooldown_minutes=0)
+    config_path = _write_config(
+        tmp_path, checks=["closing_gate"], max_messages=1, cooldown_minutes=0
+    )
     state_dir = tmp_path / "state"
-    common = ["--config", str(config_path), "--state-dir", str(state_dir), "--project-dir", str(tmp_path)]
+    common = [
+        "--config",
+        str(config_path),
+        "--state-dir",
+        str(state_dir),
+        "--project-dir",
+        str(tmp_path),
+    ]
 
     main(common + ["check"])
     out1 = capsys.readouterr().out
@@ -75,9 +106,18 @@ def test_message_budget_enforced(tmp_path, capsys):
 
 def test_cooldown_blocks_rapid_repeated_calls(tmp_path, capsys):
     (tmp_path / "LOCK.txt").write_text("owner: test\n", encoding="utf-8")
-    config_path = _write_config(tmp_path, checks=["closing_gate"], max_messages=5, cooldown_minutes=5)
+    config_path = _write_config(
+        tmp_path, checks=["closing_gate"], max_messages=5, cooldown_minutes=5
+    )
     state_dir = tmp_path / "state"
-    common = ["--config", str(config_path), "--state-dir", str(state_dir), "--project-dir", str(tmp_path)]
+    common = [
+        "--config",
+        str(config_path),
+        "--state-dir",
+        str(state_dir),
+        "--project-dir",
+        str(tmp_path),
+    ]
 
     main(common + ["check"])
     first = capsys.readouterr().out
@@ -99,7 +139,9 @@ def test_providers_command(tmp_path, capsys):
 
 def test_install_snippet_has_no_pretooluse(tmp_path, capsys):
     out_path = tmp_path / "snippet.json"
-    exit_code = main(["--state-dir", str(tmp_path), "install-snippet", "--out", str(out_path)])
+    exit_code = main(
+        ["--state-dir", str(tmp_path), "install-snippet", "--out", str(out_path)]
+    )
     assert exit_code == 0
     data = json.loads(out_path.read_text(encoding="utf-8"))
     assert "PreToolUse" not in data["hooks"]
@@ -108,15 +150,43 @@ def test_install_snippet_has_no_pretooluse(tmp_path, capsys):
 
 def test_install_snippet_supports_codex(tmp_path, capsys):
     out_path = tmp_path / "snippet-codex.json"
-    exit_code = main([
-        "--state-dir", str(tmp_path),
-        "install-snippet", "--provider", "codex", "--out", str(out_path),
-    ])
+    exit_code = main(
+        [
+            "--state-dir",
+            str(tmp_path),
+            "install-snippet",
+            "--provider",
+            "codex",
+            "--out",
+            str(out_path),
+        ]
+    )
     assert exit_code == 0
     data = json.loads(out_path.read_text(encoding="utf-8"))
     command = data["hooks"]["Stop"][0]["hooks"][0]
     assert command["commandWindows"] == command["command"]
     assert command["statusMessage"] == "WorkflowHooker: Stop"
+
+
+def test_install_snippet_action_guard_is_separate_opt_in(tmp_path, capsys):
+    out_path = tmp_path / "guard.json"
+    exit_code = main(
+        [
+            "--state-dir",
+            str(tmp_path),
+            "install-snippet",
+            "--provider",
+            "codex",
+            "--variant",
+            "action-guard",
+            "--out",
+            str(out_path),
+        ]
+    )
+    assert exit_code == 0
+    data = json.loads(out_path.read_text(encoding="utf-8"))
+    assert set(data["hooks"]) == {"PreToolUse"}
+    assert data["hooks"]["PreToolUse"][0]["matcher"] == "^apply_patch$"
 
 
 @needs_git
@@ -134,10 +204,14 @@ def test_hook_run_stop_reports_uncommitted_changes(tmp_path, capsys):
 
     exit_code = main(
         [
-            "--config", str(config_path),
-            "--state-dir", str(state_dir),
-            "--project-dir", str(tmp_path),
-            "hook-run", "Stop",
+            "--config",
+            str(config_path),
+            "--state-dir",
+            str(state_dir),
+            "--project-dir",
+            str(tmp_path),
+            "hook-run",
+            "Stop",
         ]
     )
     assert exit_code == 0
@@ -166,7 +240,15 @@ def test_scope_guard_fires_when_many_files_changed(tmp_path, capsys, monkeypatch
     state_dir = tmp_path / "state"
 
     exit_code = main(
-        ["--config", str(config_path), "--state-dir", str(state_dir), "--project-dir", str(tmp_path), "check"]
+        [
+            "--config",
+            str(config_path),
+            "--state-dir",
+            str(state_dir),
+            "--project-dir",
+            str(tmp_path),
+            "check",
+        ]
     )
     assert exit_code == 0
     out = capsys.readouterr().out
@@ -177,10 +259,18 @@ def _hook_run(config_path, state_dir, project_dir, payload, monkeypatch, event="
     import io
 
     monkeypatch.setattr("sys.stdin", io.StringIO(json.dumps(payload)))
-    return main([
-        "--config", str(config_path), "--state-dir", str(state_dir),
-        "--project-dir", str(project_dir), "hook-run", event,
-    ])
+    return main(
+        [
+            "--config",
+            str(config_path),
+            "--state-dir",
+            str(state_dir),
+            "--project-dir",
+            str(project_dir),
+            "hook-run",
+            event,
+        ]
+    )
 
 
 def test_hook_run_trennt_state_nach_session_id_aus_stdin(tmp_path, capsys, monkeypatch):
@@ -194,33 +284,53 @@ def test_hook_run_trennt_state_nach_session_id_aus_stdin(tmp_path, capsys, monke
     Claude Code in Hook-Kommandos keine Variablen ersetzt.
     """
     (tmp_path / "LOCK.txt").write_text("owner: test\n", encoding="utf-8")
-    config_path = _write_config(tmp_path, checks=["closing_gate"], max_messages=1, cooldown_minutes=0)
+    config_path = _write_config(
+        tmp_path, checks=["closing_gate"], max_messages=1, cooldown_minutes=0
+    )
     state_dir = tmp_path / "state"
 
-    assert _hook_run(config_path, state_dir, tmp_path, {"session_id": "A"}, monkeypatch) == 0
+    assert (
+        _hook_run(config_path, state_dir, tmp_path, {"session_id": "A"}, monkeypatch)
+        == 0
+    )
     assert capsys.readouterr().out.strip(), "erste Meldung der Sitzung A"
 
     # Budget von 1 ist in Sitzung A aufgebraucht.
-    assert _hook_run(config_path, state_dir, tmp_path, {"session_id": "A"}, monkeypatch) == 0
+    assert (
+        _hook_run(config_path, state_dir, tmp_path, {"session_id": "A"}, monkeypatch)
+        == 0
+    )
     assert capsys.readouterr().out == "", "Budget gilt innerhalb der Sitzung"
 
     # Neue Sitzung: eigenes Budget.
-    assert _hook_run(config_path, state_dir, tmp_path, {"session_id": "B"}, monkeypatch) == 0
+    assert (
+        _hook_run(config_path, state_dir, tmp_path, {"session_id": "B"}, monkeypatch)
+        == 0
+    )
     assert capsys.readouterr().out.strip(), "neue Sitzung startet mit frischem Budget"
 
     namen = sorted(p.name for p in state_dir.iterdir())
     assert namen == ["session-A.json", "session-B.json"], namen
 
 
-def test_session_id_aus_stdin_wird_dateinamentauglich_entschaerft(tmp_path, monkeypatch):
+def test_session_id_aus_stdin_wird_dateinamentauglich_entschaerft(
+    tmp_path, monkeypatch
+):
     """Die Kennung wandert in einen Dateinamen und kommt von aussen."""
     (tmp_path / "LOCK.txt").write_text("owner: test\n", encoding="utf-8")
     config_path = _write_config(tmp_path, checks=["closing_gate"])
     state_dir = tmp_path / "state"
 
-    assert _hook_run(
-        config_path, state_dir, tmp_path, {"session_id": "../../boese/x"}, monkeypatch
-    ) == 0
+    assert (
+        _hook_run(
+            config_path,
+            state_dir,
+            tmp_path,
+            {"session_id": "../../boese/x"},
+            monkeypatch,
+        )
+        == 0
+    )
 
     geschrieben = list(state_dir.iterdir())
     assert len(geschrieben) == 1
@@ -236,11 +346,26 @@ def test_cli_session_id_schlaegt_stdin(tmp_path, monkeypatch):
 
     import io
 
-    monkeypatch.setattr("sys.stdin", io.StringIO(json.dumps({"session_id": "aus-stdin"})))
-    assert main([
-        "--config", str(config_path), "--state-dir", str(state_dir),
-        "--project-dir", str(tmp_path), "--session-id", "explizit", "hook-run", "Stop",
-    ]) == 0
+    monkeypatch.setattr(
+        "sys.stdin", io.StringIO(json.dumps({"session_id": "aus-stdin"}))
+    )
+    assert (
+        main(
+            [
+                "--config",
+                str(config_path),
+                "--state-dir",
+                str(state_dir),
+                "--project-dir",
+                str(tmp_path),
+                "--session-id",
+                "explizit",
+                "hook-run",
+                "Stop",
+            ]
+        )
+        == 0
+    )
 
     assert [p.name for p in state_dir.iterdir()] == ["session-explizit.json"]
 
@@ -254,11 +379,21 @@ def test_hook_run_plain_format_prints_bare_message(tmp_path, capsys, monkeypatch
 
     import io
 
-    monkeypatch.setattr("sys.stdin", io.StringIO(json.dumps({"session_id": "kimi-probe"})))
+    monkeypatch.setattr(
+        "sys.stdin", io.StringIO(json.dumps({"session_id": "kimi-probe"}))
+    )
     exit_code = main(
         [
-            "--config", str(config_path), "--state-dir", str(state_dir),
-            "--project-dir", str(tmp_path), "hook-run", "--format", "plain", "Stop",
+            "--config",
+            str(config_path),
+            "--state-dir",
+            str(state_dir),
+            "--project-dir",
+            str(tmp_path),
+            "hook-run",
+            "--format",
+            "plain",
+            "Stop",
         ]
     )
     assert exit_code == 0
@@ -276,11 +411,20 @@ def test_hook_run_block_exits_2_with_message_on_stderr(tmp_path, capsys, monkeyp
 
     import io
 
-    monkeypatch.setattr("sys.stdin", io.StringIO(json.dumps({"session_id": "kimi-block-probe"})))
+    monkeypatch.setattr(
+        "sys.stdin", io.StringIO(json.dumps({"session_id": "kimi-block-probe"}))
+    )
     exit_code = main(
         [
-            "--config", str(config_path), "--state-dir", str(state_dir),
-            "--project-dir", str(tmp_path), "hook-run", "--block", "Stop",
+            "--config",
+            str(config_path),
+            "--state-dir",
+            str(state_dir),
+            "--project-dir",
+            str(tmp_path),
+            "hook-run",
+            "--block",
+            "Stop",
         ]
     )
     assert exit_code == 2
@@ -296,11 +440,20 @@ def test_hook_run_block_stays_silent_without_findings(tmp_path, capsys, monkeypa
 
     import io
 
-    monkeypatch.setattr("sys.stdin", io.StringIO(json.dumps({"session_id": "kimi-block-clean"})))
+    monkeypatch.setattr(
+        "sys.stdin", io.StringIO(json.dumps({"session_id": "kimi-block-clean"}))
+    )
     exit_code = main(
         [
-            "--config", str(config_path), "--state-dir", str(state_dir),
-            "--project-dir", str(tmp_path), "hook-run", "--block", "Stop",
+            "--config",
+            str(config_path),
+            "--state-dir",
+            str(state_dir),
+            "--project-dir",
+            str(tmp_path),
+            "hook-run",
+            "--block",
+            "Stop",
         ]
     )
     assert exit_code == 0
@@ -318,23 +471,38 @@ def test_hook_run_block_is_rejected_for_userpromptsubmit(tmp_path, capsys, monke
     monkeypatch.setattr("sys.stdin", io.StringIO(json.dumps({})))
     exit_code = main(
         [
-            "--config", str(config_path), "--state-dir", str(state_dir),
-            "--project-dir", str(tmp_path), "hook-run", "--block", "UserPromptSubmit",
+            "--config",
+            str(config_path),
+            "--state-dir",
+            str(state_dir),
+            "--project-dir",
+            str(tmp_path),
+            "hook-run",
+            "--block",
+            "UserPromptSubmit",
         ]
     )
     assert exit_code == 1
     assert "--block" in capsys.readouterr().err
 
 
-def _hook_run_ohne_project_dir(config_path, state_dir, payload, monkeypatch, event="Stop"):
+def _hook_run_ohne_project_dir(
+    config_path, state_dir, payload, monkeypatch, event="Stop"
+):
     """Wie ``_hook_run``, aber OHNE ``--project-dir`` -- so laeuft der Hook real."""
     import io
 
     monkeypatch.setattr("sys.stdin", io.StringIO(json.dumps(payload)))
-    return main([
-        "--config", str(config_path), "--state-dir", str(state_dir),
-        "hook-run", event,
-    ])
+    return main(
+        [
+            "--config",
+            str(config_path),
+            "--state-dir",
+            str(state_dir),
+            "hook-run",
+            event,
+        ]
+    )
 
 
 def test_hook_run_nimmt_arbeitsordner_aus_stdin(tmp_path, capsys, monkeypatch):
@@ -357,13 +525,21 @@ def test_hook_run_nimmt_arbeitsordner_aus_stdin(tmp_path, capsys, monkeypatch):
     state_dir = tmp_path / "state"
 
     monkeypatch.chdir(woanders)  # cwd zeigt bewusst NICHT auf das Projekt
-    assert _hook_run_ohne_project_dir(
-        config_path, state_dir, {"session_id": "S", "cwd": str(projekt)}, monkeypatch
-    ) == 0
+    assert (
+        _hook_run_ohne_project_dir(
+            config_path,
+            state_dir,
+            {"session_id": "S", "cwd": str(projekt)},
+            monkeypatch,
+        )
+        == 0
+    )
     assert "LOCK.txt" in capsys.readouterr().out
 
 
-def test_hook_run_faellt_auf_cwd_zurueck_wenn_stdin_ordner_fehlt(tmp_path, capsys, monkeypatch):
+def test_hook_run_faellt_auf_cwd_zurueck_wenn_stdin_ordner_fehlt(
+    tmp_path, capsys, monkeypatch
+):
     """Ein unbrauchbarer Ordner im Payload darf keine Quelle ins Leere zeigen
     lassen: fehlend, leer oder nicht existent -> zurueck auf das cwd."""
     projekt = tmp_path / "projekt"
@@ -372,20 +548,31 @@ def test_hook_run_faellt_auf_cwd_zurueck_wenn_stdin_ordner_fehlt(tmp_path, capsy
     config_path = _write_config(tmp_path, checks=["closing_gate"])
 
     monkeypatch.chdir(projekt)  # cwd IST diesmal das Projekt
-    for i, payload in enumerate([
-        {"session_id": "F"},                                      # Feld fehlt
-        {"session_id": "G", "cwd": "   "},                        # leer
-        {"session_id": "H", "cwd": str(tmp_path / "gibtsnicht")},   # existiert nicht
-    ]):
-        assert _hook_run_ohne_project_dir(
-            config_path, tmp_path / f"state{i}", payload, monkeypatch
-        ) == 0
+    for i, payload in enumerate(
+        [
+            {"session_id": "F"},  # Feld fehlt
+            {"session_id": "G", "cwd": "   "},  # leer
+            {"session_id": "H", "cwd": str(tmp_path / "gibtsnicht")},  # existiert nicht
+        ]
+    ):
+        assert (
+            _hook_run_ohne_project_dir(
+                config_path, tmp_path / f"state{i}", payload, monkeypatch
+            )
+            == 0
+        )
         assert "LOCK.txt" in capsys.readouterr().out, payload
 
     # Und --project-dir behaelt Vorrang vor dem stdin-Wert.
     monkeypatch.chdir(tmp_path)
-    assert _hook_run(
-        config_path, tmp_path / "state_x", projekt,
-        {"session_id": "X", "cwd": str(tmp_path)}, monkeypatch
-    ) == 0
+    assert (
+        _hook_run(
+            config_path,
+            tmp_path / "state_x",
+            projekt,
+            {"session_id": "X", "cwd": str(tmp_path)},
+            monkeypatch,
+        )
+        == 0
+    )
     assert "LOCK.txt" in capsys.readouterr().out

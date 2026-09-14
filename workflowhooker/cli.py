@@ -25,9 +25,17 @@ from pathlib import Path
 
 from .checks import CHECK_REGISTRY, CheckRunner
 from .config import Config, load_config
+from .decisions import Decision, EvidenceState, GateResult, HookSurface
+from .gates import evaluate_action_guard, evaluate_stop_gate
+from .locks import canonical_project_root
 from .providers import PROVIDER_REGISTRY, resolve_provider
 from .providers.claude import ClaudeProvider
-from .sources import CompositeStateSource, FilesStateSource, GitStateSource, TaskplanStateSource
+from .sources import (
+    CompositeStateSource,
+    FilesStateSource,
+    GitStateSource,
+    TaskplanStateSource,
+)
 from .state import SessionState, state_path_for_session
 
 
@@ -39,18 +47,41 @@ def main(argv: list[str] | None = None) -> int:
 
 def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="workflowhooker")
-    parser.add_argument("--config", type=Path, default=None, help="Pfad zu workflowhooker.toml")
-    parser.add_argument("--state-dir", type=Path, default=None, help="Override fuer den State-Ordner")
-    parser.add_argument("--session-id", default=None, help="Session-ID zur State-Trennung")
-    parser.add_argument("--project-dir", type=Path, default=None, help="Override fuer den Projektordner (Default: cwd)")
+    parser.add_argument(
+        "--config", type=Path, default=None, help="Pfad zu workflowhooker.toml"
+    )
+    parser.add_argument(
+        "--state-dir", type=Path, default=None, help="Override fuer den State-Ordner"
+    )
+    parser.add_argument(
+        "--session-id", default=None, help="Session-ID zur State-Trennung"
+    )
+    parser.add_argument(
+        "--project-dir",
+        type=Path,
+        default=None,
+        help="Override fuer den Projektordner (Default: cwd)",
+    )
 
     sub = parser.add_subparsers(required=True)
 
-    p_check = sub.add_parser("check", help="Aktive Checks gegen den Projektzustand auswerten")
+    p_check = sub.add_parser(
+        "check", help="Aktive Checks gegen den Projektzustand auswerten"
+    )
     p_check.set_defaults(func=_cmd_check)
 
-    p_hook = sub.add_parser("hook-run", help="stdin-JSON lesen, Claude-Code-Hook-Output schreiben")
-    p_hook.add_argument("event", choices=["Stop", "PreCompact", "UserPromptSubmit"])
+    p_hook = sub.add_parser(
+        "hook-run", help="stdin-JSON lesen, Claude-Code-Hook-Output schreiben"
+    )
+    p_hook.add_argument(
+        "event", choices=["PreToolUse", "Stop", "PreCompact", "UserPromptSubmit"]
+    )
+    p_hook.add_argument(
+        "--provider",
+        choices=["claude", "codex", "kimi", "manual"],
+        default="claude",
+        help="Providervertrag fuer die Ausgabe (keine Host-Konfiguration wird geaendert)",
+    )
     p_hook.add_argument(
         "--format",
         dest="output_format",
@@ -76,6 +107,12 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Provider (claude, codex, ...)",
     )
     p_install.add_argument("--out", type=Path, default=None)
+    p_install.add_argument(
+        "--variant",
+        choices=["default", "action-guard"],
+        default="default",
+        help="Default-Hinweise oder separater Opt-in-PreToolUse-Guard",
+    )
     p_install.set_defaults(func=_cmd_install_snippet)
 
     return parser
@@ -91,7 +128,9 @@ def _build_state_source(config: Config, project_dir: Path) -> CompositeStateSour
     Frueher waren alle drei hart verdrahtet -- ``order`` in der Config war
     wirkungslos und suggerierte eine Kontrolle, die es nicht gab.
     """
-    files_dir = Path(config.sources.project_dir) if config.sources.project_dir else project_dir
+    files_dir = (
+        Path(config.sources.project_dir) if config.sources.project_dir else project_dir
+    )
     git_dir = Path(config.sources.git_dir) if config.sources.git_dir else project_dir
 
     builders = {
@@ -104,7 +143,9 @@ def _build_state_source(config: Config, project_dir: Path) -> CompositeStateSour
     )
 
 
-def _run_active_checks(config: Config, project_dir: Path, state: SessionState, *, now: float | None = None) -> str | None:
+def _run_active_checks(
+    config: Config, project_dir: Path, state: SessionState, *, now: float | None = None
+) -> str | None:
     now = time.time() if now is None else now
 
     if state.messages_sent >= config.mode.max_messages_per_session:
@@ -151,13 +192,50 @@ def _cmd_hook_run(args) -> int:
         # dokumentierte Weiterfuehr-Semantik.
         print("--block ist nur fuer das Stop-Event sinnvoll.", file=sys.stderr)
         return 1
-    config = load_config(args.config)
-
     # stdin MUSS vor dem State gelesen werden: Die Sitzungskennung steht nur dort.
     # (Frueher wurde der Inhalt verworfen und nur konsumiert, damit kein Hook-
     # Prozess an ungelesenem stdin haengt -- das Konsumieren bleibt, der Inhalt
     # wird jetzt zusaetzlich ausgewertet.)
-    payload = _read_stdin_json()
+    payload, payload_reliable = _read_stdin_json_checked()
+
+    project_dir = canonical_project_root(
+        args.project_dir or _extract_cwd(payload) or Path.cwd()
+    )
+    try:
+        config = load_config(args.config)
+    except (OSError, UnicodeError, ValueError, TypeError):
+        # Ein Konfigurationsdefekt darf Hinweise ausfallen lassen, aber keine
+        # als kritisch gematchte Dateiaktion still freigeben. Da die Config
+        # selbst unlesbar ist, gilt die konservative eingebaute Kanalliste.
+        if args.event == "PreToolUse":
+            result = GateResult(
+                HookSurface.ACTION_GUARD,
+                Decision.DENY,
+                EvidenceState.UNKNOWN,
+                "config-unavailable",
+                "Kritische Dateiaktion gesperrt: Guard-Konfiguration nicht belastbar.",
+                "pending-action",
+            )
+            return _emit_action_result(result, args.provider)
+        print(
+            "[WorkflowHooker] Kontextprüfung nicht verfügbar (Konfigurationsfehler).",
+            file=sys.stderr,
+        )
+        return 0
+
+    if args.event == "PreToolUse":
+        if config.action_guard.enabled and not payload_reliable:
+            result = GateResult(
+                HookSurface.ACTION_GUARD,
+                Decision.DENY,
+                EvidenceState.UNKNOWN,
+                "payload-unavailable",
+                "Kritische Dateiaktion gesperrt: Hook-Payload nicht belastbar.",
+                "pending-action",
+            )
+        else:
+            result = evaluate_action_guard(payload, config, project_dir)
+        return _emit_action_result(result, args.provider)
 
     # Ohne diese Zeile landen ALLE Sitzungen in session-default.json, und die
     # beiden Budgets dieses Moduls verlieren ihren Sinn: Aus
@@ -170,7 +248,7 @@ def _cmd_hook_run(args) -> int:
     state_path = state_path_for_session(
         args.session_id or _extract_session_id(payload), args.state_dir
     )
-    state = SessionState.load(state_path)
+    state, state_reliable = SessionState.load_checked(state_path)
 
     # Dieselbe Lektion wie eine Zeile hoeher, zweites Feld: Der Arbeitsordner
     # steht ebenfalls nur im stdin-JSON. Das Prozess-cwd eines Hooks ist der
@@ -180,7 +258,36 @@ def _cmd_hook_run(args) -> int:
     # und KEIN Check kann je zutreffen: Das Modul laeuft, ohne je zu wirken.
     # Gemessen auf ASUS-GEI am 2026-08-01: 17 Auswertungen, 0 Ausloesungen,
     # bei gleichzeitig gesetzten Locks und uncommitteten Aenderungen.
-    project_dir = args.project_dir or _extract_cwd(payload) or Path.cwd()
+    if args.event == "Stop" and config.stop_gate.enabled:
+        source = _build_state_source(config, project_dir)
+        project_state = source.snapshot()
+        result = evaluate_stop_gate(
+            payload,
+            config,
+            project_dir,
+            project_state,
+            state,
+            state_reliable=state_reliable,
+        )
+        try:
+            state.save(state_path)
+        except OSError:
+            # Ohne dauerhaft gespeicherten Rundenbeleg darf der Hook nicht
+            # blockieren: Sonst koennte jeder Stop erneut "Runde 1" sein.
+            result = GateResult(
+                HookSurface.STOP,
+                Decision.ALLOW,
+                EvidenceState.UNKNOWN,
+                "stop-state-save-failed",
+                "[WorkflowHooker] Abschlusszustand unbekannt: Rundenbeleg konnte nicht gespeichert werden; keine weitere Hookschleife.",
+                str(project_dir.resolve(strict=False)),
+            )
+        return _emit_stop_result(
+            result,
+            args.provider,
+            legacy_block=args.block,
+            output_format=args.output_format,
+        )
 
     message = _run_active_checks(config, project_dir, state)
     state.save(state_path)
@@ -204,6 +311,63 @@ def _cmd_hook_run(args) -> int:
             print(message)
         else:
             print(json.dumps(output, ensure_ascii=False))
+    return 0
+
+
+def _emit_action_result(result: GateResult, provider: str) -> int:
+    """Formatiert ausschließlich PreToolUse-Entscheidungen.
+
+    ``allow`` bleibt still und erteilt damit keine neue Host-Berechtigung.
+    Claude kann ``ask`` nativ darstellen. Codex und Kimi koennen im
+    PreToolUse-Vertrag kein belastbares ``ask`` erzwingen; dort wird die
+    fehlende Autoritaet sicher als deny an den Master zurueckgegeben.
+    """
+
+    if result.decision is Decision.ALLOW:
+        return 0
+    decision = result.decision
+    if decision is Decision.ASK and provider in {"codex", "kimi", "manual"}:
+        decision = Decision.DENY
+    if provider == "kimi":
+        print(result.message, file=sys.stderr)
+        return 2
+    output = {
+        "hookSpecificOutput": {
+            "hookEventName": "PreToolUse",
+            "permissionDecision": decision.value,
+            "permissionDecisionReason": result.message,
+        }
+    }
+    print(json.dumps(output, ensure_ascii=False))
+    return 0
+
+
+def _emit_stop_result(
+    result: GateResult,
+    provider: str,
+    *,
+    legacy_block: bool,
+    output_format: str,
+) -> int:
+    """Formatiert Stop getrennt vom PreToolUse-Guard."""
+
+    if result.decision is Decision.DENY:
+        if provider == "kimi" or legacy_block:
+            print(result.message, file=sys.stderr)
+            return 2
+        print(
+            json.dumps(
+                {"decision": "block", "reason": result.message}, ensure_ascii=False
+            )
+        )
+        return 0
+    if result.message:
+        if provider == "kimi" or output_format == "plain":
+            print(result.message)
+        else:
+            # systemMessage macht den Restbefund sichtbar, ohne einen zweiten
+            # Stop-Nachstoss anzufordern.
+            print(json.dumps({"systemMessage": result.message}, ensure_ascii=False))
     return 0
 
 
@@ -240,22 +404,30 @@ def _extract_cwd(payload: dict) -> Path | None:
 
 
 def _read_stdin_json() -> dict:
+    payload, _ = _read_stdin_json_checked()
+    return payload
+
+
+def _read_stdin_json_checked() -> tuple[dict, bool]:
     # isatty() ist kein verlaesslicher Indikator, ob stdin sicher lesbar ist
     # (z. B. faengt pytest-Capture stdin durch ein Objekt ab, das weder ein
     # TTY ist noch echtes Lesen erlaubt und stattdessen OSError wirft).
     # Ein Hook darf dadurch niemals crashen -- deshalb defensiv abfangen.
     try:
         if sys.stdin.isatty():
-            return {}
+            return {}, False
         raw = sys.stdin.read()
     except (OSError, ValueError):
-        return {}
+        return {}, False
     if not raw.strip():
-        return {}
+        return {}, False
     try:
-        return json.loads(raw)
+        payload = json.loads(raw)
     except json.JSONDecodeError:
-        return {}
+        return {}, False
+    if not isinstance(payload, dict):
+        return {}, False
+    return payload, True
 
 
 def _cmd_providers(args) -> int:
@@ -272,11 +444,24 @@ def _cmd_providers(args) -> int:
 
 def _cmd_install_snippet(args) -> int:
     provider = PROVIDER_REGISTRY.get(args.provider, ClaudeProvider())
-    snippet = provider.hook_snippet()
+    if args.variant == "action-guard":
+        builder = getattr(provider, "pretooluse_blocker_snippet", None)
+        if builder is None:
+            print(
+                f"Provider {args.provider} hat keinen belegten Action-Guard-Kanal.",
+                file=sys.stderr,
+            )
+            return 1
+        snippet = builder()
+    else:
+        snippet = provider.hook_snippet()
     text = json.dumps(snippet, indent=2, ensure_ascii=False)
     if args.out:
         args.out.write_text(text, encoding="utf-8")
-        print(f"geschrieben nach {args.out} -- manuell in die Hook-Config einmischen", file=sys.stderr)
+        print(
+            f"geschrieben nach {args.out} -- manuell in die Hook-Config einmischen",
+            file=sys.stderr,
+        )
     else:
         print(text)
     return 0

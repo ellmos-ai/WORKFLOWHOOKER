@@ -51,6 +51,34 @@ class ProvidersConfig:
     )
 
 
+@dataclass
+class IdentityConfig:
+    """Explizite Identitaet fuer Eigentums- und Scope-Abgleiche.
+
+    Leere Werte werden nicht geraten. Ein aktiver Guard behandelt fehlende
+    Autoritaet als ``ask``; ein Stop-Gate erzwingt ohne passenden Eigentums-
+    beleg keine Nacharbeitsrunde.
+    """
+
+    owner: str = ""
+    scope: str = ""
+    host: str = ""
+    target: str = ""
+
+
+@dataclass
+class ActionGuardConfig:
+    enabled: bool = False
+
+
+@dataclass
+class StopGateConfig:
+    enabled: bool = False
+    # E02=B ist absichtlich nicht als frei erhoehbares Schleifenbudget
+    # modelliert: genau eine Nacharbeitsrunde ist der feste Vertrag.
+    max_rework_rounds: int = 1
+
+
 VALID_SOURCES = ("files", "git", "taskplan")
 
 
@@ -81,6 +109,9 @@ class Config:
     checks: ChecksConfig = field(default_factory=ChecksConfig)
     providers: ProvidersConfig = field(default_factory=ProvidersConfig)
     sources: SourcesConfig = field(default_factory=SourcesConfig)
+    identity: IdentityConfig = field(default_factory=IdentityConfig)
+    action_guard: ActionGuardConfig = field(default_factory=ActionGuardConfig)
+    stop_gate: StopGateConfig = field(default_factory=StopGateConfig)
 
     def validate(self) -> None:
         unknown = [c for c in self.mode.checks if c not in VALID_CHECKS]
@@ -97,6 +128,10 @@ class Config:
             raise ValueError(
                 f"[sources].order enthaelt unbekannte Quellen {unknown_sources}; "
                 f"gueltig sind {VALID_SOURCES}"
+            )
+        if self.stop_gate.max_rework_rounds != 1:
+            raise ValueError(
+                "[stop_gate].max_rework_rounds muss fuer E02=B genau 1 sein"
             )
 
 
@@ -130,7 +165,9 @@ def _config_from_dict(data: dict) -> Config:
             "max_messages_per_session", ModeConfig.max_messages_per_session
         ),
         cooldown_minutes=mode_data.get("cooldown_minutes", ModeConfig.cooldown_minutes),
-        idle_disable_after=mode_data.get("idle_disable_after", ModeConfig.idle_disable_after),
+        idle_disable_after=mode_data.get(
+            "idle_disable_after", ModeConfig.idle_disable_after
+        ),
     )
 
     checks_data = data.get("checks", {})
@@ -160,7 +197,34 @@ def _config_from_dict(data: dict) -> Config:
     sources = SourcesConfig(
         project_dir=sources_data.get("project_dir") or None,
         git_dir=sources_data.get("git_dir") or None,
-        order=[str(name) for name in sources_data.get("order", VALID_SOURCES) if str(name)],
+        order=[
+            str(name) for name in sources_data.get("order", VALID_SOURCES) if str(name)
+        ],
     )
 
-    return Config(mode=mode, checks=checks, providers=providers, sources=sources)
+    identity_data = data.get("identity", {})
+    identity = IdentityConfig(
+        owner=str(identity_data.get("owner", "")),
+        scope=str(identity_data.get("scope", "")),
+        host=str(identity_data.get("host", "")),
+        target=str(identity_data.get("target", "")),
+    )
+    action_guard_data = data.get("action_guard", {})
+    action_guard = ActionGuardConfig(
+        enabled=bool(action_guard_data.get("enabled", False))
+    )
+    stop_gate_data = data.get("stop_gate", {})
+    stop_gate = StopGateConfig(
+        enabled=bool(stop_gate_data.get("enabled", False)),
+        max_rework_rounds=int(stop_gate_data.get("max_rework_rounds", 1)),
+    )
+
+    return Config(
+        mode=mode,
+        checks=checks,
+        providers=providers,
+        sources=sources,
+        identity=identity,
+        action_guard=action_guard,
+        stop_gate=stop_gate,
+    )

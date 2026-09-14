@@ -25,9 +25,18 @@ class ClaudeProvider:
     def is_available(self) -> bool:
         return True
 
-    def hook_snippet(self, python_executable: str = "python", module: str = "workflowhooker") -> dict:
+    def hook_snippet(
+        self, python_executable: str = "python", module: str = "workflowhooker"
+    ) -> dict:
         def cmd(event: str) -> dict:
-            return {"hooks": [{"type": "command", "command": f"{python_executable} -m {module} hook-run {event}"}]}
+            return {
+                "hooks": [
+                    {
+                        "type": "command",
+                        "command": f"{python_executable} -m {module} hook-run {event} --provider claude",
+                    }
+                ]
+            }
 
         snippet = {
             "hooks": {
@@ -41,14 +50,24 @@ class ClaudeProvider:
         )
         return snippet
 
-    def pretooluse_blocker_snippet(self, python_executable: str = "python", module: str = "workflowhooker") -> dict:
+    def pretooluse_blocker_snippet(
+        self, python_executable: str = "python", module: str = "workflowhooker"
+    ) -> dict:
         """Optionale Blocker-Variante -- bewusst NICHT Teil von
         ``hook_snippet()``. Nur fuer echte, objektiv geprueften Blocker
         gedacht; per Default nicht installiert."""
         return {
             "hooks": {
                 "PreToolUse": [
-                    {"hooks": [{"type": "command", "command": f"{python_executable} -m {module} hook-run PreToolUse"}]}
+                    {
+                        "matcher": "Edit|Write|MultiEdit|NotebookEdit",
+                        "hooks": [
+                            {
+                                "type": "command",
+                                "command": f"{python_executable} -m {module} hook-run PreToolUse --provider claude",
+                            }
+                        ],
+                    }
                 ]
             }
         }
