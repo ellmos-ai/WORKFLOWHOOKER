@@ -9,6 +9,7 @@ from workflowhooker.providers.codex import CodexProvider
 from workflowhooker.providers.git import GitProvider
 from workflowhooker.providers.manual import ManualProvider
 from workflowhooker.providers.kimi import KimiProvider
+from workflowhooker.providers.agy import AgyProvider
 
 
 def test_default_hook_snippet_never_contains_pretooluse():
@@ -66,8 +67,8 @@ def test_resolve_provider_picks_claude_first():
     assert resolve_provider(config).name == "claude"
 
 
-def test_registry_has_all_five():
-    assert set(PROVIDER_REGISTRY) == {"claude", "codex", "kimi", "git", "manual"}
+def test_registry_has_all_six():
+    assert set(PROVIDER_REGISTRY) == {"claude", "codex", "kimi", "agy", "git", "manual"}
 
 
 def test_kimi_provider_emits_stop_and_userpromptsubmit_in_plain_format():
@@ -102,3 +103,26 @@ def test_resolve_provider_picks_kimi_when_ordered_and_available():
         pytest.skip("keine ~/.kimi-code/config.toml auf diesem Host")
     config = ProvidersConfig(order=["kimi", "manual"])
     assert resolve_provider(config).name == "kimi"
+
+
+def test_agy_provider_never_emits_pretooluse():
+    """agy-Vertrag (analog memoryhooker/providers/agy.py, [G 2026-07-25]):
+    nur ``PreInvocation`` -> ``UserPromptSubmit`` ist verdrahtet.
+    ``PostToolUse`` bleibt bewusst unverdrahtet -- WorkflowHooker hat keinen
+    Pro-Tool-Aufruf-Befehl, den es fuettern koennte (anders als MemoryHookers
+    record-search-Zaehler)."""
+    snippet = AgyProvider().hook_snippet()
+    assert set(snippet["hooks"]) == {"PreInvocation"}
+    assert "PreToolUse" not in snippet["hooks"]
+    assert "PostToolUse" not in snippet["hooks"]
+    command = snippet["hooks"]["PreInvocation"][0]["command"]
+    assert command.endswith("hook-run UserPromptSubmit")
+
+
+def test_agy_provider_always_available():
+    assert AgyProvider().is_available() is True
+
+
+def test_resolve_provider_picks_agy_when_ordered():
+    config = ProvidersConfig(order=["agy", "manual"])
+    assert resolve_provider(config).name == "agy"
