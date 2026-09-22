@@ -1,9 +1,12 @@
 from __future__ import annotations
 
-from .base import UnimplementedProvider
+try:
+    from hook_master.providers.git import GitProvider as BaseGitProvider
+except ImportError:
+    from .base import UnimplementedProvider as BaseGitProvider
 
 
-class GitProvider(UnimplementedProvider):
+class GitProvider(BaseGitProvider):
     """README nennt Git-Hooks (``pre-commit``, ``pre-push``) sogar als den
     "natuerlicheren Ort" fuer ein Abschluss-Gate als einen Agenten-Hook --
     fuer das v0.1-MVP aber bewusst noch nicht verdrahtet (Auftrag:

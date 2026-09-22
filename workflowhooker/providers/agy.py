@@ -34,10 +34,19 @@ Installation bleibt ein dokumentierter manueller Schritt.
 
 from __future__ import annotations
 
+from typing import Any
+
+from .invariants import validate_interpreter
+
+try:
+    from hook_master.providers.agy import AgyProvider as BaseAgyProvider
+except ImportError:
+    from .base import BaseProvider as BaseAgyProvider
+
 FORBIDDEN_DEFAULT_EVENT = "PreToolUse"
 
 
-class AgyProvider:
+class AgyProvider(BaseAgyProvider):
     name = "agy"
     events = ("PreInvocation",)
 
@@ -49,7 +58,8 @@ class AgyProvider:
 
     def hook_snippet(
         self, python_executable: str = "python", module: str = "workflowhooker"
-    ) -> dict:
+    ) -> dict[str, Any]:
+        validate_interpreter(python_executable)
         user_prompt_cmd = f"{python_executable} -m {module} hook-run UserPromptSubmit"
 
         snippet = {

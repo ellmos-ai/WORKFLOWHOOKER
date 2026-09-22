@@ -1,9 +1,18 @@
 from __future__ import annotations
 
+from typing import Any
+
+from .invariants import validate_interpreter, validate_timeout
+
+try:
+    from hook_master.providers.codex import CodexProvider as BaseCodexProvider
+except ImportError:
+    from .base import BaseProvider as BaseCodexProvider
+
 FORBIDDEN_DEFAULT_EVENT = "PreToolUse"
 
 
-class CodexProvider:
+class CodexProvider(BaseCodexProvider):
     """Codex-CLI-Provider für ``~/.codex/hooks.json``.
 
     Hinweise bleiben aus ``PreToolUse`` heraus; der Event ist ausschließlich
@@ -12,22 +21,26 @@ class CodexProvider:
 
     name = "codex"
     events = ("Stop", "PreCompact", "UserPromptSubmit")
+    default_timeout = 10
 
     def is_available(self) -> bool:
         return True
 
     def hook_snippet(
         self, python_executable: str = "python", module: str = "workflowhooker"
-    ) -> dict:
-        def command(event: str) -> dict:
+    ) -> dict[str, Any]:
+        validate_interpreter(python_executable)
+
+        def command(event: str) -> dict[str, Any]:
             value = f"{python_executable} -m {module} hook-run {event} --provider codex"
+            timeout = validate_timeout(getattr(self, "default_timeout", 10))
             return {
                 "hooks": [
                     {
                         "type": "command",
                         "command": value,
                         "commandWindows": value,
-                        "timeout": 10,
+                        "timeout": timeout,
                         "statusMessage": f"WorkflowHooker: {event}",
                     }
                 ]
@@ -39,10 +52,11 @@ class CodexProvider:
 
     def pretooluse_blocker_snippet(
         self, python_executable: str = "python", module: str = "workflowhooker"
-    ) -> dict:
+    ) -> dict[str, Any]:
         """Opt-in-Guard nur fuer den tatsaechlich ausgewerteten Patch-Kanal."""
-
+        validate_interpreter(python_executable)
         value = f"{python_executable} -m {module} hook-run PreToolUse --provider codex"
+        timeout = validate_timeout(getattr(self, "default_timeout", 10))
         return {
             "hooks": {
                 "PreToolUse": [
@@ -53,7 +67,7 @@ class CodexProvider:
                                 "type": "command",
                                 "command": value,
                                 "commandWindows": value,
-                                "timeout": 10,
+                                "timeout": timeout,
                                 "statusMessage": "WorkflowHooker: action guard",
                             }
                         ],

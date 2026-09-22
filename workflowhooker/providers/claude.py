@@ -15,10 +15,19 @@ NICHT auf -- die Default-Installation bleibt PreToolUse-frei.
 
 from __future__ import annotations
 
+from typing import Any
+
+from .invariants import validate_interpreter
+
+try:
+    from hook_master.providers.claude import ClaudeProvider as BaseClaudeProvider
+except ImportError:
+    from .base import BaseProvider as BaseClaudeProvider
+
 FORBIDDEN_DEFAULT_EVENT = "PreToolUse"
 
 
-class ClaudeProvider:
+class ClaudeProvider(BaseClaudeProvider):
     name = "claude"
     events = ("Stop", "PreCompact", "UserPromptSubmit")
 
@@ -27,8 +36,10 @@ class ClaudeProvider:
 
     def hook_snippet(
         self, python_executable: str = "python", module: str = "workflowhooker"
-    ) -> dict:
-        def cmd(event: str) -> dict:
+    ) -> dict[str, Any]:
+        validate_interpreter(python_executable)
+
+        def cmd(event: str) -> dict[str, Any]:
             return {
                 "hooks": [
                     {
@@ -52,10 +63,11 @@ class ClaudeProvider:
 
     def pretooluse_blocker_snippet(
         self, python_executable: str = "python", module: str = "workflowhooker"
-    ) -> dict:
+    ) -> dict[str, Any]:
         """Optionale Blocker-Variante -- bewusst NICHT Teil von
         ``hook_snippet()``. Nur fuer echte, objektiv geprueften Blocker
         gedacht; per Default nicht installiert."""
+        validate_interpreter(python_executable)
         return {
             "hooks": {
                 "PreToolUse": [

@@ -4,21 +4,40 @@ from __future__ import annotations
 
 from typing import Protocol, runtime_checkable
 
+try:
+    from hook_master.providers.base import (
+        BaseProvider,
+        Provider,
+        UnimplementedProvider,
+    )
+except ImportError:
 
-@runtime_checkable
-class Provider(Protocol):
-    name: str
+    @runtime_checkable
+    class Provider(Protocol):  # type: ignore[no-redef]
+        name: str
 
-    def is_available(self) -> bool:
-        ...
+        def is_available(self) -> bool:
+            ...
 
+    class BaseProvider:  # type: ignore[no-redef]
+        name: str = "base"
+        events: tuple[str, ...] = ()
 
-class UnimplementedProvider:
-    """Dokumentierter Stub -- Hook-Bindung fuer diesen Anbieter ist noch
-    nicht ermittelt (README: "je Anbieter zu ermitteln, nicht zu raten")."""
+        def is_available(self) -> bool:
+            return True
 
-    name = "unimplemented"
-    reason = "Hook-Bindung fuer diesen Anbieter ist noch nicht ermittelt."
+    class UnimplementedProvider:  # type: ignore[no-redef]
+        """Dokumentierter Stub -- Hook-Bindung fuer diesen Anbieter ist noch
+        nicht ermittelt (README: "je Anbieter zu ermitteln, nicht zu raten")."""
 
-    def is_available(self) -> bool:
-        return False
+        name = "unimplemented"
+        reason = "Hook-Bindung fuer diesen Anbieter ist noch nicht ermittelt."
+
+        def is_available(self) -> bool:
+            return False
+
+__all__ = [
+    "BaseProvider",
+    "Provider",
+    "UnimplementedProvider",
+]

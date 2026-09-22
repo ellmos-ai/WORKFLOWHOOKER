@@ -126,3 +126,31 @@ def test_agy_provider_always_available():
 def test_resolve_provider_picks_agy_when_ordered():
     config = ProvidersConfig(order=["agy", "manual"])
     assert resolve_provider(config).name == "agy"
+
+
+def test_provider_rejects_zero_byte_store_alias():
+    from workflowhooker.providers.invariants import validate_interpreter
+
+    with pytest.raises(ValueError, match=r"0-Byte|0-byte|Store|Alias"):
+        validate_interpreter("python3")
+
+
+def test_provider_timeout_must_be_positive():
+    from workflowhooker.providers.invariants import validate_timeout
+
+    with pytest.raises(ValueError, match=r"positiv|> 0"):
+        validate_timeout(0)
+    with pytest.raises(ValueError, match=r"positiv|> 0"):
+        validate_timeout(-5)
+    assert validate_timeout(10) == 10
+
+
+def test_provider_self_test_invariants():
+    from workflowhooker.providers.invariants import run_self_test
+
+    res = run_self_test()
+    assert res["interpreter_valid"] is True
+    assert res["timeout_kills"] is True
+    assert res["alias_detection_works"] is True
+    assert res["ok"] is True
+
