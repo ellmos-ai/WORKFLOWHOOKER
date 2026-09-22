@@ -154,3 +154,64 @@ def test_provider_self_test_invariants():
     assert res["alias_detection_works"] is True
     assert res["ok"] is True
 
+
+def test_providers_inherit_from_hook_master_bases():
+    from hook_master.providers.agy import AgyProvider as BaseAgy
+    from hook_master.providers.claude import ClaudeProvider as BaseClaude
+    from hook_master.providers.codex import CodexProvider as BaseCodex
+    from hook_master.providers.git import GitProvider as BaseGit
+    from hook_master.providers.kimi import KimiProvider as BaseKimi
+    from hook_master.providers.manual import ManualProvider as BaseManual
+
+    assert issubclass(ClaudeProvider, BaseClaude)
+    assert issubclass(CodexProvider, BaseCodex)
+    assert issubclass(AgyProvider, BaseAgy)
+    assert issubclass(KimiProvider, BaseKimi)
+    assert issubclass(GitProvider, BaseGit)
+    assert issubclass(ManualProvider, BaseManual)
+
+
+def test_hook_snippets_delegate_to_hook_master_bases():
+    from hook_master.providers.claude import ClaudeProvider as BaseClaude
+    from hook_master.providers.codex import CodexProvider as BaseCodex
+
+    claude = ClaudeProvider()
+    base_claude = BaseClaude()
+    expected_claude = base_claude.hook_snippet(
+        module="workflowhooker", events=claude.events, provider_arg=True
+    )
+    assert claude.hook_snippet() == expected_claude
+    expected_blocker = base_claude.pretooluse_blocker_snippet(
+        module="workflowhooker", provider_arg=True
+    )
+    assert claude.pretooluse_blocker_snippet() == expected_blocker
+
+    codex = CodexProvider()
+    base_codex = BaseCodex()
+    expected_codex = base_codex.hook_snippet(
+        module="workflowhooker",
+        events=codex.events,
+        timeout=10,
+        status_prefix="WorkflowHooker",
+        provider_arg=True,
+    )
+    assert codex.hook_snippet() == expected_codex
+    expected_codex_blocker = base_codex.pretooluse_blocker_snippet(
+        module="workflowhooker",
+        matcher="^apply_patch$",
+        timeout=10,
+        status_message="WorkflowHooker: action guard",
+        provider_arg=True,
+    )
+    assert codex.pretooluse_blocker_snippet() == expected_codex_blocker
+
+
+def test_invariants_imported_from_hook_master():
+    import hook_master.providers.invariants as hm_invariants
+    import workflowhooker.providers.invariants as wfl_invariants
+
+    assert wfl_invariants.validate_interpreter is hm_invariants.validate_interpreter
+    assert wfl_invariants.validate_timeout is hm_invariants.validate_timeout
+    assert wfl_invariants.run_self_test is hm_invariants.run_self_test
+
+

@@ -1,9 +1,6 @@
 from __future__ import annotations
 
-try:
-    from hook_master.providers.manual import ManualProvider as BaseManualProvider
-except ImportError:
-    from .base import BaseProvider as BaseManualProvider
+from hook_master.providers.manual import ManualProvider as BaseManualProvider
 
 
 class ManualProvider(BaseManualProvider):
@@ -12,5 +9,5 @@ class ManualProvider(BaseManualProvider):
 
     name = "manual"
 
-    def is_available(self) -> bool:
-        return True
+
+__all__ = ["ManualProvider"]

@@ -1,9 +1,6 @@
 from __future__ import annotations
 
-try:
-    from hook_master.providers.git import GitProvider as BaseGitProvider
-except ImportError:
-    from .base import UnimplementedProvider as BaseGitProvider
+from hook_master.providers.git import GitProvider as BaseGitProvider
 
 
 class GitProvider(BaseGitProvider):
@@ -14,3 +11,6 @@ class GitProvider(BaseGitProvider):
 
     name = "git"
     reason = "Git-Hook-Installation ist fuer v0.1 bewusst nicht gebaut (siehe ROADMAP v0.2+)."
+
+
+__all__ = ["GitProvider"]
