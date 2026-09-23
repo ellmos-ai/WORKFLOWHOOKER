@@ -128,11 +128,18 @@ def test_resolve_provider_picks_agy_when_ordered():
     assert resolve_provider(config).name == "agy"
 
 
-def test_provider_rejects_zero_byte_store_alias():
+def test_provider_rejects_zero_byte_store_alias(tmp_path):
     from workflowhooker.providers.invariants import validate_interpreter
 
+    # Synthetischer 0-Byte-Alias-Kandidat statt "python3": "python3" ist auf
+    # POSIX ein legitimer, realer Interpreter (T-20260921-750493182, Runde 3;
+    # siehe hook-master#5) -- validate_interpreter() wirft dort korrekt KEINE
+    # Exception dafuer. Der 0-Byte-Groessencheck ist dagegen auf jeder
+    # Plattform identisch und damit die richtige, plattformunabhaengige Sonde.
+    fake_alias = tmp_path / "mock_alias.exe"
+    fake_alias.write_bytes(b"")
     with pytest.raises(ValueError, match=r"0-Byte|0-byte|Store|Alias"):
-        validate_interpreter("python3")
+        validate_interpreter(fake_alias)
 
 
 def test_provider_timeout_must_be_positive():
