@@ -12,7 +12,9 @@ license = "MIT"
 license-files = ["LICENSE"]
 authors = [{ name = "ellmos-ai contributors" }]
 keywords = ["workflow", "llm-agent", "hook", "local-first"]
-dependencies = []
+dependencies = [
+    "hook-master @ git+https://github.com/ellmos-ai/hook-master.git@f9dcea5",
+]
 
 [project.optional-dependencies]
 dev = ["pytest>=7"]

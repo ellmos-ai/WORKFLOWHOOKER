@@ -15,36 +15,26 @@ NICHT auf -- die Default-Installation bleibt PreToolUse-frei.
 
 from __future__ import annotations
 
+from typing import Any
+
+from hook_master.providers.claude import ClaudeProvider as BaseClaudeProvider
+
 FORBIDDEN_DEFAULT_EVENT = "PreToolUse"
 
 
-class ClaudeProvider:
+class ClaudeProvider(BaseClaudeProvider):
     name = "claude"
     events = ("Stop", "PreCompact", "UserPromptSubmit")
 
-    def is_available(self) -> bool:
-        return True
-
     def hook_snippet(
         self, python_executable: str = "python", module: str = "workflowhooker"
-    ) -> dict:
-        def cmd(event: str) -> dict:
-            return {
-                "hooks": [
-                    {
-                        "type": "command",
-                        "command": f"{python_executable} -m {module} hook-run {event} --provider claude",
-                    }
-                ]
-            }
-
-        snippet = {
-            "hooks": {
-                "Stop": [cmd("Stop")],
-                "PreCompact": [cmd("PreCompact")],
-                "UserPromptSubmit": [cmd("UserPromptSubmit")],
-            }
-        }
+    ) -> dict[str, Any]:
+        snippet = super().hook_snippet(
+            python_executable=python_executable,
+            module=module,
+            events=self.events,
+            provider_arg=True,
+        )
         assert FORBIDDEN_DEFAULT_EVENT not in snippet["hooks"], (
             "Der Default-Snippet darf niemals PreToolUse enthalten (README-Kernregel)."
         )
@@ -52,22 +42,16 @@ class ClaudeProvider:
 
     def pretooluse_blocker_snippet(
         self, python_executable: str = "python", module: str = "workflowhooker"
-    ) -> dict:
+    ) -> dict[str, Any]:
         """Optionale Blocker-Variante -- bewusst NICHT Teil von
         ``hook_snippet()``. Nur fuer echte, objektiv geprueften Blocker
         gedacht; per Default nicht installiert."""
-        return {
-            "hooks": {
-                "PreToolUse": [
-                    {
-                        "matcher": "Edit|Write|MultiEdit|NotebookEdit",
-                        "hooks": [
-                            {
-                                "type": "command",
-                                "command": f"{python_executable} -m {module} hook-run PreToolUse --provider claude",
-                            }
-                        ],
-                    }
-                ]
-            }
-        }
+        return super().pretooluse_blocker_snippet(
+            python_executable=python_executable,
+            module=module,
+            matcher="Edit|Write|MultiEdit|NotebookEdit",
+            provider_arg=True,
+        )
+
+
+__all__ = ["ClaudeProvider", "FORBIDDEN_DEFAULT_EVENT"]
