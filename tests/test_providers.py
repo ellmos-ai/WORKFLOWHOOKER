@@ -15,7 +15,7 @@ from workflowhooker.providers.manual import ManualProvider
 def test_default_hook_snippet_never_contains_pretooluse():
     snippet = ClaudeProvider().hook_snippet()
     assert "PreToolUse" not in snippet["hooks"]
-    assert set(snippet["hooks"]) == {"Stop", "PreCompact", "UserPromptSubmit"}
+    assert set(snippet["hooks"]) == {"Stop", "PreCompact", "UserPromptSubmit", "SessionStart"}
 
 
 def test_pretooluse_blocker_variant_exists_separately_and_is_not_default():
@@ -31,7 +31,7 @@ def test_codex_provider_emits_verified_codex_hook_shape():
     provider = CodexProvider()
     assert provider.is_available() is True
     snippet = provider.hook_snippet()
-    assert set(snippet["hooks"]) == {"Stop", "PreCompact", "UserPromptSubmit"}
+    assert set(snippet["hooks"]) == {"Stop", "PreCompact", "UserPromptSubmit", "SessionStart"}
     assert "PreToolUse" not in snippet["hooks"]
     command = snippet["hooks"]["Stop"][0]["hooks"][0]
     assert command["commandWindows"] == command["command"]

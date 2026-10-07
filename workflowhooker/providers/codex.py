@@ -6,14 +6,21 @@ FORBIDDEN_DEFAULT_EVENT = "PreToolUse"
 class CodexProvider:
     """Codex-CLI-Provider für ``~/.codex/hooks.json``.
 
-    Events und Ausgabeformat wurden am 2026-07-27 gegen die offizielle
-    Codex-Dokumentation und Codex CLI 0.145.0 geprüft. Hinweise bleiben aus
-    ``PreToolUse`` heraus; der Event ist ausschließlich für harte Guards
-    vorgesehen.
+    ``Stop``/``PreCompact``/``UserPromptSubmit`` wurden am 2026-07-27 gegen
+    die offizielle Codex-Dokumentation und Codex CLI 0.145.0 geprüft.
+    Hinweise bleiben aus ``PreToolUse`` heraus; der Event ist ausschließlich
+    für harte Guards vorgesehen.
+
+    ``SessionStart`` (hinzugefügt 2026-08-25) ist laut CLAUDE.md-Regelwerk
+    ("Codex liest User-Hooks aus ~/.codex/hooks.json ... SessionStart") als
+    Codex-Event dokumentiert, aber NICHT eigens gegen die aktuelle Codex-CLI
+    empirisch erneut geprüft -- vor produktivem Einsatz mit einer echten
+    Codex-Session verifizieren (Analogieschluss aus dem generischen
+    ``events``-Loop unten, kein Neuprüfungs-Datum wie oben).
     """
 
     name = "codex"
-    events = ("Stop", "PreCompact", "UserPromptSubmit")
+    events = ("Stop", "PreCompact", "UserPromptSubmit", "SessionStart")
 
     def is_available(self) -> bool:
         return True

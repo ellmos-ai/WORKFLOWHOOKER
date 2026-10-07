@@ -22,6 +22,12 @@ class ClosingGateCheck:
             problems.append(f"eigene(r) Lock noch vorhanden: {', '.join(state.lock_files)}")
         if state.git_dirty:
             problems.append(f"{state.uncommitted_files} uncommittete Aenderung(en)")
+        conflict_copies = state.meta.get("conflict_copies") or ()
+        if conflict_copies:
+            problems.append(
+                "moegliche OneDrive-Konfliktkopie(n) dieses Hosts (A7, siehe CLAUDE.md "
+                f"'KEIN BAU MEHR IN ONEDRIVE'): {', '.join(conflict_copies)}"
+            )
 
         if not problems:
             return None

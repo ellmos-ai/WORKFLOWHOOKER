@@ -36,6 +36,14 @@ def test_closing_gate_mentions_both_problems_together():
     assert "LOCK.txt" in message and "2" in message
 
 
+def test_closing_gate_fires_on_conflict_copy():
+    check = ClosingGateCheck()
+    state = ProjectState(meta={"conflict_copies": ("lock_scan-ASUS-GEI.py",)})
+    message = check.evaluate(state, Config())
+    assert message is not None
+    assert "lock_scan-ASUS-GEI.py" in message
+
+
 # ---------------------------------------------------------------------------
 # drift_warning
 # ---------------------------------------------------------------------------

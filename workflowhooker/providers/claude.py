@@ -4,10 +4,14 @@ Wie beim Schwestermodul MemoryHooker schreibt dieses Modul NIEMALS
 automatisch in eine echte ``settings.json`` -- Installation bleibt ein
 dokumentierter manueller Schritt.
 
-Default-Snippet nutzt ausschliesslich ``Stop``, ``PreCompact`` und
-``UserPromptSubmit`` -- niemals ``PreToolUse`` fuer Hinweise (README:
+Default-Snippet nutzt ``Stop``, ``PreCompact``, ``UserPromptSubmit`` und
+``SessionStart`` -- niemals ``PreToolUse`` fuer Hinweise (README:
 "PreToolUse nur fuer echte Blocker -- niemals fuer Hinweise", empirisch
-287 ms pro Tool-Aufruf).
+287 ms pro Tool-Aufruf). ``SessionStart`` seit 2026-08-25 fuer die
+Policy-/Ortsinjektoren (siehe ``injectors.PolicyInjector``/
+``LocationInjector``) -- bleibt wie alle anderen Events erst nach
+expliziter ``[injectors] policy/location = true`` in der Config aktiv,
+allein die Hook-Verdrahtung schaltet nichts ein.
 
 ``pretooluse_blocker_snippet()`` existiert als GETRENNTE Methode fuer den
 Fall, dass irgendwann ein echter, hart geprueften Blocker gebaut wird
@@ -22,7 +26,7 @@ FORBIDDEN_DEFAULT_EVENT = "PreToolUse"
 
 class ClaudeProvider:
     name = "claude"
-    events = ("Stop", "PreCompact", "UserPromptSubmit")
+    events = ("Stop", "PreCompact", "UserPromptSubmit", "SessionStart")
 
     def is_available(self) -> bool:
         return True
@@ -36,6 +40,7 @@ class ClaudeProvider:
                 "Stop": [cmd("Stop")],
                 "PreCompact": [cmd("PreCompact")],
                 "UserPromptSubmit": [cmd("UserPromptSubmit")],
+                "SessionStart": [cmd("SessionStart")],
             }
         }
         assert FORBIDDEN_DEFAULT_EVENT not in snippet["hooks"], (

@@ -5,7 +5,7 @@
   "category": "control",
   "kind": "workflow",
   "status": "released",
-  "version": "0.2.3",
+  "version": "0.3.0",
   "visibility": "private",
   "provides": [
     "workflow.hook",
@@ -36,5 +36,8 @@
     "path": ".",
     "repository": "https://github.com/ellmos-ai/workflowhooker.git"
   },
-  "adapters": []
+  "adapters": [],
+  "repo_aliases": [
+    "ellmos-ai/workflowhooker-provenance"
+  ]
 }

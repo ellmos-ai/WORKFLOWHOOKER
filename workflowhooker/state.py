@@ -40,10 +40,8 @@ class SessionState:
     # diesem Muster).
     last_message_ts: float | None = None
     checks: dict[str, CheckRuntime] = field(default_factory=dict)
-    # Idempotenz-Guard fuer den Kandidaten-Sammler (candidates.py,
-    # "candidate-collect"): hoechstens EIN Envelope je Sitzung, auch wenn
-    # der Hook mehrfach feuert (4-Augen-Hook-Regel: wiederholter Aufruf darf
-    # nicht mehrfach wirken).
+    # Legacy-v1 compatibility only. Since the v2 lifecycle contract,
+    # candidates.py owns idempotency via the complete durable job key.
     candidate_enqueued: bool = False
 
     @classmethod
