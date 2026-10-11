@@ -124,3 +124,7 @@ Lock-Inhalte oder Exception-Texte. Der Abschlusszustand wird atomar ersetzt und
 Beleg-Fingerprint gehören zum Integritätsdigest, damit unterbrochene,
 gleichzeitige oder nachträglich veränderte Zustände keine neue Einmalrunde
 erzeugen.
+
+## Verwandte Projekte
+
+- [COMA](https://github.com/ellmos-ai/coma): Lokale dateibasierte Jobkoordination und Prozessstart/-status für Agenten; ergänzt WorkflowHookers Lebenszyklusprüfungen.
