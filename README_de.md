@@ -118,13 +118,13 @@ JSON-Zustandsdatei. Projektdaten werden nicht übertragen. Sicherheitsmeldungen
 beschreibt [SECURITY.md](SECURITY.md), die Herkunft
 [PROVENANCE.md](PROVENANCE.md). Lizenz: MIT, siehe [LICENSE](LICENSE).
 
-## Verwandte Projekte
-
-- [COMA](https://github.com/ellmos-ai/coma): Lokale dateibasierte Jobkoordination und Prozessstart/-status für Agenten; ergänzt WorkflowHookers Lebenszyklusprüfungen.
-
 Guard-Fehlertexte sind fest formuliert und spiegeln weder Hook-Eingaben noch
 Lock-Inhalte oder Exception-Texte. Der Abschlusszustand wird atomar ersetzt und
 über eine kleine benachbarte `.lock`-Datei serialisiert. Rundenzahl und
 Beleg-Fingerprint gehören zum Integritätsdigest, damit unterbrochene,
 gleichzeitige oder nachträglich veränderte Zustände keine neue Einmalrunde
 erzeugen.
+
+## Verwandte Projekte
+
+- [COMA](https://github.com/ellmos-ai/coma): Lokale dateibasierte Jobkoordination und Prozessstart/-status für Agenten; ergänzt WorkflowHookers Lebenszyklusprüfungen.
