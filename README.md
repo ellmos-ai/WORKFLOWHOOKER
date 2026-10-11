@@ -153,6 +153,10 @@ evidence fingerprint are included in the runtime integrity digest.
 See [SECURITY.md](SECURITY.md) for private vulnerability reporting and
 [PROVENANCE.md](PROVENANCE.md) for source-history and BACH lineage notes.
 
+## Related projects
+
+- [COMA](https://github.com/ellmos-ai/coma): Local, file-based agent-job coordination and process startup/status; complements WorkflowHooker's lifecycle checks.
+
 ## License
 
 MIT. See [LICENSE](LICENSE).

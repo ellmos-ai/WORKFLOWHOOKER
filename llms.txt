@@ -25,3 +25,7 @@ Local-first workflow checks for coding-agent lifecycle hooks.
   cleans locks or diffs.
 - No target-level Bash, PowerShell, unified-exec, or arbitrary MCP coverage is
   claimed.
+
+## Related projects
+
+- [COMA](https://github.com/ellmos-ai/coma): Local, file-based agent-job coordination and process startup/status; complements WorkflowHooker's lifecycle checks.
