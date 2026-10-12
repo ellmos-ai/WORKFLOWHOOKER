@@ -91,7 +91,7 @@ def extract_action_targets(payload: dict[str, Any], cwd: Path) -> ActionTargets:
     else:
         return ActionTargets(False)
 
-    if not raw_paths:
+    if not raw_paths or any("\x00" in raw for raw in raw_paths):
         return ActionTargets(True, malformed=True)
     targets = []
     for raw in raw_paths:
