@@ -1,5 +1,8 @@
 from pathlib import Path
 
+import pytest
+
+from workflowhooker import gates
 from workflowhooker.config import (
     ActionGuardConfig,
     Config,
@@ -103,6 +106,95 @@ def test_missing_target_on_covered_tool_is_unknown_and_denied(tmp_path: Path):
         _payload(tmp_path, tool_input={"content": "x"}), _config(action=True), tmp_path
     )
     assert (result.decision, result.evidence) == (Decision.DENY, EvidenceState.UNKNOWN)
+
+
+@pytest.mark.parametrize(
+    ("tool", "tool_input"),
+    [
+        ("Write", {"file_path": "bad\x00path.py"}),
+        ("MoveFile", {"source": "bad\x00source.py", "destination": "target.py"}),
+        ("MoveFile", {"source": "source.py", "destination": "bad\x00target.py"}),
+        (
+            "apply_patch",
+            {
+                "command": (
+                    "*** Begin Patch\n"
+                    "*** Update File: bad\x00path.py\n"
+                    "*** End Patch"
+                )
+            },
+        ),
+    ],
+    ids=("explicit-path", "move-source", "move-destination", "apply-patch-header"),
+)
+def test_nul_action_targets_are_rejected_before_path_construction_and_denied(
+    tmp_path: Path, monkeypatch, tool: str, tool_input: dict
+):
+    payload = _payload(tmp_path, tool=tool, tool_input=tool_input)
+
+    def unexpected_path_construction(*_args, **_kwargs):
+        pytest.fail("A raw NUL target must be rejected before constructing Path.")
+
+    monkeypatch.setattr(gates, "Path", unexpected_path_construction)
+    extracted = gates.extract_action_targets(payload, tmp_path)
+    assert extracted.covered is True
+    assert extracted.malformed is True
+    assert extracted.targets == ()
+
+    result = evaluate_action_guard(
+        payload,
+        _config(action=True),
+        tmp_path,
+        lock_inspector=lambda *_: pytest.fail(
+            "Malformed target must be denied before inspecting locks."
+        ),
+    )
+    assert result.decision is Decision.DENY
+    assert result.evidence is EvidenceState.UNKNOWN
+    assert result.code == "target-unresolved"
+
+
+@pytest.mark.parametrize(
+    ("tool", "tool_input", "relative_targets"),
+    [
+        ("Write", {"file_path": "valid.py"}, ("valid.py",)),
+        (
+            "MoveFile",
+            {"source": "source.py", "destination": "destination.py"},
+            ("source.py", "destination.py"),
+        ),
+        (
+            "apply_patch",
+            {
+                "command": (
+                    "*** Begin Patch\n"
+                    "*** Update File: valid.py\n"
+                    "*** End Patch"
+                )
+            },
+            ("valid.py",),
+        ),
+    ],
+    ids=("explicit-path", "move-files", "apply-patch-header"),
+)
+def test_valid_action_targets_are_still_resolved_and_allowed(
+    tmp_path: Path, tool: str, tool_input: dict, relative_targets: tuple[str, ...]
+):
+    payload = _payload(tmp_path, tool=tool, tool_input=tool_input)
+    extracted = gates.extract_action_targets(payload, tmp_path)
+    assert extracted.covered is True
+    assert extracted.malformed is False
+    assert extracted.targets == tuple(
+        (tmp_path / relative).resolve(strict=False) for relative in relative_targets
+    )
+
+    result = evaluate_action_guard(
+        payload,
+        _config(action=True),
+        tmp_path,
+        lock_inspector=lambda *_: LockSnapshot(EvidenceState.CLEAN),
+    )
+    assert result.decision is Decision.ALLOW
 
 
 def test_missing_authority_is_ask_not_allow(tmp_path: Path):
