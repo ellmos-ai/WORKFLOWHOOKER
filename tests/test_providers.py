@@ -4,12 +4,12 @@ import pytest
 
 from workflowhooker.config import ProvidersConfig
 from workflowhooker.providers import PROVIDER_REGISTRY, resolve_provider
+from workflowhooker.providers.agy import AgyProvider
 from workflowhooker.providers.claude import ClaudeProvider
 from workflowhooker.providers.codex import CodexProvider
 from workflowhooker.providers.git import GitProvider
-from workflowhooker.providers.manual import ManualProvider
 from workflowhooker.providers.kimi import KimiProvider
-from workflowhooker.providers.agy import AgyProvider
+from workflowhooker.providers.manual import ManualProvider
 
 
 def test_default_hook_snippet_never_contains_pretooluse():
@@ -215,6 +215,7 @@ def test_hook_snippets_delegate_to_hook_master_bases():
 
 def test_invariants_imported_from_hook_master():
     import hook_master.providers.invariants as hm_invariants
+
     import workflowhooker.providers.invariants as wfl_invariants
 
     assert wfl_invariants.validate_interpreter is hm_invariants.validate_interpreter

@@ -3,13 +3,37 @@
 
 Siehe README.md und ROADMAP.md.
 
-Status: v0.2.1 -- Abschluss-Gate + Drift-/Umfangswaechter implementiert
-(keiner per Default aktiv).
+Abschluss-Gate, Drift-/Umfangswächter und SessionStart-Injektoren
+sind ausdrücklich aktivierbar und bleiben standardmäßig ausgeschaltet.
 """
 
 from .config import Config, load_config
+from .extractor_consumer import ConsumerResult, ExtractorConsumer, ExtractorRunner
+from .injectors import (
+    GoalInjector,
+    LocationInjector,
+    LoopInjector,
+    PolicyInjector,
+    build_goal_message,
+    build_loop_briefing,
+)
 from .protocol import ProjectState, StateSource
 
 __version__ = "0.2.1"
 
-__all__ = ["ProjectState", "StateSource", "Config", "load_config", "__version__"]
+__all__ = [
+    "Config",
+    "ConsumerResult",
+    "ExtractorConsumer",
+    "ExtractorRunner",
+    "GoalInjector",
+    "LocationInjector",
+    "LoopInjector",
+    "PolicyInjector",
+    "ProjectState",
+    "StateSource",
+    "__version__",
+    "build_goal_message",
+    "build_loop_briefing",
+    "load_config",
+]

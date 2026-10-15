@@ -9,12 +9,12 @@ ROADMAP ("ein Check, der nichts mehr findet, schaltet sich selbst ab").
 
 from __future__ import annotations
 
-from contextlib import contextmanager
 import hashlib
 import json
 import os
 import tempfile
 import time
+from contextlib import contextmanager
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
@@ -167,6 +167,7 @@ class SessionState:
     last_message_ts: float | None = None
     checks: dict[str, CheckRuntime] = field(default_factory=dict)
     stop_gates: dict[str, StopGateRuntime] = field(default_factory=dict)
+    candidate_enqueued: bool = False
 
     @classmethod
     def load(cls, path: Path) -> "SessionState":
@@ -208,6 +209,7 @@ class SessionState:
             _validate_stop_gates(stop_gates)
             state = cls(
                 messages_sent=data.get("messages_sent", 0),
+                candidate_enqueued=bool(data.get("candidate_enqueued", False)),
                 last_message_ts=data.get("last_message_ts"),
                 checks=checks,
                 stop_gates=stop_gates,
@@ -221,6 +223,7 @@ class SessionState:
         path.parent.mkdir(parents=True, exist_ok=True)
         data = {
             "messages_sent": self.messages_sent,
+            "candidate_enqueued": self.candidate_enqueued,
             "last_message_ts": self.last_message_ts,
             "checks": {name: asdict(runtime) for name, runtime in self.checks.items()},
             "stop_gates": {

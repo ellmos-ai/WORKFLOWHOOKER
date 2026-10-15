@@ -31,13 +31,13 @@ PROVIDER_REGISTRY: dict[str, Provider] = {
 }
 
 __all__ = [
+    "PROVIDER_REGISTRY",
     "AgyProvider",
     "ClaudeProvider",
     "CodexProvider",
     "GitProvider",
     "KimiProvider",
     "ManualProvider",
-    "PROVIDER_REGISTRY",
     "Provider",
     "UnimplementedProvider",
     "resolve_provider",

@@ -8,10 +8,10 @@ werden nicht in Fehlermeldungen gespiegelt.
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-import re
 
 from .decisions import EvidenceState
 

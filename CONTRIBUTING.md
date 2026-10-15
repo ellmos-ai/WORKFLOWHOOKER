@@ -1,29 +1,19 @@
 # Contributing
 
-## Where development happens
+This public repository owns the `workflowhooker` runtime and its behavioral tests.
+Develop shared functionality here. Private deployments consume a pinned public
+revision and keep host settings, private inputs and historical evidence outside
+the public package. A private extension is warranted only for actual private
+executable behavior; it must not shadow the core namespace.
 
-This repository is the **public, curated** side of a two-repository pair:
+The historical private repository retains its Git history. Never force-push one
+repository's history over the other. Check `git remote -v` before pushing and
+start public changes from the public default branch.
 
-| Repository | Role |
-|---|---|
-| `ellmos-ai/workflowhooker` | public distribution — curated, tested, release-ready |
-| `ellmos-ai/workflowhooker-provenance` | private twin — full development history |
+Install `.[dev]`, run `python -m pytest`, and verify the built wheel in a fresh
+environment outside the checkout. Provider changes also require tests against
+the declared `hook-master` dependency. Passing private tests alone does not
+verify the public artifact.
 
-Development and the complete history live in the **private twin**. What reaches
-`main` here are curated, tested changes, brought over by squash or cherry-pick.
-
-**`main` is never force-pushed with development history.** The two branches have
-deliberately separate shapes: the private twin keeps every step, this one keeps
-the story a reader needs. Pushing one over the other destroys that distinction
-in both directions.
-
-## Practical consequences
-
-- A local clone that tracks a `master` branch belongs to the private twin, not
-  to this repository. Check `git remote -v` before pushing; a stale remote
-  reference is easy to mistake for a diverged branch.
-- Fixes made directly against this repository go on a branch taken from
-  `origin/main`, with only the fix commits on it — never a rebase of a
-  development branch onto `main`.
-- Tests must be green on the branch you actually push. A fix verified on the
-  development side is not verified here until it runs against this tree.
+Keep optional behavior disabled by default. Do not commit private registries,
+transcripts, host paths, credentials, session receipts or local lock files.

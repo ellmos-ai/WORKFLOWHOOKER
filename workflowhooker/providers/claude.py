@@ -40,6 +40,17 @@ class ClaudeProvider(BaseClaudeProvider):
         )
         return snippet
 
+    def session_start_snippet(
+        self, python_executable: str = "python", module: str = "workflowhooker"
+    ) -> dict[str, Any]:
+        """Explicit opt-in for policy and location injectors."""
+        return super().hook_snippet(
+            python_executable=python_executable,
+            module=module,
+            events=("SessionStart",),
+            provider_arg=True,
+        )
+
     def pretooluse_blocker_snippet(
         self, python_executable: str = "python", module: str = "workflowhooker"
     ) -> dict[str, Any]:
@@ -53,5 +64,50 @@ class ClaudeProvider(BaseClaudeProvider):
             provider_arg=True,
         )
 
+    def shadow_hook_snippet(
+        self,
+        python_executable: str = "python",
+        module: str = "workflowhooker",
+        *,
+        config_path=None,
+        state_dir=None,
+        session_root=None,
+    ) -> dict:
+        """Generate opt-in S4 wiring without changing real settings.
 
-__all__ = ["ClaudeProvider", "FORBIDDEN_DEFAULT_EVENT"]
+        ``GoalComplete`` deliberately is not guessed from ``Stop``.  A formal
+        goal producer can use :meth:`shadow_goal_command`; native Claude hooks
+        provide SessionEnd as the fallback boundary.
+        """
+        from .shadow import NATIVE_SHADOW_EVENTS, build_shadow_command
+
+        def group(event: str) -> dict:
+            return {
+                "hooks": [
+                    {
+                        "type": "command",
+                        "command": build_shadow_command(
+                            self.name,
+                            event,
+                            python_executable=python_executable,
+                            module=module,
+                            config_path=config_path,
+                            state_dir=state_dir,
+                            session_root=session_root,
+                        ),
+                        "timeout": 10,
+                    }
+                ]
+            }
+
+        return {"hooks": {event: [group(event)] for event in NATIVE_SHADOW_EVENTS}}
+
+
+    def shadow_goal_command(self, **kwargs) -> str:
+        from .shadow import build_shadow_command
+
+        return build_shadow_command(self.name, "GoalComplete", **kwargs)
+
+
+
+__all__ = ["FORBIDDEN_DEFAULT_EVENT", "ClaudeProvider"]

@@ -4,7 +4,6 @@ from pathlib import Path
 from workflowhooker.decisions import EvidenceState
 from workflowhooker.locks import inspect_locks
 
-
 NOW = datetime(2026, 9, 14, 12, 0, tzinfo=timezone.utc)
 
 

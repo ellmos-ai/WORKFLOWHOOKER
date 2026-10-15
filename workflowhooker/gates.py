@@ -13,7 +13,6 @@ from .locks import LockRecord, LockSnapshot, inspect_locks
 from .protocol import ProjectState
 from .state import SessionState, StopRuntimeIntegrityError
 
-
 _EXPLICIT_PATH_FIELDS = {
     "Edit": ("file_path",),
     "Write": ("file_path",),

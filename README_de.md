@@ -2,7 +2,8 @@
 
 WorkflowHooker führt kleine, konfigurierbare Ablaufprüfungen an
 Lebenszyklus-Ereignissen unterstützter Coding-Agenten aus. Das Modul arbeitet
-lokal, hat keine Laufzeitabhängigkeiten, nutzt kein Netzwerk und bleibt stumm,
+lokal, nutzt `hook-master` zur Providerformatierung, ruft in den eingebauten
+Prüfungen kein Netzwerk auf und bleibt stumm,
 bis Prüfungen ausdrücklich aktiviert werden.
 
 ## Funktionen
@@ -128,3 +129,67 @@ erzeugen.
 ## Verwandte Projekte
 
 - [COMA](https://github.com/ellmos-ai/coma): Lokale dateibasierte Jobkoordination und Prozessstart/-status für Agenten; ergänzt WorkflowHookers Lebenszyklusprüfungen.
+
+## Codex-Kontext nach Komprimierung
+
+In einer ausdrücklich ausgewählten TOML-Datei aktivieren:
+
+```toml
+[compaction]
+enabled = true
+```
+
+Der Hinweis nutzt Codex `SessionStart` mit `source = compact` und liefert
+`hookSpecificOutput.additionalContext`. Er erinnert daran, dass erneut angezeigte
+Nutzernachrichten historisch sein können, erledigte Schritte zu berücksichtigen
+und die Aufgabe am aktuellen Stand fortzusetzen. Tatsächlich neue Nachrichten
+und Korrekturen bleiben maßgeblich. Dies ist eine Orientierung für das Modell,
+keine Garantie gegen Wiederholungsschleifen. `PostCompact` ist kein Ersatzkanal.
+
+```shell
+python -m workflowhooker install-snippet --provider codex --variant compaction
+```
+
+Das Ergebnis enthält nur `SessionStart`, Matcher `^compact$` und Timeout 10.
+Vor dem Einmischen beide Befehlsfelder `command` und `commandWindows` auf den
+installierten Interpreter und einen absoluten Konfigurationspfad setzen.
+Shellgerechte Anführungszeichen verwenden, beispielsweise unter Windows:
+
+```text
+"C:/path/to/venv/Scripts/python.exe" -m workflowhooker --config "C:/path/to/workflowhooker.toml" hook-run SessionStart --provider codex
+```
+
+Genau einen passenden Handler registrieren. Eine ältere Registrierung desselben
+SessionStart-Befehls ohne Matcher vorher durch die Variante `session-start`
+ersetzen; deren Matcher schließt Komprimierung aus. `--existing` erzeugt nur ein
+zusammengeführtes Hook-Snippet, keinen Ersatz für die gesamte Hostkonfiguration.
+Andere Einstellungen und Vertrauensdaten erhalten. Die native Vertrauensprüfung
+von Codex nicht umgehen.
+
+Der Komprimierungspfad liest nur Eingabe und Konfiguration, keine Projektquellen
+oder normalen Sitzungszustände. Ein ausgeschöpftes Hinweisbudget unterdrückt keine
+spätere Komprimierungsmeldung. Ungültige Eingaben bleiben stumm. Zur Rücknahme die
+Option ausschalten oder nur diese Registrierung entfernen. Manuelle und
+automatische Komprimierung müssen mit der installierten Codex-Version separat
+abgenommen werden; Unit-Tests ersetzen diesen Nachweis nicht.
+
+## Gemeinsamer Kern und optionale Funktionen
+
+Dieses öffentliche Repository ist der Entwicklungsort des Laufzeitkerns. Private
+Installationen konsumieren einen festen öffentlichen Commit und halten ihre
+Einstellungen, Daten und historischen Nachweise getrennt. Ein privates Python-Modul
+ist nur für tatsächlich private ausführbare Funktionen erforderlich.
+
+`goal` liest lokale Ziel-/Aufgabendateien; `loop-briefing` formatiert den Arbeitsstand.
+`[injectors] goal = true` aktiviert PreCompact-Briefings. Policy- und Ortsinjektoren
+werden getrennt aktiviert (`policy = true`, `location = true`) und benötigen
+`install-snippet --variant session-start`. Registry-Inhalte bleiben lokal. Die
+Scope-Ableitung unterstützt `.TOPICS/<scope>` und `_Local_DEV/repos/<name>`; für
+andere Verzeichnisse wird kein Scope abgeleitet. Die optionalen Integrationen
+`taskplan` und `source_resolver` sind nicht mitgeliefert.
+
+`candidate-collect`, `candidate-extract`, `provider-shadow` und `boot-context-lint`
+stellen lokale Lebenszyklus-, Extraktions- und Prüfwerkzeuge bereit. Details stehen
+in der jeweiligen `--help`-Ausgabe. Kandidatenaufzeichnung erfordert
+`[candidates] enabled = true`; kein Extraktor wird automatisch eingeplant.
+Standardregistrierungen und bisherige Aktions-/Abschluss-Guards bleiben erhalten.
