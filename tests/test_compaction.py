@@ -64,5 +64,15 @@ def test_compaction_config_default_and_opt_in(tmp_path):
 def test_compaction_config_rejects_non_boolean(tmp_path, value):
     path = tmp_path / "hook.toml"
     path.write_text(f"[compaction]\nenabled = {value}\n", encoding="utf-8")
-    with pytest.raises(ValueError, match="compaction"):
+    # Python 3.10's fallback rejects unsupported inline tables at parse time;
+    # newer parsers reach the compaction type check. Both must reject the value.
+    with pytest.raises(ValueError):
         load_config(path)
+
+
+@pytest.mark.parametrize("value", ['"false"', '"true"', '1', '0', '[]', '{}'])
+def test_compaction_config_rejects_non_boolean_with_fallback(tmp_path, monkeypatch, value):
+    from workflowhooker import _toml
+
+    monkeypatch.setattr(_toml, "loads", _toml.loads_fallback)
+    test_compaction_config_rejects_non_boolean(tmp_path, value)
