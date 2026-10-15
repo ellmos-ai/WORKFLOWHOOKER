@@ -26,13 +26,13 @@ class ProjectState:
     git_dirty: bool = False
     uncommitted_files: int = 0
     changed_top_level_dirs: tuple[str, ...] = ()
+    meta: dict[str, Any] = field(default_factory=dict)
     # Optional context used by the goal/loop injectors.  Sources may leave
     # these fields empty; a missing source is never treated as an error.
     goal: str | None = None
     goal_sources: tuple[str, ...] = ()
     open_tasks: tuple[str, ...] = ()
     task_ids: tuple[int, ...] = ()
-    meta: dict[str, Any] = field(default_factory=dict)
 
     @property
     def goal_text(self) -> str | None:

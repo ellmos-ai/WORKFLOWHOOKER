@@ -160,7 +160,6 @@ def state_transaction(path: Path, timeout_seconds: float | None = None):
 
 @dataclass
 class SessionState:
-    candidate_enqueued: bool = False
     messages_sent: int = 0
     # None = "noch keine Meldung in dieser Sitzung" -- kein 0.0-Sentinel
     # (siehe MemoryHooker state.py fuer den dort gefangenen Bug mit genau
@@ -168,6 +167,7 @@ class SessionState:
     last_message_ts: float | None = None
     checks: dict[str, CheckRuntime] = field(default_factory=dict)
     stop_gates: dict[str, StopGateRuntime] = field(default_factory=dict)
+    candidate_enqueued: bool = False
 
     @classmethod
     def load(cls, path: Path) -> "SessionState":

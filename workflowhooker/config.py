@@ -183,11 +183,11 @@ class Config:
     checks: ChecksConfig = field(default_factory=ChecksConfig)
     providers: ProvidersConfig = field(default_factory=ProvidersConfig)
     sources: SourcesConfig = field(default_factory=SourcesConfig)
-    injectors: InjectorsConfig = field(default_factory=InjectorsConfig)
-    candidates: CandidatesConfig = field(default_factory=CandidatesConfig)
     identity: IdentityConfig = field(default_factory=IdentityConfig)
     action_guard: ActionGuardConfig = field(default_factory=ActionGuardConfig)
     stop_gate: StopGateConfig = field(default_factory=StopGateConfig)
+    injectors: InjectorsConfig = field(default_factory=InjectorsConfig)
+    candidates: CandidatesConfig = field(default_factory=CandidatesConfig)
     compaction: CompactionConfig = field(default_factory=CompactionConfig)
 
     def validate(self) -> None:

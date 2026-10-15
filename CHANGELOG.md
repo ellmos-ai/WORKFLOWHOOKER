@@ -4,6 +4,19 @@ All notable public changes are documented in this file.
 
 ## Unreleased
 
+### Added
+
+- One public runtime core includes optional goal/loop briefings, policy/location
+  injectors, project-scoped task sources, conflict-copy detection, candidate
+  spooling, extractor consumption, shadow adapters and boot-context linting.
+  Private deployments can consume pinned public revisions without duplicating
+  the runtime namespace. Private settings and historical receipts stay separate.
+- Opt-in Codex post-compaction notice through `SessionStart` / `source=compact`,
+  independent of advisory budgets, cooldowns, project sources and state files.
+  New user instructions remain authoritative. Default hook snippets are unchanged.
+- Separate `session-start` and `compaction` installation variants. Hook merging
+  preserves distinct matchers and remains idempotent within each matcher.
+
 ### Fixed
 
 - Added the opt-in E01 action guard contract: action/context/stop/side-effect

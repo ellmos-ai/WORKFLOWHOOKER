@@ -35,6 +35,7 @@ from .candidates import (
     read_all,
 )
 from .checks import CHECK_REGISTRY, CheckRunner
+from .compaction import build_compaction_output
 from .config import Config, load_config
 from .decisions import Decision, EvidenceState, GateResult, HookSurface
 from .gates import evaluate_action_guard, evaluate_stop_gate
@@ -162,7 +163,7 @@ def _build_parser() -> argparse.ArgumentParser:
     p_install.add_argument("--out", type=Path, default=None)
     p_install.add_argument(
         "--variant",
-        choices=["default", "action-guard", "session-start"],
+        choices=["default", "action-guard", "session-start", "compaction"],
         default="default",
         help="Default-Hinweise oder separater Opt-in-PreToolUse-Guard",
     )
@@ -326,9 +327,6 @@ def _cmd_hook_run(args) -> int:
     # wird jetzt zusaetzlich ausgewertet.)
     payload, payload_reliable = _read_stdin_json_checked()
 
-    project_dir = canonical_project_root(
-        args.project_dir or _extract_cwd(payload) or Path.cwd()
-    )
     try:
         config = load_config(args.config)
     except (OSError, UnicodeError, ValueError, TypeError):
@@ -350,6 +348,22 @@ def _cmd_hook_run(args) -> int:
             file=sys.stderr,
         )
         return 0
+
+    if args.provider == "codex" and args.event == "SessionStart":
+        if not payload_reliable:
+            return 0
+        if payload.get("source") == "compact":
+            output = build_compaction_output(
+                payload, provider=args.provider, enabled=config.compaction.enabled,
+            )
+            if output is not None:
+                # ASCII JSON is lossless and independent of Windows console encoding.
+                print(json.dumps(output, ensure_ascii=True))
+            return 0
+
+    project_dir = canonical_project_root(
+        args.project_dir or _extract_cwd(payload) or Path.cwd()
+    )
 
     if args.event == "PreToolUse":
         if config.action_guard.enabled and not payload_reliable:
@@ -611,6 +625,12 @@ def _cmd_install_snippet(args) -> int:
             state_dir=args.hook_state_dir,
             session_root=args.session_root,
         )
+    elif args.variant == "compaction":
+        builder = getattr(provider, "compaction_snippet", None)
+        if builder is None:
+            print("Komprimierungshinweis ist nur für codex verfügbar.", file=sys.stderr)
+            return 2
+        snippet = builder()
     elif args.variant == "session-start":
         builder = getattr(provider, "session_start_snippet", None)
         if builder is None:

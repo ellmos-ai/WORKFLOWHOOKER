@@ -215,7 +215,7 @@ def build_shadow_command(
 
 
 def merge_hook_snippets(existing: dict, addition: dict) -> dict:
-    """Return a hooks-only merge and skip already registered commands.
+    """Return a hooks-only merge, deduplicating commands within each matcher.
 
     Other settings are intentionally not copied, so a diagnostic merge can be
     printed without exposing unrelated environment or credential settings.
@@ -233,7 +233,7 @@ def merge_hook_snippets(existing: dict, addition: dict) -> dict:
             raise ValueError("hook event groups must be arrays")
         target_groups = merged["hooks"].setdefault(event, [])
         existing_commands = {
-            handler.get("commandWindows") or handler.get("command")
+            (group.get("matcher"), handler.get("commandWindows") or handler.get("command"))
             for group in target_groups
             if isinstance(group, dict)
             for handler in group.get("hooks", [])
@@ -249,11 +249,12 @@ def merge_hook_snippets(existing: dict, addition: dict) -> dict:
             for handler in handlers:
                 if not isinstance(handler, dict):
                     raise ValueError("hook handler must be an object")
-                signature = handler.get("commandWindows") or handler.get("command")
-                if signature and signature in existing_commands:
+                command = handler.get("commandWindows") or handler.get("command")
+                signature = (group.get("matcher"), command)
+                if command and signature in existing_commands:
                     continue
                 fresh_handlers.append(deepcopy(handler))
-                if signature:
+                if command:
                     existing_commands.add(signature)
             if fresh_handlers:
                 fresh_group = deepcopy(group)
