@@ -175,12 +175,19 @@ python -m workflowhooker install-snippet --provider codex --variant compaction
 ```
 
 The registration contains only `SessionStart`, matcher `^compact$`, timeout 10.
-Set both `command` and `commandWindows` to the installed interpreter and an
-absolute config path with shell-appropriate quoting, for example on Windows:
+Set the installed interpreter and an absolute config path in both command
+fields, preserving shell-appropriate quoting. For a Windows PowerShell session,
+`commandWindows` needs the call operator before a quoted executable:
 
-```text
-"C:/path/to/venv/Scripts/python.exe" -m workflowhooker --config "C:/path/to/workflowhooker.toml" hook-run SessionStart --provider codex
+```powershell
+& "C:/path/to/venv/Scripts/python.exe" -m workflowhooker --config "C:/path/to/workflowhooker.toml" hook-run SessionStart --provider codex
 ```
+
+Keep the POSIX `command` without `&`. The shared hook-master provider adds the
+operator when generating Codex Windows snippets; this also covers the normal,
+session-start and action-guard variants. Codex shadow commands apply the same
+rule. Bare executable names keep their existing form. A changed definition must
+be reviewed again through `/hooks` before Codex runs it.
 
 Keep exactly one matching handler. Replace an older wildcard registration of this
 same command with the `session-start` variant before combining both variants;

@@ -17,6 +17,8 @@ from copy import deepcopy
 from dataclasses import dataclass
 from pathlib import Path
 
+from hook_master.providers.codex import powershell_command
+
 from ..candidates import LifecycleController, LifecycleResult
 
 SHADOW_PROVIDERS = ("claude", "codex")
@@ -210,7 +212,8 @@ def build_shadow_command(
     if session_root is not None:
         argv.extend(("--session-root", str(session_root)))
     if windows:
-        return subprocess.list2cmdline(argv)
+        command = subprocess.list2cmdline(argv)
+        return powershell_command(command) if provider == "codex" else command
     return shlex.join(argv)
 
 

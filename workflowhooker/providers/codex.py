@@ -49,11 +49,15 @@ class CodexProvider(BaseCodexProvider):
         self, python_executable: str = "python", module: str = "workflowhooker"
     ) -> dict[str, Any]:
         """Opt-in context notice after compaction, before the next model request."""
-        self.validate_command(python_executable, 10)
-        command = f"{python_executable} -m {module} hook-run SessionStart --provider codex"
-        return {"hooks": {"SessionStart": [self.format_hook(
-            "SessionStart", command, matcher="^compact$", timeout=10,
-        )]}}
+        snippet = super().hook_snippet(
+            python_executable=python_executable,
+            module=module,
+            events=("SessionStart",),
+            timeout=10,
+            provider_arg=True,
+        )
+        snippet["hooks"]["SessionStart"][0]["matcher"] = "^compact$"
+        return snippet
 
     def pretooluse_blocker_snippet(
         self, python_executable: str = "python", module: str = "workflowhooker"
