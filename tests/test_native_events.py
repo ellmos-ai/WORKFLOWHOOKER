@@ -1,16 +1,15 @@
 """Native CLI/Event-Smokes mit ausschließlich synthetischen Payloads."""
 
-from concurrent.futures import ThreadPoolExecutor
 import json
 import os
 import subprocess
 import sys
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 import pytest
 
 from workflowhooker.state import state_path_for_session, state_transaction
-
 
 ROOT = Path(__file__).parent.parent
 

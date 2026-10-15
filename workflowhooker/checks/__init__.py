@@ -18,10 +18,10 @@ CHECK_REGISTRY: dict[str, Check] = {
 }
 
 __all__ = [
+    "CHECK_REGISTRY",
     "Check",
     "CheckRunner",
     "ClosingGateCheck",
     "DriftWarningCheck",
     "ScopeGuardCheck",
-    "CHECK_REGISTRY",
 ]

@@ -79,7 +79,76 @@ class StopGateConfig:
     max_rework_rounds: int = 1
 
 
-VALID_SOURCES = ("files", "git", "taskplan")
+@dataclass
+class PolicyInjectorConfig:
+    """See ``injectors.PolicyInjector``. ``registry_path`` overrides the
+    default ``~/.policy-registry/registry.json``; ``None`` keeps the
+    default. ``max_entries`` bounds the token cost of one SessionStart
+    message (README: "Injektor darf kein zweites CLAUDE.md werden")."""
+
+    registry_path: str | None = None
+    max_entries: int = 5
+
+
+@dataclass
+class LocationInjectorConfig:
+    """See ``injectors.LocationInjector``. ``roles`` are source-resolver
+    role names; the default set deliberately excludes ``policy.registry``
+    (see LocationInjector docstring -- PolicyInjector covers that role)."""
+
+    roles: list[str] = field(
+        default_factory=lambda: [
+            "resources.inventory",
+            "decisions.ledger",
+            "user.model",
+            "memory.curated",
+        ]
+    )
+
+
+@dataclass
+class InjectorsConfig:
+    """Opt-in context injectors.
+
+    Checks remain silent by default, and so do the injectors.  ``goal`` is
+    intended for the ``PreCompact`` hook; ``loop`` is exposed through the
+    explicit briefing command and is never a scheduler.  ``policy`` and
+    ``location`` are both intended for the ``SessionStart`` hook; their
+    output is combined into a single message so two SessionStart injectors
+    never spend two slots of ``mode.max_messages_per_session`` (README,
+    Abschnitt "Session-Start-Hooker").
+    """
+
+    goal: bool = False
+    loop: bool = False
+    policy: bool = False
+    location: bool = False
+    policy_config: PolicyInjectorConfig = field(default_factory=PolicyInjectorConfig)
+    location_config: LocationInjectorConfig = field(default_factory=LocationInjectorConfig)
+
+
+@dataclass
+class CandidatesConfig:
+    """Opt-in lifecycle spool for later skill/workflow extraction.
+
+    Bleibt wie alle anderen Mechanismen per Default aus: Der Live-Hook
+    schreibt NUR, wenn ``enabled = true`` gesetzt ist -- selbst ein
+    versehentlich verdrahteter Hook bleibt sonst ein stiller No-Op.
+    ``max_records`` begrenzt terminale Job-/Receipt-Paare; aktive oder
+    aufschiebbare Arbeit wird nie nur fuer ein Groessenlimit verworfen.
+    """
+
+    enabled: bool = False
+    max_records: int = 500
+    extractor_version: str = "workflow-extract@1.1.0+skill-extractor@1.3.1"
+    privacy_class: str = "local-private"
+    max_tokens_per_job: int = 12_000
+    max_jobs_per_session: int = 3
+    max_jobs_per_day: int = 20
+    lease_seconds: int = 900
+
+
+VALID_SOURCES = ("files", "git", "taskplan", "goal")
 
 
 @dataclass
@@ -100,7 +169,7 @@ class SourcesConfig:
 
     project_dir: str | None = None  # fuer files-StateSource (LOCK*.txt)
     git_dir: str | None = None  # fuer git-StateSource (Default: project_dir/cwd)
-    order: list[str] = field(default_factory=lambda: list(VALID_SOURCES))
+    order: list[str] = field(default_factory=lambda: ["files", "git", "taskplan"])
 
 
 @dataclass
@@ -109,6 +178,8 @@ class Config:
     checks: ChecksConfig = field(default_factory=ChecksConfig)
     providers: ProvidersConfig = field(default_factory=ProvidersConfig)
     sources: SourcesConfig = field(default_factory=SourcesConfig)
+    injectors: InjectorsConfig = field(default_factory=InjectorsConfig)
+    candidates: CandidatesConfig = field(default_factory=CandidatesConfig)
     identity: IdentityConfig = field(default_factory=IdentityConfig)
     action_guard: ActionGuardConfig = field(default_factory=ActionGuardConfig)
     stop_gate: StopGateConfig = field(default_factory=StopGateConfig)
@@ -133,6 +204,22 @@ class Config:
             raise ValueError(
                 "[stop_gate].max_rework_rounds muss fuer E02=B genau 1 sein"
             )
+        if self.candidates.max_records < 0:
+            raise ValueError("[candidates].max_records darf nicht negativ sein")
+        if self.candidates.max_tokens_per_job < 0:
+            raise ValueError("[candidates].max_tokens_per_job darf nicht negativ sein")
+        if self.candidates.max_jobs_per_session < 0:
+            raise ValueError("[candidates].max_jobs_per_session darf nicht negativ sein")
+        if self.candidates.max_jobs_per_day < 0:
+            raise ValueError("[candidates].max_jobs_per_day darf nicht negativ sein")
+        if self.candidates.lease_seconds <= 0:
+            raise ValueError("[candidates].lease_seconds muss positiv sein")
+        if not self.candidates.extractor_version.strip():
+            raise ValueError("[candidates].extractor_version darf nicht leer sein")
+        if not self.candidates.privacy_class.strip():
+            raise ValueError("[candidates].privacy_class darf nicht leer sein")
+        if self.injectors.policy_config.max_entries < 0:
+            raise ValueError("[injectors.policy_config].max_entries darf nicht negativ sein")
 
 
 def default_config() -> Config:
@@ -193,13 +280,57 @@ def _config_from_dict(data: dict) -> Config:
         claude_events=list(claude_data.get("events", ProvidersConfig().claude_events)),
     )
 
+    injectors_data = data.get("injectors", {})
+    # Accept both the compact boolean form (``goal = true``) and a small
+    # ``{ enabled = true }`` table so hand-written configs remain forgiving.
+    goal_value = injectors_data.get("goal", injectors_data.get("goal_injector", False))
+    loop_value = injectors_data.get("loop", injectors_data.get("loop_injector", False))
+    policy_value = injectors_data.get("policy", injectors_data.get("policy_injector", False))
+    location_value = injectors_data.get("location", injectors_data.get("location_injector", False))
+
+    policy_config_data = injectors_data.get("policy_config", {})
+    policy_config = PolicyInjectorConfig(
+        registry_path=policy_config_data.get("registry_path") or None,
+        max_entries=policy_config_data.get("max_entries", PolicyInjectorConfig.max_entries),
+    )
+
+    location_config_data = injectors_data.get("location_config", {})
+    location_config = LocationInjectorConfig(
+        roles=[
+            str(role)
+            for role in location_config_data.get("roles", LocationInjectorConfig().roles)
+            if str(role)
+        ],
+    )
+
+    injectors = InjectorsConfig(
+        goal=_enabled_value(goal_value),
+        loop=_enabled_value(loop_value),
+        policy=_enabled_value(policy_value),
+        location=_enabled_value(location_value),
+        policy_config=policy_config,
+        location_config=location_config,
+    )
+
     sources_data = data.get("sources", {})
     sources = SourcesConfig(
         project_dir=sources_data.get("project_dir") or None,
         git_dir=sources_data.get("git_dir") or None,
         order=[
-            str(name) for name in sources_data.get("order", VALID_SOURCES) if str(name)
+            str(name) for name in sources_data.get("order", SourcesConfig().order) if str(name)
         ],
+    )
+
+    candidates_data = data.get("candidates", {})
+    candidates = CandidatesConfig(
+        enabled=_enabled_value(candidates_data.get("enabled", False)),
+        max_records=candidates_data.get("max_records", CandidatesConfig.max_records),
+        extractor_version=str(candidates_data.get("extractor_version", CandidatesConfig.extractor_version)),
+        privacy_class=str(candidates_data.get("privacy_class", CandidatesConfig.privacy_class)),
+        max_tokens_per_job=candidates_data.get("max_tokens_per_job", CandidatesConfig.max_tokens_per_job),
+        max_jobs_per_session=candidates_data.get("max_jobs_per_session", CandidatesConfig.max_jobs_per_session),
+        max_jobs_per_day=candidates_data.get("max_jobs_per_day", CandidatesConfig.max_jobs_per_day),
+        lease_seconds=candidates_data.get("lease_seconds", CandidatesConfig.lease_seconds),
     )
 
     identity_data = data.get("identity", {})
@@ -224,7 +355,15 @@ def _config_from_dict(data: dict) -> Config:
         checks=checks,
         providers=providers,
         sources=sources,
+        injectors=injectors,
+        candidates=candidates,
         identity=identity,
         action_guard=action_guard,
         stop_gate=stop_gate,
     )
+
+
+def _enabled_value(value: object) -> bool:
+    if isinstance(value, dict):
+        return bool(value.get("enabled", False))
+    return bool(value)

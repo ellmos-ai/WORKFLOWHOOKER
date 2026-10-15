@@ -32,6 +32,17 @@ class CodexProvider(BaseCodexProvider):
         assert FORBIDDEN_DEFAULT_EVENT not in snippet["hooks"]
         return snippet
 
+    def session_start_snippet(
+        self, python_executable: str = "python", module: str = "workflowhooker"
+    ) -> dict[str, Any]:
+        """Explicit opt-in for policy and location injectors."""
+        return super().hook_snippet(
+            python_executable=python_executable,
+            module=module,
+            events=("SessionStart",),
+            provider_arg=True,
+        )
+
     def pretooluse_blocker_snippet(
         self, python_executable: str = "python", module: str = "workflowhooker"
     ) -> dict[str, Any]:
@@ -45,5 +56,58 @@ class CodexProvider(BaseCodexProvider):
             provider_arg=True,
         )
 
+    def shadow_hook_snippet(
+        self,
+        python_executable: str = "python",
+        module: str = "workflowhooker",
+        *,
+        config_path=None,
+        state_dir=None,
+        session_root=None,
+    ) -> dict:
+        """Generate S4 shadow handlers; installation remains manual."""
+        from .shadow import NATIVE_SHADOW_EVENTS, build_shadow_command
 
-__all__ = ["CodexProvider", "FORBIDDEN_DEFAULT_EVENT"]
+        def group(event: str) -> dict:
+            command = build_shadow_command(
+                self.name,
+                event,
+                python_executable=python_executable,
+                module=module,
+                config_path=config_path,
+                state_dir=state_dir,
+                session_root=session_root,
+            )
+            command_windows = build_shadow_command(
+                self.name,
+                event,
+                python_executable=python_executable,
+                module=module,
+                config_path=config_path,
+                state_dir=state_dir,
+                session_root=session_root,
+                windows=True,
+            )
+            return {
+                "hooks": [
+                    {
+                        "type": "command",
+                        "command": command,
+                        "commandWindows": command_windows,
+                        "timeout": 3 if event == "SessionEnd" else 10,
+                        "statusMessage": f"WorkflowHooker shadow: {event}",
+                    }
+                ]
+            }
+
+        return {"hooks": {event: [group(event)] for event in NATIVE_SHADOW_EVENTS}}
+
+
+    def shadow_goal_command(self, **kwargs) -> str:
+        from .shadow import build_shadow_command
+
+        return build_shadow_command(self.name, "GoalComplete", **kwargs)
+
+
+
+__all__ = ["FORBIDDEN_DEFAULT_EVENT", "CodexProvider"]

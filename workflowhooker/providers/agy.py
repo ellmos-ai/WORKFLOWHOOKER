@@ -42,4 +42,4 @@ class AgyProvider(BaseAgyProvider):
         return snippet
 
 
-__all__ = ["AgyProvider", "FORBIDDEN_DEFAULT_EVENT"]
+__all__ = ["FORBIDDEN_DEFAULT_EVENT", "AgyProvider"]
