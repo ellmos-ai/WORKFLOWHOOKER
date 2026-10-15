@@ -173,6 +173,11 @@ class SourcesConfig:
 
 
 @dataclass
+class CompactionConfig:
+    enabled: bool = False
+
+
+@dataclass
 class Config:
     mode: ModeConfig = field(default_factory=ModeConfig)
     checks: ChecksConfig = field(default_factory=ChecksConfig)
@@ -183,8 +188,11 @@ class Config:
     identity: IdentityConfig = field(default_factory=IdentityConfig)
     action_guard: ActionGuardConfig = field(default_factory=ActionGuardConfig)
     stop_gate: StopGateConfig = field(default_factory=StopGateConfig)
+    compaction: CompactionConfig = field(default_factory=CompactionConfig)
 
     def validate(self) -> None:
+        if type(self.compaction.enabled) is not bool:
+            raise ValueError("[compaction].enabled muss ein Boolean sein")
         unknown = [c for c in self.mode.checks if c not in VALID_CHECKS]
         if unknown:
             raise ValueError(
@@ -245,6 +253,10 @@ def load_config(path: Path | str | None) -> Config:
 
 
 def _config_from_dict(data: dict) -> Config:
+    compaction_data = data.get("compaction", {})
+    if not isinstance(compaction_data, dict):
+        raise ValueError("[compaction] muss eine Tabelle sein")
+    compaction = CompactionConfig(enabled=compaction_data.get("enabled", False))
     mode_data = data.get("mode", {})
     mode = ModeConfig(
         checks=list(mode_data.get("checks", [])),
@@ -360,6 +372,7 @@ def _config_from_dict(data: dict) -> Config:
         identity=identity,
         action_guard=action_guard,
         stop_gate=stop_gate,
+        compaction=compaction,
     )
 
 
