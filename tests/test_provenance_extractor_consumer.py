@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import time
 from pathlib import Path
 
@@ -19,7 +20,7 @@ _DEFAULT_SKILL_VERSIONS = {"workflow-extract": "1.1.0", "skill-extractor": "1.0.
 def _hermetic_canonical_skills_root(tmp_path_factory, monkeypatch):
     """Verhindert, dass Tests stillschweigend die echten, auf dem
     Entwicklungsrechner installierten Skills unter ~/.codex/skills bzw.
-    ~/.agents/skills lesen (T-20260906-608180694): Dort vorhandene
+    ~/.agents/skills lesen: Dort vorhandene
     workflow-extract/skill-extractor-Skills liessen die Tests lokal gruen
     erscheinen, waehrend sie auf einem frischen CI-Runner ohne diese
     Verzeichnisse mit 'canonical-skill-unavailable' fehlschlagen. Setzt
@@ -29,7 +30,7 @@ def _hermetic_canonical_skills_root(tmp_path_factory, monkeypatch):
     canonical_skill_paths uebergeben, sind davon unberuehrt (die haben
     Vorrang vor der Root-Discovery).
     """
-    # Hermetik-Wächter (Reviewer-Befund T-20260906-752636937): Kommt ein Skill zu
+    # Hermetik-Wächter: Kommt ein Skill zu
     # REQUIRED_SKILLS hinzu, ohne dass die Fixture ihn kennt, fiele
     # _discover_skill_path() fuer ihn still auf ~/.codex/skills zurueck.
     assert set(_DEFAULT_SKILL_VERSIONS) == set(REQUIRED_SKILLS), (
@@ -514,25 +515,33 @@ def test_deferred_budget_never_calls_runner(tmp_path: Path):
     assert controller.spool.load_receipt(second_result.job_key).status == "deferred"
 
 
+def test_canonical_skill_immutability_check_is_hermetic(tmp_path, monkeypatch):
+    original_exists = Path.exists
+
+    def confined_exists(path):
+        assert path.is_relative_to(tmp_path.parent), "test accessed a non-fixture path"
+        return original_exists(path)
+
+    with monkeypatch.context() as guard:
+        guard.setattr(Path, "exists", confined_exists)
+        test_consumer_does_not_modify_canonical_skill_files(tmp_path)
+
+
 def test_consumer_does_not_modify_canonical_skill_files(tmp_path: Path):
-    paths = [
-        Path(r"C:\Users\User\.codex\skills\workflow-extract\SKILL.md"),
-        Path(r"C:\Users\User\.codex\skills\skill-extractor\SKILL.md"),
-        Path(r"C:\_Local_DEV\repos\skills\workflow-extract\SKILL.md"),
-        Path(r"C:\_Local_DEV\repos\skills\skill-extractor\SKILL.md"),
-    ]
-    paths = [path for path in paths if path.exists()]
-    if len(paths) < 2:
-        pytest.skip("canonical extractor skills are not installed in this environment")
+    root = Path(os.environ["WORKFLOWHOOKER_SKILLS_ROOT"])
+    paths = [root / name / "SKILL.md" for name in REQUIRED_SKILLS]
+    assert all(path.exists() for path in paths)
     before = {
         path: hashlib.sha256(path.read_bytes()).hexdigest()
         for path in paths
     }
     controller, _, job_key = _enqueue(tmp_path, ["Keine Änderung am Skill."])
 
+    runner = FakeRunner()
     ExtractorConsumer(controller.spool).consume(
-        job_key, runner=FakeRunner(), owner_id="worker-1", now=1_001.0
+        job_key, runner=runner, owner_id="worker-1", now=1_001.0
     )
+    assert len(runner.requests) == 1
 
     after = {
         path: hashlib.sha256(path.read_bytes()).hexdigest()

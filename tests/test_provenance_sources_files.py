@@ -4,7 +4,7 @@ from unittest import mock
 from workflowhooker.sources.files import FilesStateSource, find_conflict_copies
 
 # ---------------------------------------------------------------------------
-# find_conflict_copies (A7-Gegenmassnahme, T-20260903-323755354)
+# find_conflict_copies regression coverage
 # ---------------------------------------------------------------------------
 
 

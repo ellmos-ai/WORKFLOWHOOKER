@@ -1,4 +1,4 @@
-"""S5 shadow evaluation matrix (T-20260828-889029953).
+"""S5 shadow evaluation matrix with synthetic fixtures.
 
 Drives the real S4 adapter -> S1 spool -> S2 consumer chain end to end with
 fixture transcripts and scripted runners. Nothing here registers a hook,
@@ -36,10 +36,10 @@ SECRETS = {
     "github_pat": "ghp_0123456789abcdefABCDEF",
     "bearer": "Bearer eyJhbGciOiJIUzI1NiJ9.payload.sig",
     "assigned_password": "password=Hunter2Hunter2",
-    "email": "lukas.test@example.org",
+    "email": "fixture@example.org",
     "phone": "+49 170 1234567",
-    "ipv4": "100.119.69.90",
-    "windows_user": "C:\\Users\\LukasG\\secret.txt",
+    "ipv4": "192.0.2.10",
+    "windows_user": "C:\\Users\\ExampleUser\\secret.txt",
     "aws_key_id": "AKIAABCDEFGHIJKLMNOP",
     # Formats outside the documented secret-pii-v1 pattern set:
     "german_passwort": "Passwort: Sommer2026!",
@@ -55,10 +55,10 @@ SECRET_PROBES = {
     "github_pat": "0123456789abcdefABCDEF",
     "bearer": "payload.sig",
     "assigned_password": "Hunter2Hunter2",
-    "email": "lukas.test@example.org",
+    "email": "fixture@example.org",
     "phone": "170 1234567",
-    "ipv4": "100.119.69.90",
-    "windows_user": "LukasG",
+    "ipv4": "192.0.2.10",
+    "windows_user": "ExampleUser",
     "aws_key_id": "AKIAABCDEFGHIJKLMNOP",
     "german_passwort": "Sommer2026!",
     "slack_token": "abcdefghijkl",

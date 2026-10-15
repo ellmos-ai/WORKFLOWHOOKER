@@ -60,7 +60,7 @@ def test_candidate_scopes_from_plan_d_repo_path(tmp_path):
     # Plan-D clones live under .../repos/<name> -- NOT under .TOPICS at all
     # (see CLAUDE.md "Repo-/Modul-Arbeit: Plan D"). The repo name itself
     # becomes the fallback candidate scope. Built from tmp_path so this
-    # passes on any host, not only one with a literal C:\_Local_DEV.
+    # passes on any host without a predefined local repository directory.
     repo_root = tmp_path / "_Local_DEV" / "repos" / "workflowhooker" / "workflowhooker"
     repo_root.mkdir(parents=True)
     candidates = candidate_scopes_from_path(repo_root)
