@@ -19,6 +19,9 @@ All notable public changes are documented in this file.
 
 ### Fixed
 
+- Ignore non-object roots in optional policy registries instead of aborting
+  SessionStart; cover direct injection and the host-hook CLI with regressions.
+- Clarify the PowerShell call operator in the German `commandWindows` example.
 - Added the opt-in E01 action guard contract: action/context/stop/side-effect
   results remain separate, `unknown` is distinct from `clean`, and applicable
   decisions use `deny > ask > allow`. Technical failures deny only a matched,

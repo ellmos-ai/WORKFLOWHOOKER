@@ -153,10 +153,13 @@ python -m workflowhooker install-snippet --provider codex --variant compaction
 Das Ergebnis enthält nur `SessionStart`, Matcher `^compact$` und Timeout 10.
 Vor dem Einmischen beide Befehlsfelder `command` und `commandWindows` auf den
 installierten Interpreter und einen absoluten Konfigurationspfad setzen.
-Shellgerechte Anführungszeichen verwenden, beispielsweise unter Windows:
+Shellgerechte Anführungszeichen verwenden. Unter PowerShell benötigt
+`commandWindows` vor dem zitierten Programmpfad den Aufrufoperator `&`.
+Das POSIX-Befehlsfeld `command` bleibt ohne diesen Operator. Beispiel für
+`commandWindows`:
 
-```text
-"C:/path/to/venv/Scripts/python.exe" -m workflowhooker --config "C:/path/to/workflowhooker.toml" hook-run SessionStart --provider codex
+```powershell
+& "C:/path/to/venv/Scripts/python.exe" -m workflowhooker --config "C:/path/to/workflowhooker.toml" hook-run SessionStart --provider codex
 ```
 
 Genau einen passenden Handler registrieren. Eine ältere Registrierung desselben

@@ -39,25 +39,3 @@ def test_session_start_injectors_require_explicit_snippet(provider):
     handler = snippet["hooks"]["SessionStart"][0]["hooks"][0]
     assert "hook-run SessionStart" in handler["command"]
     assert f"--provider {provider.name}" in handler["command"]
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

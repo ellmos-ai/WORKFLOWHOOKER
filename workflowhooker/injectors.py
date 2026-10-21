@@ -131,6 +131,9 @@ class PolicyInjector:
         except (OSError, json.JSONDecodeError, ValueError):
             return None
 
+        if not isinstance(data, dict):
+            return None
+
         entries = data.get("entries")
         if not isinstance(entries, list):
             return None
