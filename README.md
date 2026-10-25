@@ -139,6 +139,21 @@ request the one rework round. A second Stop, a host-provided
 without another block. WorkflowHooker never deletes locks, resets diffs, or
 otherwise cleans foreign work.
 
+## Claude Code plugin
+
+This repository is also the Claude Code plugin `workflowhooker`. It wires `hook-run` to `Stop`, `PreCompact` and
+`UserPromptSubmit` and stays silent until the project contains `workflowhooker.toml`; `/workflowhooker:gates init`
+creates a starter file (closing gate with one rework round, no `taskplan` source). Skill: `workflow-gates`.
+
+```
+/plugin marketplace add ellmos-ai/ellmos-plugins
+/plugin install workflowhooker@ellmos
+```
+
+Data flow: local files and `git` only, nothing is sent over the network. Python 3.10+ is required (`py -3` on Windows,
+or set `ELLMOS_PYTHON`). Compatibility: Claude Code (hooks, command, skill); Codex through its own hook snippet
+(`install-snippet --provider codex`).
+
 ## Data and security boundaries
 
 WorkflowHooker reads local project state and stores a small JSON state file per

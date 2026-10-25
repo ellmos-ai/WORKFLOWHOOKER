@@ -4,6 +4,12 @@ All notable public changes are documented in this file.
 
 ## Unreleased
 
+### Added
+
+- Claude Code plugin `workflowhooker` (`.claude-plugin/plugin.json`, `hooks/hooks.json`, `hooks/run.sh`,
+  command `/gates`, skill `workflow-gates`). Hooks run `hook-run` for Stop, PreCompact and UserPromptSubmit and are
+  silent without `workflowhooker.toml`.
+
 ### Fixed
 
 - Added the opt-in E01 action guard contract: action/context/stop/side-effect
