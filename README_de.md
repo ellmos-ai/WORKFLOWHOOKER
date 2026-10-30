@@ -111,6 +111,22 @@ Befund kann genau eine Nacharbeitsrunde anfordern. Beim zweiten Stop, bei
 wahrheitsgemäße Restmeldung ohne erneuten Block. WorkflowHooker löscht keine
 Locks, setzt keine Diffs zurück und räumt fremde Arbeit niemals automatisch auf.
 
+## Claude-Code-Plugin
+
+Dieses Repository ist zugleich das Claude-Code-Plugin `workflowhooker`. Es verdrahtet `hook-run` mit `Stop`,
+`PreCompact` und `UserPromptSubmit` und bleibt still, solange das Projekt keine `workflowhooker.toml` enthält;
+`/workflowhooker:gates init` legt eine Startdatei an (Abschluss-Gate mit genau einer Nacharbeitsrunde, ohne
+`taskplan`-Quelle). Skill: `workflow-gates`.
+
+```
+/plugin marketplace add ellmos-ai/ellmos-plugins
+/plugin install workflowhooker@ellmos
+```
+
+Datenfluss: nur lokale Dateien und `git`, nichts geht ins Netz. Voraussetzung ist Python 3.10+ (`py -3` unter Windows
+oder `ELLMOS_PYTHON` setzen). Kompatibilität: Claude Code (Hooks, Befehl, Skill); Codex über das eigene Hook-Snippet
+(`install-snippet --provider codex`).
+
 ## Datenschutz und Lizenz
 
 WorkflowHooker liest lokalen Projektzustand und speichert je Sitzung eine kleine
