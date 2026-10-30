@@ -2,12 +2,12 @@
 
 # WorkflowHooker
 
-> **Contributing:** development happens in the private twin `workflowhooker-provenance`; this repository carries the curated result. See [CONTRIBUTING.md](CONTRIBUTING.md).
+> **Contributing:** this repository owns the shared runtime core. Private deployments consume a pinned public revision and keep their settings and data separate. See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 
 WorkflowHooker runs small, configurable workflow checks at lifecycle events
-exposed by supported coding-agent hosts. It is local-first, has no runtime
-dependencies, performs no network requests, and is silent until checks are
+exposed by supported coding-agent hosts. It is local-first, performs no
+network requests in its built-in checks, uses `hook-master` for provider formatting, and is silent until checks are
 explicitly enabled.
 
 ## Features
@@ -175,3 +175,59 @@ See [SECURITY.md](SECURITY.md) for private vulnerability reporting and
 ## License
 
 MIT. See [LICENSE](LICENSE).
+
+## Codex context after compaction
+
+Enable `[compaction] enabled = true` in a TOML file. The notice uses Codex
+`SessionStart` with `source = compact` and `hookSpecificOutput.additionalContext`.
+Redisplayed user messages may be historical; the model should reconcile completed
+work and current goal status while respecting genuinely new corrections. This is
+model guidance, not a guarantee against loops. `PostCompact` is not the context
+channel.
+
+```shell
+python -m workflowhooker install-snippet --provider codex --variant compaction
+```
+
+The registration contains only `SessionStart`, matcher `^compact$`, timeout 10.
+Set the installed interpreter and an absolute config path in both command
+fields, preserving shell-appropriate quoting. For a Windows PowerShell session,
+`commandWindows` needs the call operator before a quoted executable:
+
+```powershell
+& "C:/path/to/venv/Scripts/python.exe" -m workflowhooker --config "C:/path/to/workflowhooker.toml" hook-run SessionStart --provider codex
+```
+
+Keep the POSIX `command` without `&`. The shared hook-master provider adds the
+operator when generating Codex Windows snippets; this also covers the normal,
+session-start and action-guard variants. Codex shadow commands apply the same
+rule. Bare executable names keep their existing form. A changed definition must
+be reviewed again through `/hooks` before Codex runs it.
+
+Keep exactly one matching handler. Replace an older wildcard registration of this
+same command with the `session-start` variant before combining both variants;
+its matcher excludes compact. `--existing` produces only a hooks-only merge,
+not a replacement for the host configuration. Preserve other settings and trust
+data; do not bypass Codex's native hook trust checks.
+
+The compact path reads only input/configuration, never project sources or advisory
+state. It emits per valid invocation even after the message budget is exhausted.
+Malformed input is silent. Roll back by disabling the option or removing only
+this registration. Real manual and automatic compaction must be accepted against
+the installed Codex version; unit tests alone are not runtime acceptance.
+
+## Optional shared capabilities
+
+`goal` reads local goal/task files; `loop-briefing` formats current work.
+`[injectors] goal = true` enables PreCompact briefings. Policy/location injectors
+are independently opt-in (`policy = true`, `location = true`) and require
+`install-snippet --variant session-start`. Registry inputs remain local. Scope
+inference supports `.TOPICS/<scope>` and `_Local_DEV/repos/<name>`; unknown layouts
+produce no inferred scope. Optional `taskplan` and `source_resolver` integrations
+are not bundled.
+
+`candidate-collect`, `candidate-extract`, `provider-shadow`, and `boot-context-lint`
+expose local lifecycle/extraction and lint tools; consult each command's `--help`.
+Candidate recording requires `[candidates] enabled = true`. No extractor runner
+is scheduled automatically. Default hooks and existing action/stop guards retain
+their contracts.

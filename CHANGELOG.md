@@ -6,12 +6,25 @@ All notable public changes are documented in this file.
 
 ### Added
 
-- Claude Code plugin `workflowhooker` (`.claude-plugin/plugin.json`, `hooks/hooks.json`, `hooks/run.sh`,
-  command `/gates`, skill `workflow-gates`). Hooks run `hook-run` for Stop, PreCompact and UserPromptSubmit and are
-  silent without `workflowhooker.toml`.
+- Claude Code plugin workflowhooker (.claude-plugin/plugin.json, hooks/hooks.json, hooks/run.sh,
+  command /gates, skill workflow-gates). Hooks run hook-run for Stop, PreCompact and UserPromptSubmit and are
+  silent without workflowhooker.toml.
+- One public runtime core includes optional goal/loop briefings, policy/location
+  injectors, project-scoped task sources, conflict-copy detection, candidate
+  spooling, extractor consumption, shadow adapters and boot-context linting.
+  Private deployments can consume pinned public revisions without duplicating
+  the runtime namespace. Private settings and historical receipts stay separate.
+- Opt-in Codex post-compaction notice through `SessionStart` / `source=compact`,
+  independent of advisory budgets, cooldowns, project sources and state files.
+  New user instructions remain authoritative. Default hook snippets are unchanged.
+- Separate `session-start` and `compaction` installation variants. Hook merging
+  preserves distinct matchers and remains idempotent within each matcher.
 
 ### Fixed
 
+- Ignore non-object roots in optional policy registries instead of aborting
+  SessionStart; cover direct injection and the host-hook CLI with regressions.
+- Clarify the PowerShell call operator in the German `commandWindows` example.
 - Added the opt-in E01 action guard contract: action/context/stop/side-effect
   results remain separate, `unknown` is distinct from `clean`, and applicable
   decisions use `deny > ask > allow`. Technical failures deny only a matched,

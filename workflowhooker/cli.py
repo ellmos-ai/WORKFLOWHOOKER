@@ -18,28 +18,48 @@ bleibt das Modul vollstaendig stumm, wie im README gefordert.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import sys
 import time
 from pathlib import Path
 
+from .boot_context_lint import lint_path
+from .candidates import (
+    LIFECYCLE_EVENTS,
+    BudgetSpec,
+    CandidateSpool,
+    CorruptSpoolError,
+    LifecycleController,
+    default_queue_path,
+    read_all,
+)
 from .checks import CHECK_REGISTRY, CheckRunner
+from .compaction import build_compaction_output
 from .config import Config, load_config
 from .decisions import Decision, EvidenceState, GateResult, HookSurface
 from .gates import evaluate_action_guard, evaluate_stop_gate
+from .injectors import GoalInjector, LocationInjector, LoopInjector, PolicyInjector
 from .locks import canonical_project_root
 from .providers import PROVIDER_REGISTRY, resolve_provider
 from .providers.claude import ClaudeProvider
+from .providers.shadow import (
+    SHADOW_PROVIDERS,
+    dispatch_shadow_lifecycle,
+    merge_hook_snippets,
+)
 from .sources import (
     CompositeStateSource,
     FilesStateSource,
     GitStateSource,
+    GoalStateSource,
     TaskplanStateSource,
 )
 from .state import (
     SessionState,
     StateTransactionTimeout,
     StopRuntimeIntegrityError,
+    default_state_dir,
     state_path_for_session,
     state_transaction,
 )
@@ -80,7 +100,7 @@ def _build_parser() -> argparse.ArgumentParser:
         "hook-run", help="stdin-JSON lesen, Claude-Code-Hook-Output schreiben"
     )
     p_hook.add_argument(
-        "event", choices=["PreToolUse", "Stop", "PreCompact", "UserPromptSubmit"]
+        "event", choices=["PreToolUse", "Stop", "PreCompact", "UserPromptSubmit", "SessionStart"]
     )
     p_hook.add_argument(
         "--provider",
@@ -102,6 +122,34 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     p_hook.set_defaults(func=_cmd_hook_run)
 
+    p_goal = sub.add_parser(
+        "goal",
+        aliases=["goal-inject"],
+        help="Ziel-/Task-Erinnerung fuer PreCompact ausgeben",
+    )
+    p_goal.add_argument(
+        "--format",
+        dest="output_format",
+        choices=["plain", "json"],
+        default="plain",
+        help="Ausgabeformat (plain oder JSON mit additionalContext)",
+    )
+    p_goal.set_defaults(func=_cmd_goal)
+
+    p_loop = sub.add_parser(
+        "loop-briefing",
+        aliases=["loop-inject"],
+        help="Aktuelles Weck-Briefing fuer eine lokale Runtime erzeugen",
+    )
+    p_loop.add_argument(
+        "--format",
+        dest="output_format",
+        choices=["plain", "json"],
+        default="plain",
+        help="Ausgabeformat (plain oder JSON mit briefing)",
+    )
+    p_loop.set_defaults(func=_cmd_loop_briefing)
+
     p_providers = sub.add_parser("providers", help="Provider-Fallback-Kette anzeigen")
     p_providers.set_defaults(func=_cmd_providers)
 
@@ -115,11 +163,84 @@ def _build_parser() -> argparse.ArgumentParser:
     p_install.add_argument("--out", type=Path, default=None)
     p_install.add_argument(
         "--variant",
-        choices=["default", "action-guard"],
+        choices=["default", "action-guard", "session-start", "compaction"],
         default="default",
         help="Default-Hinweise oder separater Opt-in-PreToolUse-Guard",
     )
+    p_install.add_argument(
+        "--shadow", action="store_true", help="Nur opt-in S4-Lifecycle-Shadow-Handler ausgeben"
+    )
+    p_install.add_argument(
+        "--existing", type=Path, default=None,
+        help="Vorhandene Hook-JSON nur zum deduplizierten hooks-only Merge lesen",
+    )
+    p_install.add_argument("--hook-config", type=Path, default=None)
+    p_install.add_argument("--hook-state-dir", type=Path, default=None)
+    p_install.add_argument("--session-root", type=Path, default=None)
     p_install.set_defaults(func=_cmd_install_snippet)
+
+    p_provider_shadow = sub.add_parser(
+        "provider-shadow",
+        help=(
+            "Stiller Codex-/Claude-Lifecycleadapter: validiert den expliziten "
+            "Sessionpfad und schreibt nur in den opt-in Kandidatenspool"
+        ),
+    )
+    p_provider_shadow.add_argument("provider", choices=SHADOW_PROVIDERS)
+    p_provider_shadow.add_argument("event", choices=LIFECYCLE_EVENTS)
+    p_provider_shadow.add_argument("--session-root", type=Path, default=None)
+    p_provider_shadow.set_defaults(func=_cmd_provider_shadow)
+
+    p_candidate_collect = sub.add_parser(
+        "candidate-collect",
+        help=(
+            "LEICHTER Lifecycle-Hook: plant atomare, redigierte Jobs/Checkpoints "
+            "(Zeiger, keine Transkriptinhalte) oder recovered abgelaufene Leases. "
+            "Stumm, solange [candidates].enabled nicht gesetzt ist."
+        ),
+    )
+    p_candidate_collect.add_argument("event", choices=LIFECYCLE_EVENTS)
+    p_candidate_collect.add_argument(
+        "--provider",
+        default="unknown",
+        help="Anbieterkennung fuer das Envelope (claude, codex, kimi, agy, ...)",
+    )
+    p_candidate_collect.set_defaults(func=_cmd_candidate_collect)
+
+    p_candidate_extract = sub.add_parser(
+        "candidate-extract",
+        help=(
+            "OFFLINE: gesammelte Kandidaten-Jobs/Receipts sichten und auf die "
+            "manuellen Skills skill-extractor/workflow-extract verweisen. "
+            "Fuehrt selbst KEINE Extraktion aus."
+        ),
+    )
+    p_candidate_extract.add_argument(
+        "--format", dest="output_format", choices=["plain", "json"], default="plain"
+    )
+    p_candidate_extract.add_argument(
+        "--clear",
+        action="store_true",
+        help=(
+            "Veraltete Kompatibilitaetsoption; bleibt read-only und entfernt "
+            "weder v1-JSONL noch v2-Jobs"
+        ),
+    )
+    p_candidate_extract.set_defaults(func=_cmd_candidate_extract)
+
+    p_boot_lint = sub.add_parser(
+        "boot-context-lint",
+        help="Boot-Markdown und Sidecar-JSON rein lesend auf Laufprotokoll-Drift prüfen",
+    )
+    p_boot_lint.add_argument("paths", nargs="+", type=Path, help="Explizit zu prüfende Dateien")
+    p_boot_lint.add_argument(
+        "--format",
+        dest="output_format",
+        choices=["plain", "json"],
+        default="plain",
+        help="Ausgabeformat (plain oder JSON)",
+    )
+    p_boot_lint.set_defaults(func=_cmd_boot_context_lint)
 
     return parser
 
@@ -142,7 +263,8 @@ def _build_state_source(config: Config, project_dir: Path) -> CompositeStateSour
     builders = {
         "files": lambda: FilesStateSource(files_dir),
         "git": lambda: GitStateSource(git_dir),
-        "taskplan": lambda: TaskplanStateSource(),
+        "taskplan": lambda: TaskplanStateSource(project_dir),
+        "goal": lambda: GoalStateSource(files_dir),
     }
     return CompositeStateSource(
         [builders[name]() for name in config.sources.order if name in builders]
@@ -205,9 +327,6 @@ def _cmd_hook_run(args) -> int:
     # wird jetzt zusaetzlich ausgewertet.)
     payload, payload_reliable = _read_stdin_json_checked()
 
-    project_dir = canonical_project_root(
-        args.project_dir or _extract_cwd(payload) or Path.cwd()
-    )
     try:
         config = load_config(args.config)
     except (OSError, UnicodeError, ValueError, TypeError):
@@ -229,6 +348,22 @@ def _cmd_hook_run(args) -> int:
             file=sys.stderr,
         )
         return 0
+
+    if args.provider == "codex" and args.event == "SessionStart":
+        if not payload_reliable:
+            return 0
+        if payload.get("source") == "compact":
+            output = build_compaction_output(
+                payload, provider=args.provider, enabled=config.compaction.enabled,
+            )
+            if output is not None:
+                # ASCII JSON is lossless and independent of Windows console encoding.
+                print(json.dumps(output, ensure_ascii=True))
+            return 0
+
+    project_dir = canonical_project_root(
+        args.project_dir or _extract_cwd(payload) or Path.cwd()
+    )
 
     if args.event == "PreToolUse":
         if config.action_guard.enabled and not payload_reliable:
@@ -262,8 +397,6 @@ def _cmd_hook_run(args) -> int:
     # gearbeitet wird. Startet der Nutzer in seinem Home (kein Repository),
     # meldet die git-Quelle "nicht verfuegbar", der Projektzustand bleibt leer
     # und KEIN Check kann je zutreffen: Das Modul laeuft, ohne je zu wirken.
-    # Gemessen auf ASUS-GEI am 2026-08-01: 17 Auswertungen, 0 Ausloesungen,
-    # bei gleichzeitig gesetzten Locks und uncommitteten Aenderungen.
     if args.event == "Stop" and config.stop_gate.enabled:
         source = _build_state_source(config, project_dir)
         project_state = source.snapshot()
@@ -310,6 +443,20 @@ def _cmd_hook_run(args) -> int:
 
     state, state_reliable = SessionState.load_checked(state_path)
     message = _run_active_checks(config, project_dir, state)
+    if message is None and args.event == "PreCompact" and config.injectors.goal:
+        now = time.time()
+        if _message_slot_available(config, state, now):
+            message = GoalInjector(_build_state_source(config, project_dir)).generate()
+            if message:
+                _record_message(state, now)
+    if message is None and args.event == "SessionStart" and (
+        config.injectors.policy or config.injectors.location
+    ):
+        now = time.time()
+        if _message_slot_available(config, state, now):
+            message = _build_session_start_message(config, project_dir)
+            if message:
+                _record_message(state, now)
     if state_reliable:
         state.save(state_path)
 
@@ -465,7 +612,32 @@ def _cmd_providers(args) -> int:
 
 def _cmd_install_snippet(args) -> int:
     provider = PROVIDER_REGISTRY.get(args.provider, ClaudeProvider())
-    if args.variant == "action-guard":
+    if args.shadow:
+        if args.variant != "default":
+            print("--shadow cannot be combined with another variant.", file=sys.stderr)
+            return 2
+        builder = getattr(provider, "shadow_hook_snippet", None)
+        if builder is None:
+            print("Shadow-Snippet ist nur für claude und codex verfügbar.", file=sys.stderr)
+            return 2
+        snippet = builder(
+            config_path=args.hook_config,
+            state_dir=args.hook_state_dir,
+            session_root=args.session_root,
+        )
+    elif args.variant == "compaction":
+        builder = getattr(provider, "compaction_snippet", None)
+        if builder is None:
+            print("Komprimierungshinweis ist nur für codex verfügbar.", file=sys.stderr)
+            return 2
+        snippet = builder()
+    elif args.variant == "session-start":
+        builder = getattr(provider, "session_start_snippet", None)
+        if builder is None:
+            print("SessionStart-Snippet ist nur für claude und codex verfügbar.", file=sys.stderr)
+            return 2
+        snippet = builder()
+    elif args.variant == "action-guard":
         builder = getattr(provider, "pretooluse_blocker_snippet", None)
         if builder is None:
             print(
@@ -476,6 +648,13 @@ def _cmd_install_snippet(args) -> int:
         snippet = builder()
     else:
         snippet = provider.hook_snippet()
+    if args.existing:
+        try:
+            existing = json.loads(args.existing.read_text(encoding="utf-8"))
+            snippet = merge_hook_snippets(existing, snippet)
+        except (OSError, ValueError) as exc:
+            print(f"Vorhandene Hook-JSON ist unlesbar: {exc}", file=sys.stderr)
+            return 2
     text = json.dumps(snippet, indent=2, ensure_ascii=False)
     if args.out:
         args.out.write_text(text, encoding="utf-8")
@@ -486,6 +665,271 @@ def _cmd_install_snippet(args) -> int:
     else:
         print(text)
     return 0
+
+
+def _build_session_start_message(config: Config, project_dir: Path) -> str | None:
+    """Combine Policy- and Ortsinjektor output into ONE message.
+
+    Deliberately a single combined message, not two separate ones: two
+    SessionStart injectors would otherwise spend two of
+    ``mode.max_messages_per_session`` on the very first turn, starving the
+    rest of the session's message budget for checks/goal (README, Abschnitt
+    "Session-Start-Hooker"). Either half may be empty; the whole call
+    returns ``None`` only if both are.
+    """
+    parts: list[str] = []
+    if config.injectors.policy:
+        policy_config = config.injectors.policy_config
+        registry_path = Path(policy_config.registry_path) if policy_config.registry_path else None
+        policy_message = PolicyInjector(
+            registry_path=registry_path, max_entries=policy_config.max_entries
+        ).generate(project_dir)
+        if policy_message:
+            parts.append(policy_message)
+    if config.injectors.location:
+        roles = tuple(config.injectors.location_config.roles)
+        location_message = LocationInjector(roles=roles or None).generate(project_dir)
+        if location_message:
+            parts.append(location_message)
+    if not parts:
+        return None
+    return "\n\n".join(parts)
+
+
+def _cmd_goal(args) -> int:
+    config = load_config(args.config)
+    project_dir = args.project_dir or Path.cwd()
+    message = GoalInjector(_build_state_source(config, project_dir)).generate()
+    if message:
+        if args.output_format == "json":
+            print(
+                json.dumps(
+                    {
+                        "hookSpecificOutput": {
+                            "hookEventName": "PreCompact",
+                            "additionalContext": message,
+                        }
+                    },
+                    ensure_ascii=False,
+                )
+            )
+        else:
+            print(message)
+    return 0
+
+
+def _cmd_loop_briefing(args) -> int:
+    config = load_config(args.config)
+    project_dir = args.project_dir or Path.cwd()
+    message = LoopInjector(_build_state_source(config, project_dir)).generate()
+    if message:
+        if args.output_format == "json":
+            print(json.dumps({"briefing": message}, ensure_ascii=False))
+        else:
+            print(message)
+    return 0
+
+
+def _message_slot_available(config: Config, state: SessionState, now: float) -> bool:
+    if state.messages_sent >= config.mode.max_messages_per_session:
+        return False
+    return not (
+        state.last_message_ts is not None
+        and (now - state.last_message_ts) < config.mode.cooldown_minutes * 60
+    )
+
+
+def _record_message(state: SessionState, now: float) -> None:
+    state.messages_sent += 1
+    state.last_message_ts = now
+
+
+def _opaque_session_ref(value: str | None) -> str | None:
+    """Map an external session ID to a stable, private contract identity."""
+
+    if not isinstance(value, str) or not value.strip():
+        return None
+    digest = hashlib.sha256(value.strip().encode("utf-8")).hexdigest()
+    return f"sha256:{digest}"
+
+
+def _extract_session_ref(payload: dict) -> str | None:
+    return _opaque_session_ref(payload.get("session_id"))
+
+
+def _cmd_provider_shadow(args) -> int:
+    """Provider runtime stays fail-open; evidence admission stays fail-closed."""
+    try:
+        config = load_config(args.config)
+        if not config.candidates.enabled:
+            return 0
+        payload = _read_stdin_json()
+        state_dir = args.state_dir or default_state_dir()
+        controller = _candidate_controller(config, state_dir)
+        dispatch_shadow_lifecycle(
+            controller,
+            provider=args.provider,
+            event=args.event,
+            payload=payload,
+            session_root=args.session_root,
+        )
+    except Exception:
+        # This is the outer provider-hook boundary.  Evidence validation and
+        # spool writes fail closed above; no local adapter failure may turn a
+        # provider shutdown into an error or produce hook output.
+        return 0
+    return 0
+
+
+def _candidate_controller(config: Config, state_dir: Path) -> LifecycleController:
+    candidates = config.candidates
+    return LifecycleController(
+        CandidateSpool(state_dir, max_records=candidates.max_records),
+        extractor_version=candidates.extractor_version,
+        privacy_class=candidates.privacy_class,
+        budget=BudgetSpec(
+            max_tokens_per_job=candidates.max_tokens_per_job,
+            max_jobs_per_session=candidates.max_jobs_per_session,
+            max_jobs_per_day=candidates.max_jobs_per_day,
+        ),
+        lease_seconds=candidates.lease_seconds,
+    )
+
+
+def _payload_text(payload: dict, *names: str) -> str | None:
+    for name in names:
+        value = payload.get(name)
+        if isinstance(value, str) and value.strip():
+            return value.strip()
+    return None
+
+
+def _cmd_candidate_collect(args) -> int:
+    """Cheap E1 lifecycle hook; never runs a model or copies transcript text."""
+    config = load_config(args.config)
+    if not config.candidates.enabled:
+        return 0
+
+    payload = _read_stdin_json()
+    explicit_state_id = (
+        _extract_session_id({"session_id": args.session_id})
+        if args.session_id
+        else None
+    )
+    state_session_id = explicit_state_id or _extract_session_id(payload)
+    state_path = state_path_for_session(state_session_id, args.state_dir)
+    state = SessionState.load(state_path)
+    session_ref = (
+        _opaque_session_ref(args.session_id)
+        or _extract_session_ref(payload)
+        or "default"
+    )
+
+    source_anchor = payload.get("transcript_path")
+    if not isinstance(source_anchor, str) or not source_anchor:
+        source_anchor = None
+
+    observed = {
+        "messages_sent": state.messages_sent,
+        "has_transcript_path": source_anchor is not None,
+        "has_cwd": isinstance(payload.get("cwd"), str),
+    }
+    for counter_name in ("message_count", "turn_count"):
+        counter = payload.get(counter_name)
+        if isinstance(counter, int) and not isinstance(counter, bool) and counter >= 0:
+            observed[counter_name] = counter
+    state_dir = args.state_dir or default_state_dir()
+    controller = _candidate_controller(config, state_dir)
+    try:
+        controller.handle(
+            event=args.event,
+            provider=args.provider,
+            session_ref=session_ref,
+            goal_ref=_payload_text(payload, "goal_id", "goal_ref"),
+            boundary_epoch=_payload_text(payload, "boundary_epoch"),
+            horizon_hash=_payload_text(
+                payload, "horizon_hash", "last_event_hash", "transcript_hash"
+            ),
+            source_anchor=source_anchor,
+            observed=observed,
+        )
+    except (OSError, ValueError, CorruptSpoolError):
+        # Lifecycle hooks stay fail-open; durable corruption is observable via
+        # candidate-extract and is never reset or overwritten here.
+        return 0
+    return 0
+
+
+def _cmd_candidate_extract(args) -> int:
+    """OFFLINE: listet gesammelte Kandidaten-Jobs und Legacy-Signale auf und
+    verweist auf die Skills, die die eigentliche (teure) Extraktion
+    ausfuehren -- ``skill-extractor`` (Chatverlauf -> wiederverwendbarer
+    Skill) bzw. ``workflow-extract`` (Chatverlauf/Automations-Prompt ->
+    Cron-/Loop-Automatisierung). Dieser Befehl fuehrt selbst KEINE
+    Extraktion aus. Der Befehl ist immer rein lesend; die veraltete
+    Kompatibilitätsoption ``--clear`` ist absichtlich ein No-op.
+    """
+    state_dir = args.state_dir or default_state_dir()
+    spool = CandidateSpool(state_dir)
+    queue_path = default_queue_path(state_dir)  # v1 read-compatibility only
+    events = read_all(queue_path)
+    records: list[dict] = []
+    for job in spool.list_jobs():
+        record = job.to_dict()
+        try:
+            record["receipt"] = spool.load_receipt(job.job_key).to_dict()
+        except CorruptSpoolError:
+            record["receipt"] = {"status": "corrupt"}
+        records.append(record)
+    records.extend({**event.to_dict(), "legacy": True} for event in events)
+
+    if args.output_format == "json":
+        print(json.dumps(records, ensure_ascii=False))
+    else:
+        if not records:
+            print("Keine Kandidaten-Signale in der Warteschlange.")
+        for record in records:
+            if record.get("legacy"):
+                continue
+            receipt = record.get("receipt", {})
+            anchor = record.get("source_anchor") or "(kein Transkript-Zeiger)"
+            print(
+                f"[{record['provider']}] {record['event']} session={record['session_ref']} "
+                f"job={record['job_key']} status={receipt.get('status', 'unknown')} "
+                f"anchor={anchor}"
+            )
+        for event in events:
+            anchor = event.source_anchor or "(kein Transkript-Zeiger)"
+            print(
+                f"[legacy:{event.provider}] {event.event} session={event.session_ref} "
+                f"anchor={anchor} observed={event.observed}"
+            )
+        if records:
+            print()
+            print(
+                "Hinweis: reine Beobachtung, keine Bewertung. Fuer eine "
+                "Skill-Ableitung 'skill-extractor' auf die genannten "
+                "Transkript-Zeiger anwenden; fuer eine Automations-/"
+                "Workflow-Ableitung 'workflow-extract'."
+            )
+
+    return 0
+
+
+def _cmd_boot_context_lint(args) -> int:
+    """Opt-in Diagnose; keine Hook-Registrierung und keine Mutation."""
+    findings = [finding for path in args.paths for finding in lint_path(path)]
+    if args.output_format == "json":
+        print(json.dumps([finding.to_dict() for finding in findings], ensure_ascii=False))
+    else:
+        for finding in findings:
+            location = finding.path
+            if finding.line is not None:
+                location += f":{finding.line}"
+            if finding.field:
+                location += f" [{finding.field}]"
+            print(f"{finding.code} {location}: {finding.message}")
+    return 1 if findings else 0
 
 
 if __name__ == "__main__":  # pragma: no cover
