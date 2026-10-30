@@ -1,0 +1,14 @@
+{
+  "description": "Runs the configured workflowhooker gates (closing gate, drift and scope warnings) on Stop, PreCompact and UserPromptSubmit. Silent unless the project contains workflowhooker.toml. Local files and git only.",
+  "hooks": {
+    "Stop": [
+      {"hooks": [{"type": "command", "command": "sh \"${CLAUDE_PLUGIN_ROOT}/hooks/run.sh\" Stop", "timeout": 30}]}
+    ],
+    "PreCompact": [
+      {"hooks": [{"type": "command", "command": "sh \"${CLAUDE_PLUGIN_ROOT}/hooks/run.sh\" PreCompact", "timeout": 30}]}
+    ],
+    "UserPromptSubmit": [
+      {"hooks": [{"type": "command", "command": "sh \"${CLAUDE_PLUGIN_ROOT}/hooks/run.sh\" UserPromptSubmit", "timeout": 30}]}
+    ]
+  }
+}

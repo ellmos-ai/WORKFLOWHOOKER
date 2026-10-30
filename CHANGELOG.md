@@ -6,6 +6,9 @@ All notable public changes are documented in this file.
 
 ### Added
 
+- Claude Code plugin workflowhooker (.claude-plugin/plugin.json, hooks/hooks.json, hooks/run.sh,
+  command /gates, skill workflow-gates). Hooks run hook-run for Stop, PreCompact and UserPromptSubmit and are
+  silent without workflowhooker.toml.
 - One public runtime core includes optional goal/loop briefings, policy/location
   injectors, project-scoped task sources, conflict-copy detection, candidate
   spooling, extractor consumption, shadow adapters and boot-context linting.
